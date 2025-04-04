@@ -75,6 +75,7 @@ inline std::string TokenTypeToString(TokenType type)
     case TokenType::Colon: return "Colon";
     case TokenType::Keyword: return "Keyword";
     case TokenType::Pipe: return "Pipe";
+    case TokenType::Type: return "Type";
     default: return "Unknown";
     }
 }
