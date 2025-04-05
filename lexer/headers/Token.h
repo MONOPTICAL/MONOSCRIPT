@@ -19,38 +19,7 @@ enum class TokenType {
     Colon,
     Pipe
 };
-/*
-Identifier: Represents variable names, function names, etc.
-Number: Represents numeric literals (integers, floats, etc.)
-String: Represents string literals (enclosed in quotes).
-Operator: Represents operators (e.g., +, -, *, /).
-Keyword: Represents reserved keywords (e.g., if, else, while).
-LeftParen: Represents the left parenthesis '('.
-RightParen: Represents the right parenthesis ')'.
-Comma: Represents the comma ','.
 
-*/
-
-/*
-Identifiers:
-echo
-sum
-
-*/
-/*
-Operators:
-Сейчас + - * / ^= = 
-Потом != == < > <= >= && ++ --
-*/
-
-/*
-a ^= 1;
-Tokenized as:
-Identifier: a
-Operator: ^=
-Number: 1
-
-*/
 struct Token {
     TokenType type;
     std::string value;
