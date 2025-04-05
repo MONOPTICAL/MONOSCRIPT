@@ -9,10 +9,11 @@ Lexer::Lexer(const std::string &sourceCode)
         std::cout << line << std::endl;
     }
     this->currentLine = 1;
-    this->currentIndex = 0;
+    this->currentIndex = -1; //0
     this->currentTokenType = TokenType::None;
     this->currentTokenValue = "";
     this->isStringnotFinished = false;
+    this->firstLettersInBuiltTypes = {'i', 'f', 's', 'b', 'a', 'm'}; // i32, f32, string, bool, array, map
 
 }
 
@@ -23,14 +24,15 @@ void Lexer::tokenize()
         for(auto y : x)
         {
             currentIndex++;
-            if (isspace(y) && currentTokenType != TokenType::String && currentTokenType != TokenType::Identifier)
+            if (isspace(y) && currentTokenType != TokenType::String && currentTokenType != TokenType::Identifier && y != '.')
             {
                 continue;
             }
             else
             {
                 TokenType type = IdentifyTokenType(y); // LeftParen
-                if (y == ' ')
+
+                if (y == ' ' && y != '.') // По какой то причине C++ перенаправляет . сюда 
                 {
                     if (type == TokenType::Identifier)
                     {
@@ -44,19 +46,16 @@ void Lexer::tokenize()
                         }
                     }
                 }
-                
+
                 TokenType keywordCheck = IsKeyword(currentTokenValue); // Check if the current token is a keyword
                 if(keywordCheck != TokenType::Identifier)
                 {
-                    if(!(isalpha(x[currentIndex-1])))
-                    {
-                        addToken(keywordCheck, currentTokenValue);
-                        currentTokenType = TokenType::None; // Reset the current token type for the next token
-                        currentTokenValue = ""; // Reset the current token value for the next token
-                    }
+                    addToken(keywordCheck, currentTokenValue);
+                    currentTokenType = TokenType::None; // Reset the current token type for the next token
+                    currentTokenValue = ""; // Reset the current token value for the next token
                 }
 
-                if (type != currentTokenType && currentTokenType != TokenType::None) // <--
+                if (type != currentTokenType && (currentTokenType != TokenType::None && type != TokenType::Dot)) // <--
                 {
                     if (currentTokenType == TokenType::String && type != currentTokenType && isStringnotFinished)
                     {
@@ -112,6 +111,12 @@ void Lexer::tokenize()
                     continue;
                 }
 
+                if (type == TokenType::Dot && currentTokenType == TokenType::Number)
+                {
+                    currentTokenValue += y;
+                    continue;
+                }
+
                 if (type == TokenType::Operator && currentTokenType == TokenType::None)
                 {
                     currentTokenType = type;
@@ -121,9 +126,17 @@ void Lexer::tokenize()
                 else if (type == TokenType::Operator && currentTokenType == TokenType::Operator)
                 {
                     currentTokenValue += y;
-                    if (currentTokenValue != "//")
+                    if (currentTokenValue != "//" && currentTokenValue != ">>")
                     {
                         addToken(currentTokenType, currentTokenValue); // Add the token to the current line
+                        currentTokenType = TokenType::None; // Reset the current token type for the next token
+                        currentTokenValue = ""; // Reset the current token value for the next token
+                        continue;
+                    }
+                    else if (currentTokenValue == ">>")
+                    {
+                        addToken(currentTokenType, ">"); // Add the token to the current line
+                        addToken(currentTokenType, ">"); // Add the token to the current line
                         currentTokenType = TokenType::None; // Reset the current token type for the next token
                         currentTokenValue = ""; // Reset the current token value for the next token
                         continue;
@@ -151,7 +164,6 @@ void Lexer::tokenize()
                     currentTokenType = TokenType::None;
                     continue;
                 }
-                //std::cout << "Default case" << std::endl;
                 currentTokenType = type;
                 currentTokenValue = y;
                 addToken(currentTokenType, currentTokenValue); // Add the token to the current line
@@ -203,6 +215,10 @@ TokenType Lexer::IdentifyTokenType(const char &value) const
 {
     if (isalpha(value) || value == '_')
         return TokenType::Identifier;
+    else if (value == '.')
+    {
+        return TokenType::Dot;
+    }
     else if (isdigit(value))
         return TokenType::Number;
     else if (value == '"')
@@ -217,6 +233,10 @@ TokenType Lexer::IdentifyTokenType(const char &value) const
         return TokenType::LeftBracket;
     else if (value == ']')
         return TokenType::RightBracket;
+    else if (value == '{')
+        return TokenType::LeftBrace;
+    else if (value == '}')
+        return TokenType::RightBrace;
     else if (value == ',')
         return TokenType::Comma;
     else if (value == ';')
@@ -233,28 +253,30 @@ TokenType Lexer::IdentifyTokenType(const char &value) const
 TokenType Lexer::IsKeyword(const std::string &value) const
 {
     std::vector <std::string> keywords = {
-        "echo",
-        "if", 
-        "and",
-        "or",
-        "else", 
-        "while", 
-        "for", 
-        "return",
-        "break",
-        "continue",
-        "true",
-        "false",
-        "null",
-        "import",
-        "const",
-        "in",
-        "is",
-        "range"
+        "echo", // Print to console
+        "if",  // If statement
+        "and", // Logical AND
+        "or", // Logical OR
+        "else",  // Else statement
+        "while",  // While loop
+        "for",  // For loop
+        "return", // Return statement
+        "break", // Break statement
+        "continue", // Continue statement
+        "true", // Boolean true
+        "false", // Boolean false
+        "null", // Null value
+        "import", // Import module
+        "const", // Constant declaration
+        "in", // In operator for iteration
+        "is" // Type check operator
+        "final", // Final keyword for initialization
+        "public", // Public access modifier
+        "private" // Private access modifier
     }; 
 
     std::vector<std::string> builtinTypes = {
-        "i32", "i64", "bool", "string", "void", "array"
+        "i32", "i64", "bool", "string", "void", "array", "map", "float", "struct", "class" 
     };
 
     if (std::find(keywords.begin(), keywords.end(), value) != keywords.end())

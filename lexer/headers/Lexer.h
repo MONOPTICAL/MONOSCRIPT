@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <cctype>
+#include <algorithm>
 #include "Token.h"
 #include "ParsingFunctions.h"
 
@@ -45,6 +46,7 @@ private:
     std::vector<std::string> sourceCode;
     std::vector<Token> currentTokens;
     std::vector<std::vector<Token>> allTokens; // Vector of vectors to store tokens for each line
+    std::vector<char> firstLettersInBuiltTypes;
     int currentLine;
     int currentIndex;
     TokenType currentTokenType;
