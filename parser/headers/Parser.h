@@ -1,7 +1,10 @@
-#include "../lexer/headers/Token.h"
-#include "./AST.h"
+#include "../../lexer/headers/Token.h"
+#include "../../includes/icecream.hpp"
+#include "AST.h"
 #include <memory>
 #include <stdexcept>
+#include <string_view>
+#include <iostream>
 class Parser {
 public:
     Parser(const std::vector<std::vector<Token>>& tokens);
@@ -18,6 +21,7 @@ private:
     Token current(); // возвращает текущий токен
     Token advance(); // переходит к следующему токену
     Token peek(); // возвращает следующий токен без перехода к нему
+    std::string peekType();
     bool nextLine(); // переходит к следующей строке токенов
     bool match(TokenType type); // проверяет, совпадает ли текущий токен с заданным типом
                                 // и если да, переходит к следующему токену
@@ -27,12 +31,12 @@ private:
     std::shared_ptr<ASTNode> parseStatement();
     std::shared_ptr<ASTNode> parseExpression();
     std::shared_ptr<FunctionNode> parseFunction();
-    std::shared_ptr<BlockNode> parseBlock();
-    std::shared_ptr<ASTNode> parseAssignment();
+    std::shared_ptr<BlockNode> parseBlock(int);
+    std::shared_ptr<ASTNode> parseAssignment(bool);
     std::shared_ptr<ASTNode> parseIf();
     std::shared_ptr<ASTNode> parseFor();
     std::shared_ptr<ASTNode> parseReturn();
-    std::shared_ptr<ASTNode> parseCallOrVariable();
+    std::shared_ptr<ASTNode> parseCall();
 /*
 все возможные случаи это
 _______________________________________
@@ -74,9 +78,11 @@ return [expression]
 
     // вспомогательное
     void consume(TokenType, const std::string& errMsg);
-    bool isEndOfFile() const;
+    bool isEndOfFile() const; 
+    bool isEndOfLine() const; // проверяет, достигнут ли конец строки
     int getIndentLevel(const std::vector<Token>& line);
     Token getLastTokenInCurrentLine() const;
     int getPrecedence(const Token& token) const;
+    std::string getFullType();
 };
     

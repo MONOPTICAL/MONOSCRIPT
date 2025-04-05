@@ -13,12 +13,17 @@ class ASTNode {
 
 class ProgramNode : public ASTNode {
     public:
+        ProgramNode() = default;
+        ProgramNode(const std::vector<std::shared_ptr<ASTNode>>& body) : body(body) {}
         std::vector<std::shared_ptr<ASTNode>> body;
 };
     
 class FunctionNode : public ASTNode {
     public:
-        std::shared_ptr<IdentifierNode> name; // Имя функции тоже идентификатор
+        FunctionNode() = default;
+        FunctionNode(const std::string& name, const std::string& returnType, const std::vector<std::pair<std::string, std::string>>& parameters, std::shared_ptr<ASTNode> body) 
+            : name(name), returnType(returnType), parameters(parameters), body(body) {}
+        std::string name; // Имя функции тоже идентификатор
         std::string returnType;
         std::vector<std::pair<std::string, std::string>> parameters; // {type, name}
         std::shared_ptr<ASTNode> body; // BlockNode
@@ -26,17 +31,27 @@ class FunctionNode : public ASTNode {
 
 class BlockNode : public ASTNode {
     public:
+        BlockNode() = default;
+        BlockNode(const std::vector<std::shared_ptr<ASTNode>>& statements) : statements(statements) {}
         std::vector<std::shared_ptr<ASTNode>> statements;
 };
 
 class VariableAssignNode : public ASTNode {
     public:
+        VariableAssignNode() = default;
+        VariableAssignNode(const std::string& name, bool isConst, const std::string& type, std::shared_ptr<ASTNode> expression) 
+            : name(name), isConst(isConst), type(type), expression(expression) {}
         std::string name;
+        std::string type;
+        bool isConst;
         std::shared_ptr<ASTNode> expression;
 };
     
 class IfNode : public ASTNode {
     public:
+        IfNode() = default;
+        IfNode(std::shared_ptr<ASTNode> condition, std::shared_ptr<BlockNode> thenBlock, std::shared_ptr<BlockNode> elseBlock = nullptr) 
+            : condition(condition), thenBlock(thenBlock), elseBlock(elseBlock) {}
         std::shared_ptr<ASTNode> condition;
         std::shared_ptr<BlockNode> thenBlock;
         std::shared_ptr<BlockNode> elseBlock; // может быть nullptr
@@ -44,6 +59,9 @@ class IfNode : public ASTNode {
     
 class ForNode : public ASTNode {
     public:
+        ForNode() = default;
+        ForNode(const std::string& varName, std::shared_ptr<ASTNode> iterable, std::shared_ptr<BlockNode> body) 
+            : varName(varName), iterable(iterable), body(body) {}
         std::string varName;
         std::shared_ptr<ASTNode> iterable;
         std::shared_ptr<BlockNode> body;
@@ -51,17 +69,25 @@ class ForNode : public ASTNode {
     
 class ReturnNode : public ASTNode {
     public:
+        ReturnNode() = default;
+        ReturnNode(std::shared_ptr<ASTNode> expression) : expression(expression) {}
         std::shared_ptr<ASTNode> expression;
 };
     
 class CallNode : public ASTNode {
     public:
+        CallNode() = default;
+        CallNode(const std::string& callee, const std::vector<std::shared_ptr<ASTNode>>& arguments) 
+            : callee(callee), arguments(arguments) {}
         std::string callee;
         std::vector<std::shared_ptr<ASTNode>> arguments;
 };
     
 class BinaryOpNode : public ASTNode {
     public:
+        BinaryOpNode() = default;
+        BinaryOpNode(std::shared_ptr<ASTNode> left, const std::string& op, std::shared_ptr<ASTNode> right) 
+            : left(left), op(op), right(right) {}
         std::string op;
         std::shared_ptr<ASTNode> left;
         std::shared_ptr<ASTNode> right;
@@ -69,28 +95,51 @@ class BinaryOpNode : public ASTNode {
     
 class UnaryOpNode : public ASTNode {
     public:
+        UnaryOpNode() = default;
+        UnaryOpNode(const std::string& op, std::shared_ptr<ASTNode> operand) 
+            : op(op), operand(operand) {}
         std::string op;
         std::shared_ptr<ASTNode> operand;
 };
     
 class IdentifierNode : public ASTNode {
     public:
+        IdentifierNode() = default;
+        IdentifierNode(const std::string& name) : name(name) {}
         std::string name;
 };
 
 class NumberNode : public ASTNode {
     public:
+        NumberNode() = default;
+        NumberNode(int value) : value(value) {}
         int value;
+};
+
+class FloatNumberNode : public ASTNode { // Добавить поддержку для float
+    public:
+        FloatNumberNode() = default;
+        FloatNumberNode(float value) : value(value) {}
+        float value;
 };
 
 class StringNode : public ASTNode {
     public:
+        StringNode() = default;
+        StringNode(const std::string& value) : value(value) {}
         std::string value;
 };
 
 class BooleanNode : public ASTNode {
     public:
+        BooleanNode() = default;
+        BooleanNode(bool value) : value(value) {}
         bool value;
+};
+
+class NullNode : public ASTNode {
+    public:
+        NullNode() = default;
 };
     
 #endif // AST_H
