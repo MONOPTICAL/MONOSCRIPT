@@ -54,11 +54,14 @@ private:
     TokenType currentTokenType;
     std::string currentTokenValue;
     bool isStringnotFinished = false;
+    bool isInMultilineComment = false;
 
     void addToken(TokenType type, const std::string& value);
     TokenType IdentifyTokenType(const char& value) const;
     TokenType IsKeyword(const std::string& value) const;
     std::optional<char> peek(int offset) const;
+    void resetValues();
+    void removeEmpty();
 };
 
 #endif // LEXER_H
