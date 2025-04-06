@@ -5,6 +5,9 @@
 #include <stdexcept>
 #include <string_view>
 #include <iostream>
+#include <optional>
+#include <algorithm>
+
 class Parser {
 public:
     Parser(const std::vector<std::vector<Token>>& tokens);

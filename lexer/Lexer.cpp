@@ -1,5 +1,6 @@
 #include "headers/Lexer.h"
 #include "iostream"
+
 Lexer::Lexer(const std::string &sourceCode)
 {
     this->sourceCode = ParsingFunctions::split(sourceCode, "\n");
@@ -9,12 +10,10 @@ Lexer::Lexer(const std::string &sourceCode)
         std::cout << line << std::endl;
     }
     this->currentLine = 1;
-    this->currentIndex = -1; //0
+    this->currentIndex = -1;
     this->currentTokenType = TokenType::None;
     this->currentTokenValue = "";
     this->isStringnotFinished = false;
-    this->firstLettersInBuiltTypes = {'i', 'f', 's', 'b', 'a', 'm'}; // i32, f32, string, bool, array, map
-
 }
 
 void Lexer::tokenize()
@@ -24,154 +23,159 @@ void Lexer::tokenize()
         for(auto y : x)
         {
             currentIndex++;
-            if (isspace(y) && currentTokenType != TokenType::String && currentTokenType != TokenType::Identifier && y != '.')
+            TokenType type = IdentifyTokenType(y); // LeftParen
+            TokenType keywordCheck;
+
+            if ((y == ' ' && y != '.') && (currentTokenType != TokenType::String)) // По какой то причине C++ перенаправляет . сюда 
             {
+                if(currentTokenValue!="")
+                {
+                    currentTokenValue = ParsingFunctions::trim(currentTokenValue);
+                    keywordCheck = IsKeyword(currentTokenValue); // Check if the current token is a keyword
+
+                    keywordCheck==TokenType::Identifier ? addToken(currentTokenType, currentTokenValue) : addToken(keywordCheck, currentTokenValue);
+                    
+                    currentTokenType = TokenType::None; // Reset the current token type for the next token
+                    currentTokenValue = ""; // Reset the current token value for the next token
+                }
                 continue;
             }
-            else
+
+            keywordCheck = IsKeyword(currentTokenValue); // Check if the current token is a keyword
+            if(keywordCheck != TokenType::Identifier)
             {
-                TokenType type = IdentifyTokenType(y); // LeftParen
-
-                if (y == ' ' && y != '.') // По какой то причине C++ перенаправляет . сюда 
-                {
-                    if (type == TokenType::Identifier)
-                    {
-                        if (type == currentTokenType)
-                        {
-                            currentTokenValue = ParsingFunctions::trim(currentTokenValue);
-                            addToken(IsKeyword(currentTokenValue), currentTokenValue);
-                            currentTokenType = TokenType::None; // Reset the current token type for the next token
-                            currentTokenValue = ""; // Reset the current token value for the next token
-                            continue;
-                        }
-                    }
-                }
-
-                TokenType keywordCheck = IsKeyword(currentTokenValue); // Check if the current token is a keyword
-                if(keywordCheck != TokenType::Identifier)
+                std::optional<char> peekChar = peek(0);
+                if(peekChar.has_value() && IdentifyTokenType(peekChar.value())!=TokenType::Identifier)
                 {
                     addToken(keywordCheck, currentTokenValue);
                     currentTokenType = TokenType::None; // Reset the current token type for the next token
                     currentTokenValue = ""; // Reset the current token value for the next token
                 }
+            }
 
-                if (type != currentTokenType && (currentTokenType != TokenType::None && type != TokenType::Dot)) // <--
+
+            if (type != currentTokenType && (currentTokenType != TokenType::None && type != TokenType::Dot)) 
+            {
+                if (currentTokenType == TokenType::String && type != currentTokenType && isStringnotFinished)
                 {
-                    if (currentTokenType == TokenType::String && type != currentTokenType && isStringnotFinished)
-                    {
-                        currentTokenType = TokenType::String;
-                        currentTokenValue += y;
-                        continue;
-                    }
-
-                    if (currentTokenType == TokenType::Identifier && type == TokenType::Number)
-                    {
-                        currentTokenValue += y;
-                        continue; 
-                    }
-
-                    if(currentTokenValue.length() > 0) 
-                    {
-                        currentIndex--;
-                        addToken(currentTokenType, currentTokenValue); // Add the previous token if it has more than 1 character
-                        currentIndex++;
-                    }
-
-                    if (currentTokenType != TokenType::String)
-                    {
-                        currentTokenType = type;
-                        currentTokenValue = y;
-                        if(type == TokenType::String)
-                            isStringnotFinished = true;
-                        continue;
-                    }
+                    currentTokenType = TokenType::String;
+                    currentTokenValue += y;
+                    continue;
                 }
 
-                if (type == TokenType::Identifier && currentTokenType == TokenType::None)
+                if (currentTokenType == TokenType::Identifier && type == TokenType::Number)
+                {
+                    currentTokenValue += y;
+                    continue; 
+                }
+
+                if(currentTokenValue.length() > 0) 
+                {
+                    currentIndex--;
+                    addToken(currentTokenType, currentTokenValue); // Add the previous token if it has more than 1 character
+                    currentIndex++;
+                }
+
+                if (currentTokenType != TokenType::String)
                 {
                     currentTokenType = type;
                     currentTokenValue = y;
+                    if(type == TokenType::String)
+                        isStringnotFinished = true;
                     continue;
                 }
-                else if (type == TokenType::Identifier && currentTokenType == TokenType::Identifier)
-                {
-                    currentTokenValue += y;
-                    continue;
-                }
+            }
 
-                if (type == TokenType::Number && currentTokenType == TokenType::None)
-                {
-                    currentTokenType = type;
-                    currentTokenValue = y;
-                    continue;
-                }
-                else if (type == TokenType::Number && currentTokenType == TokenType::Number)
-                {
-                    currentTokenValue += y;
-                    continue;
-                }
-
-                if (type == TokenType::Dot && currentTokenType == TokenType::Number)
-                {
-                    currentTokenValue += y;
-                    continue;
-                }
-
-                if (type == TokenType::Operator && currentTokenType == TokenType::None)
-                {
-                    currentTokenType = type;
-                    currentTokenValue = y;
-                    continue;
-                }
-                else if (type == TokenType::Operator && currentTokenType == TokenType::Operator)
-                {
-                    currentTokenValue += y;
-                    if (currentTokenValue != "//" && currentTokenValue != ">>")
-                    {
-                        addToken(currentTokenType, currentTokenValue); // Add the token to the current line
-                        currentTokenType = TokenType::None; // Reset the current token type for the next token
-                        currentTokenValue = ""; // Reset the current token value for the next token
-                        continue;
-                    }
-                    else if (currentTokenValue == ">>")
-                    {
-                        addToken(currentTokenType, ">"); // Add the token to the current line
-                        addToken(currentTokenType, ">"); // Add the token to the current line
-                        currentTokenType = TokenType::None; // Reset the current token type for the next token
-                        currentTokenValue = ""; // Reset the current token value for the next token
-                        continue;
-                    }
-                    else
-                    {
-                        currentTokenType = TokenType::None; // Reset the current token type for the next token
-                        currentTokenValue = ""; // Reset the current token value for the next token
-                        break;
-                    }
-                }
-
-                if(type == TokenType::String && currentTokenType != TokenType::String)
-                {
-                    currentTokenType = type;
-                    currentTokenValue = y;
-                    isStringnotFinished = true;
-                    continue;
-                }
-                else if (type == TokenType::String && currentTokenType == TokenType::String)
-                {
-                    currentTokenValue += y;
-                    isStringnotFinished = false;
-                    addToken(currentTokenType, currentTokenValue); // Add the token to the current line
-                    currentTokenType = TokenType::None;
-                    continue;
-                }
+            if (type == TokenType::Identifier && currentTokenType == TokenType::None)
+            {
                 currentTokenType = type;
                 currentTokenValue = y;
-                addToken(currentTokenType, currentTokenValue); // Add the token to the current line
-                currentTokenType = TokenType::None; // Reset the current token type for the next token
-                currentTokenValue = ""; // Reset the current token value for the next token
-                
-                //std::cout << "4)Current token type:" << TokenTypeToString(currentTokenType) << std::endl;
+                continue;
             }
+            else if (type == TokenType::Identifier && currentTokenType == TokenType::Identifier)
+            {
+                currentTokenValue += y;
+                continue;
+            }
+
+            if (type == TokenType::Number && currentTokenType == TokenType::None)
+            {
+                currentTokenType = type;
+                currentTokenValue = y;
+                continue;
+            }
+            else if (type == TokenType::Number && currentTokenType == TokenType::Number)
+            {
+                currentTokenValue += y;
+                continue;
+            }
+
+            if (type == TokenType::Dot && currentTokenType == TokenType::Number)
+            {
+                currentTokenValue += y;
+                continue;
+            }
+
+            if (type == TokenType::Operator && currentTokenType == TokenType::None)
+            {
+                currentTokenType = type;
+                currentTokenValue = y;
+                continue;
+            }
+            else if (type == TokenType::Operator && currentTokenType == TokenType::Operator)
+            {
+                currentTokenValue += y;
+                if (currentTokenValue != "//" && currentTokenValue != ">>")
+                {
+                    addToken(currentTokenType, currentTokenValue); // Add the token to the current line
+                    currentTokenType = TokenType::None; // Reset the current token type for the next token
+                    currentTokenValue = ""; // Reset the current token value for the next token
+                    continue;
+                }
+                else if (currentTokenValue == ">>")
+                {
+                    addToken(currentTokenType, ">"); // Add the token to the current line
+                    addToken(currentTokenType, ">"); // Add the token to the current line
+                    currentTokenType = TokenType::None; // Reset the current token type for the next token
+                    currentTokenValue = ""; // Reset the current token value for the next token
+                    continue;
+                }
+                else
+                {
+                    currentTokenType = TokenType::None; // Reset the current token type for the next token
+                    currentTokenValue = ""; // Reset the current token value for the next token
+                    break;
+                }
+            }
+
+            if(type == TokenType::String && currentTokenType != TokenType::String)
+            {
+                currentTokenType = type;
+                currentTokenValue = y;
+                isStringnotFinished = true;
+                continue;
+            }
+            else if (type == TokenType::String && currentTokenType == TokenType::String)
+            {
+                currentTokenValue += y;
+                isStringnotFinished = false;
+                addToken(currentTokenType, currentTokenValue); // Add the token to the current line
+                currentTokenType = TokenType::None;
+                currentTokenValue = "";
+                continue;
+            }
+            //IC(currentTokenValue, TokenTypeToString(currentTokenType), y);
+            if(currentTokenValue.length() > 0) 
+            {
+                currentIndex--;
+                addToken(currentTokenType, currentTokenValue); // Add the previous token if it has more than 1 character
+                currentIndex++;
+            }
+            currentTokenType = type;
+            currentTokenValue = y;
+            addToken(currentTokenType, currentTokenValue); // Add the token to the current line
+            currentTokenType = TokenType::None; // Reset the current token type for the next token
+            currentTokenValue = ""; // Reset the current token value for the next token
         }
         if(currentTokenType != TokenType::None)
             if (currentTokenType == TokenType::Identifier)
@@ -181,7 +185,7 @@ void Lexer::tokenize()
 
         allTokens.push_back(currentTokens); // Add the current line tokens to the allTokens vector
         currentTokens.clear(); // Clear the current tokens for the next line
-        currentIndex = 0; // Reset the current index for the next line
+        currentIndex = -1; // Reset the current index for the next line
         currentTokenType = TokenType::None; // Reset the current token type for the next line
         currentTokenValue = ""; // Reset the current token value for the next line
         currentLine++; // Increment the line number
@@ -269,7 +273,7 @@ TokenType Lexer::IsKeyword(const std::string &value) const
         "import", // Import module
         "const", // Constant declaration
         "in", // In operator for iteration
-        "is" // Type check operator
+        "is", // Type check operator
         "final", // Final keyword for initialization
         "public", // Public access modifier
         "private" // Private access modifier
@@ -288,5 +292,16 @@ TokenType Lexer::IsKeyword(const std::string &value) const
     {
         return TokenType::Type; // Treat builtin types as keywords
     }
+
     return TokenType::Identifier; // Default case, can be changed as needed
+}
+
+std::optional<char> Lexer::peek(int offset) const
+{
+    //IC(currentIndex, currentLine,offset);
+    if (currentIndex + offset < sourceCode[currentLine-1].length())
+    {
+        return sourceCode[currentLine-1][currentIndex+offset];
+    }
+    return NULL;
 }

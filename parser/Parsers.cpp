@@ -160,7 +160,7 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
 
     const i32 i = 0 -- константа с статической инициализацией
     final i ^= 0  -- константа с динамической инициализацией
-    */                            
+    */                           
     std::string type;                                           // Переменная для хранения типа
     std::string variableName;                                   // Переменная для хранения имени переменной
     bool finalFlag = false;                                     // Флаг для проверки наличия ключевого слова final
@@ -174,6 +174,7 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
                 ": " + current().value);
         }
         keyWord != "const" ? finalFlag = true : finalFlag = false; // Если токен - это const, то finalFlag = false, иначе finalFlag = true
+        IC(finalFlag);
         advance();                                                 // Переходим к следующему токену
     }
 
@@ -216,7 +217,8 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
         {Identifier, "customType"} {Identifier, "i"}
         И если посмотреть так образно то у них одинаковое окончание с Identifier и одинаковый оператор присваивания
         */
-        type = getFullType(); // Получаем полный тип переменной                                       // Переменная имеет тип auto и когда во время runtime
+        IC();
+        type = getFullType(); // Получаем полный тип переменной               
         variableName = current().value;                         // Сохраняем имя переменной
         consume(TokenType::Identifier, "Expected identifier");  // Проверяем наличие идентификатора
         if(!check(TokenType::Operator) || current().value != "^=") // Проверяем наличие оператора присваивания
@@ -226,7 +228,6 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
                 ": " + current().value);
         }
     }
-
     // Здесь мы уже у оператора присваивания, который идёт после имени переменной
     advance(); // Переходим к следующему токену
     //std::cout << "[parseAssignment] Current token: " << current().value << std::endl; // Выводим текущий токен в консоль
