@@ -14,6 +14,7 @@ Lexer::Lexer(const std::string &sourceCode)
     this->currentTokenType = TokenType::None;
     this->currentTokenValue = "";
     this->isStringnotFinished = false;
+    this->isInMultilineComment = false;
 }
 
 void Lexer::tokenize()
@@ -23,6 +24,12 @@ void Lexer::tokenize()
         for(auto y : x)
         {
             currentIndex++;
+            if (this->isInMultilineComment)
+                if(y!='*' && peek(0)!='/')
+                    continue;
+                else
+                    this->isInMultilineComment=false;
+
             TokenType type = IdentifyTokenType(y); // LeftParen
             TokenType keywordCheck;
 
@@ -30,13 +37,11 @@ void Lexer::tokenize()
             {
                 if(currentTokenValue!="")
                 {
-                    currentTokenValue = ParsingFunctions::trim(currentTokenValue);
                     keywordCheck = IsKeyword(currentTokenValue); // Check if the current token is a keyword
 
                     keywordCheck==TokenType::Identifier ? addToken(currentTokenType, currentTokenValue) : addToken(keywordCheck, currentTokenValue);
                     
-                    currentTokenType = TokenType::None; // Reset the current token type for the next token
-                    currentTokenValue = ""; // Reset the current token value for the next token
+                    resetValues();
                 }
                 continue;
             }
@@ -48,8 +53,7 @@ void Lexer::tokenize()
                 if(peekChar.has_value() && IdentifyTokenType(peekChar.value())!=TokenType::Identifier)
                 {
                     addToken(keywordCheck, currentTokenValue);
-                    currentTokenType = TokenType::None; // Reset the current token type for the next token
-                    currentTokenValue = ""; // Reset the current token value for the next token
+                    resetValues();
                 }
             }
 
@@ -125,25 +129,32 @@ void Lexer::tokenize()
             else if (type == TokenType::Operator && currentTokenType == TokenType::Operator)
             {
                 currentTokenValue += y;
-                if (currentTokenValue != "//" && currentTokenValue != ">>")
+
+                // Просто скипает */
+                if (currentTokenValue == "*/"){resetValues();continue;}
+                
+                if (currentTokenValue != "//" && currentTokenValue != "/*" && currentTokenValue != ">>")
                 {
                     addToken(currentTokenType, currentTokenValue); // Add the token to the current line
-                    currentTokenType = TokenType::None; // Reset the current token type for the next token
-                    currentTokenValue = ""; // Reset the current token value for the next token
+                    resetValues();
                     continue;
                 }
                 else if (currentTokenValue == ">>")
                 {
                     addToken(currentTokenType, ">"); // Add the token to the current line
                     addToken(currentTokenType, ">"); // Add the token to the current line
-                    currentTokenType = TokenType::None; // Reset the current token type for the next token
-                    currentTokenValue = ""; // Reset the current token value for the next token
+                    resetValues();
+                    continue;
+                }
+                else if (currentTokenValue == "/*")
+                {
+                    resetValues();
+                    this->isInMultilineComment = true;
                     continue;
                 }
                 else
                 {
-                    currentTokenType = TokenType::None; // Reset the current token type for the next token
-                    currentTokenValue = ""; // Reset the current token value for the next token
+                    resetValues();
                     break;
                 }
             }
@@ -159,14 +170,14 @@ void Lexer::tokenize()
             {
                 currentTokenValue += y;
                 isStringnotFinished = false;
+                
                 addToken(currentTokenType, currentTokenValue); // Add the token to the current line
-                currentTokenType = TokenType::None;
-                currentTokenValue = "";
+                resetValues();
                 continue;
             }
             //IC(currentTokenValue, TokenTypeToString(currentTokenType), y);
             if(currentTokenValue.length() > 0) 
-            {
+            {            
                 currentIndex--;
                 addToken(currentTokenType, currentTokenValue); // Add the previous token if it has more than 1 character
                 currentIndex++;
@@ -174,8 +185,7 @@ void Lexer::tokenize()
             currentTokenType = type;
             currentTokenValue = y;
             addToken(currentTokenType, currentTokenValue); // Add the token to the current line
-            currentTokenType = TokenType::None; // Reset the current token type for the next token
-            currentTokenValue = ""; // Reset the current token value for the next token
+            resetValues();
         }
         if(currentTokenType != TokenType::None)
             if (currentTokenType == TokenType::Identifier)
@@ -190,6 +200,7 @@ void Lexer::tokenize()
         currentTokenValue = ""; // Reset the current token value for the next line
         currentLine++; // Increment the line number
     }
+    removeEmpty();
 }
 
 const std::vector<std::vector<Token>> &Lexer::getTokens() const
@@ -211,7 +222,8 @@ const std::vector<std::vector<Token>> &Lexer::getTokens() const
 
 void Lexer::addToken(TokenType type, const std::string &value)
 {
-    Token token = {type, value, currentLine, currentIndex};
+    std::string trimmed = ParsingFunctions::trim(value); // for safety reasons
+    Token token = {type, trimmed, currentLine, currentIndex};
     currentTokens.push_back(token);
 }
 
@@ -304,4 +316,23 @@ std::optional<char> Lexer::peek(int offset) const
         return sourceCode[currentLine-1][currentIndex+offset];
     }
     return NULL;
+}
+
+void Lexer::resetValues()
+{
+    currentTokenType = TokenType::None; // Reset the current token type for the next token
+    currentTokenValue = ""; // Reset the current token value for the next token
+}
+
+void Lexer::removeEmpty()
+{
+    this->allTokens.erase(
+        std::remove_if(
+            this->allTokens.begin(), this->allTokens.end(),
+            [](const std::vector<Token>& token) {return token.empty();}
+        ),
+        this->allTokens.end()
+    );
+    // Сделано так а не .erase(remove(.begin(), .end(), std::vector<Token>()))
+    // Для будущего а то вдруг, хуй знает
 }
