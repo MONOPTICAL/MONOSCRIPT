@@ -85,14 +85,19 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         // const [Type] [variableName] = [expression] or [variableName] ^= [expression]
         // const i32 i = 0 or i ^= 0
         // ↑ if we have keyword const, and next token is type, we have const variable declaration
+    else if (currentToken.type == TokenType::Keyword && currentToken.value == "const" && peek().type == TokenType::Type)
+    {
+        return parseAssignment(true);
+    }
     // Final variable declaration
         // final [Type] [variableName] = [expression] or [variableName] ^= [expression]
         // final i32 i = 0 or i ^= 0
         // ↑ if we have keyword final, and next token is type, we have final variable declaration
-    else if (currentToken.type == TokenType::Keyword && (currentToken.value == "const" || currentToken.value == "final") && peek().type == TokenType::Type)
+    else if(currentToken.type == TokenType::Keyword && currentToken.value == "final" && peek().type == TokenType::Identifier)
     {
         return parseAssignment(true);
     }
+    //else if((currentToken.type == TokenType::Type || currentToken.type == TokenType::Operator) && )
     // Function call
         // [functionName]([expression], [expression], ...)
         // bubbleSort(arr, 0, 10)

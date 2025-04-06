@@ -46,16 +46,24 @@ class ASTDebugger {
                 debug(un->operand, indent + 2);
             }
             else if (auto ident = std::dynamic_pointer_cast<IdentifierNode>(node)) {
-                printIndent(indent); std::cout << "Identifier: " << ident->name << "\n";
+                printIndent(indent); std::cout << "Value: " << ident->name << " - <identifier>" << "\n";
             }
             else if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
-                printIndent(indent); std::cout << "Number: " << num->value << "\n";
+                printIndent(indent); std::cout << "Value: " << num->value << " - <i32/i64>" << "\n";
             }
             else if (auto str = std::dynamic_pointer_cast<StringNode>(node)) {
-                printIndent(indent); std::cout << "String: \"" << str->value << "\"\n";
+                printIndent(indent); std::cout << "Value: \"" << str->value << " - <string>" << "\"\n";
             }
             else if (auto boolean = std::dynamic_pointer_cast<BooleanNode>(node)) {
-                printIndent(indent); std::cout << "Boolean: " << (boolean->value ? "true" : "false") << "\n";
+                printIndent(indent); std::cout << "Value: " << (boolean->value ? "true" : "false") << " - <bool>" << "\n";
+            }
+            else if (auto floatNum = std::dynamic_pointer_cast<FloatNumberNode>(node))
+            {
+                printIndent(indent); std::cout << "Value: " << floatNum->value << " - <float>" << "\n";
+            }
+            else if (auto null = std::dynamic_pointer_cast<NullNode>(node))
+            {
+                printIndent(indent); std::cout << "Value: <null>" << "\n";
             }
             else {
                 printIndent(indent); std::cout << "Unknown AST node\n";
@@ -88,6 +96,7 @@ int main()
     lexer.tokenize();
     const std::vector<std::vector<Token>> X = lexer.getTokens();
 
+    /*
     Parser parser(X);
     std::shared_ptr<ProgramNode> program = parser.parse();
     if (program) {
@@ -95,6 +104,7 @@ int main()
     } else {
         std::cerr << "Failed to parse the source code." << std::endl;
     }
+    */
     
     return 0;
 }

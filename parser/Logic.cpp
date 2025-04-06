@@ -262,10 +262,18 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
     if (currentToken.type == TokenType::Number) // Если токен - число
     {
         advance(); // Переходим к следующему токену
-        int numberValue;
+        std::optional<int> intValue; // Переменная для хранения значения числа
+        std::optional<float> floatValue; // Переменная для хранения значения числа с плавающей точкой
         try
         {
-            numberValue = std::stoi(currentToken.value); // Преобразуем строку в число
+            if(std::find(currentToken.value.begin(), currentToken.value.end(), '.') != currentToken.value.end()) // Если число с плавающей точкой
+            {
+                floatValue = std::stof(currentToken.value); // Преобразуем строку в число с плавающей точкой
+            }
+            else
+            {
+                intValue = std::stoi(currentToken.value); // Преобразуем строку в число
+            }
         }
         catch (const std::invalid_argument& e) // Если преобразование не удалось, выбрасываем исключение
         {
@@ -274,7 +282,14 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
                 ": " + currentToken.value);
         }
 
-        return std::make_shared<NumberNode>(numberValue); // Создаём узел цифры
+        if (intValue.has_value()) // Если число целое
+        {
+            return std::make_shared<NumberNode>(intValue.value()); // Создаём узел числа
+        }
+        else
+        {
+            return std::make_shared<FloatNumberNode>(floatValue.value()); // Создаём узел числа с плавающей точкой
+        }
     }
     else if (currentToken.type == TokenType::String) // Если токен - строка
     {

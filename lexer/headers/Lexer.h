@@ -6,8 +6,10 @@
 #include <vector>
 #include <cctype>
 #include <algorithm>
+#include <optional>
 #include "Token.h"
 #include "ParsingFunctions.h"
+#include "../../includes/icecream.hpp"
 
 class Lexer
 {
@@ -56,6 +58,7 @@ private:
     void addToken(TokenType type, const std::string& value);
     TokenType IdentifyTokenType(const char& value) const;
     TokenType IsKeyword(const std::string& value) const;
+    std::optional<char> peek(int offset) const;
 };
 
 #endif // LEXER_H
