@@ -4,11 +4,6 @@
 Lexer::Lexer(const std::string &sourceCode)
 {
     this->sourceCode = ParsingFunctions::split(sourceCode, "\n");
-    std::cout << "Source code:" << std::endl;
-    for (const auto &line : this->sourceCode)
-    {
-        std::cout << line << std::endl;
-    }
     this->currentLine = 1;
     this->currentIndex = -1;
     this->currentTokenType = TokenType::None;
@@ -30,7 +25,7 @@ void Lexer::tokenize()
                 else
                     this->isInMultilineComment=false;
 
-            TokenType type = IdentifyTokenType(y); // LeftParen
+            TokenType type = IdentifyTokenType(y);
             TokenType keywordCheck;
 
             if ((y == ' ' && y != '.') && (currentTokenType != TokenType::String)) // По какой то причине C++ перенаправляет . сюда 
@@ -223,6 +218,7 @@ const std::vector<std::vector<Token>> &Lexer::getTokens() const
 void Lexer::addToken(TokenType type, const std::string &value)
 {
     std::string trimmed = ParsingFunctions::trim(value); // for safety reasons
+    IC(trimmed);
     Token token = {type, trimmed, currentLine, currentIndex};
     currentTokens.push_back(token);
 }
@@ -288,7 +284,8 @@ TokenType Lexer::IsKeyword(const std::string &value) const
         "is", // Type check operator
         "final", // Final keyword for initialization
         "public", // Public access modifier
-        "private" // Private access modifier
+        "private", // Private access modifier
+        "this" // Class access
     }; 
 
     std::vector<std::string> builtinTypes = {

@@ -23,7 +23,7 @@ class FunctionNode : public ASTNode {
         FunctionNode() = default;
         FunctionNode(const std::string& name, const std::string& returnType, const std::vector<std::pair<std::string, std::string>>& parameters, std::shared_ptr<ASTNode> body) 
             : name(name), returnType(returnType), parameters(parameters), body(body) {}
-        std::string name; // Имя функции тоже идентификатор
+        std::string name;
         std::string returnType;
         std::vector<std::pair<std::string, std::string>> parameters; // {type, name}
         std::shared_ptr<ASTNode> body; // BlockNode
@@ -116,7 +116,7 @@ class NumberNode : public ASTNode {
         int value;
 };
 
-class FloatNumberNode : public ASTNode { // Добавить поддержку для float
+class FloatNumberNode : public ASTNode {
     public:
         FloatNumberNode() = default;
         FloatNumberNode(float value) : value(value) {}

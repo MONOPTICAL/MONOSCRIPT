@@ -64,7 +64,7 @@ std::shared_ptr<ASTNode> Parser::parseIf()
     auto condition = parseExpression();
     int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока if
     nextLine(); // Переходим к следующей строке токенов 
-    IC(expectedIndent, current().value, peek().value, lineIndex, tokenIndex);
+    //IC(expectedIndent, current().value, peek().value, lineIndex, tokenIndex);
     auto thenBlock = parseBlock(expectedIndent);
     std::shared_ptr<BlockNode> elseBlock = nullptr;
     if (check(TokenType::Keyword) && peek().value == "else")
@@ -99,7 +99,7 @@ std::shared_ptr<ASTNode> Parser::parseFor()
 
     int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока for
     nextLine(); // Переходим к следующему токену 
-    IC(expectedIndent, current().value, peek().value, lineIndex, tokenIndex);
+    //IC(expectedIndent, current().value, peek().value, lineIndex, tokenIndex);
     auto body = parseBlock(expectedIndent); // Парсим тело цикла for
 
     return std::make_shared<ForNode>(iterationVariable, variable, body); // Создаём узел цикла for
@@ -121,7 +121,7 @@ std::shared_ptr<BlockNode> Parser::parseBlock(int expectedIndent)
         if (actualIndent > expectedIndent)
             throw std::runtime_error("Unexpected indentation at line " + std::to_string(lineIndex));
 
-        IC(actualIndent, expectedIndent, current().value, peek().value, lineIndex, tokenIndex);
+        //IC(actualIndent, expectedIndent, current().value, peek().value, lineIndex, tokenIndex);
         // пропустить Pipe токены
         tokenIndex = actualIndent;
 
@@ -174,7 +174,7 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
                 ": " + current().value);
         }
         keyWord != "const" ? finalFlag = true : finalFlag = false; // Если токен - это const, то finalFlag = false, иначе finalFlag = true
-        IC(finalFlag);
+        //IC(finalFlag);
         advance();                                                 // Переходим к следующему токену
     }
 
@@ -217,7 +217,7 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
         {Identifier, "customType"} {Identifier, "i"}
         И если посмотреть так образно то у них одинаковое окончание с Identifier и одинаковый оператор присваивания
         */
-        IC();
+        //IC();
         type = getFullType(); // Получаем полный тип переменной               
         variableName = current().value;                         // Сохраняем имя переменной
         consume(TokenType::Identifier, "Expected identifier");  // Проверяем наличие идентификатора
