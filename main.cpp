@@ -24,6 +24,11 @@ class ASTDebugger {
                 }
                 debug(func->body, indent + 2);
             }
+            else if (auto For = std::dynamic_pointer_cast<ForNode>(node))
+            {
+                printIndent(indent); std::cout << "For, iter_var: " << For->varName << "(auto)\n";
+
+            }
             else if (auto block = std::dynamic_pointer_cast<BlockNode>(node)) {
                 printIndent(indent); std::cout << "Block\n";
                 for (const auto& stmt : block->statements) debug(stmt, indent + 2);
@@ -96,7 +101,7 @@ int main()
     lexer.tokenize();
     const std::vector<std::vector<Token>> X = lexer.getTokens();
 
-    /*
+
     Parser parser(X);
     std::shared_ptr<ProgramNode> program = parser.parse();
     if (program) {
@@ -104,7 +109,7 @@ int main()
     } else {
         std::cerr << "Failed to parse the source code." << std::endl;
     }
-    */
+
     
     return 0;
 }
