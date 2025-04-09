@@ -77,7 +77,7 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         // [Type] [variableName] = [expression] or [variableName] ^= [expression]
         // i32 i = 0 or i ^= 0
         // ↑ if we have type, and next token is identifier, we have static variable declaration
-    else if (currentToken.type == TokenType::Type && peek().type == TokenType::Identifier)
+    else if (currentToken.type == TokenType::Type) //&& peek().type == TokenType::Identifier)
     {
         return parseAssignment(false);
     }

@@ -218,7 +218,7 @@ int Parser::getPrecedence(const Token &token) const
     if (token.type != TokenType::Operator && token.type != TokenType::Keyword) return -1;
     if (token.value == "or") return 1; // keyword
     if (token.value == "and") return 2; // keyword
-    if (token.value == "==") return 3; // operator
+    if (token.value == "==" || token.value == "<" || token.value == ">") return 3; // operator
     if (token.value == "+" || token.value == "-") return 4; // operator
     if (token.value == "*" || token.value == "/") return 5; // operator
 
@@ -234,7 +234,7 @@ std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
         Token currentToken = current(); // + текущий токен, == текущий токен
         int currentPrecedence = getPrecedence(currentToken); // Получаем приоритет текущего токена
         if (currentPrecedence < precedence) break; // Если текущий приоритет меньше, чем заданный, выходим из цикла
-        //std::cout << "not here, breaked" << std::endl; // Отладочный вывод
+
         advance(); // Переходим к следующему токену
         auto right = parseBinary(currentPrecedence); // Рекурсивно разбираем правую часть выражения
 
@@ -247,7 +247,7 @@ std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
 std::shared_ptr<ASTNode> Parser::parseUnary()
 {
     Token currentToken = current();
-    if (currentToken.type == TokenType::Operator && (currentToken.value == "-" || currentToken.value == "!"))
+    if (currentToken.type == TokenType::Operator && (currentToken.value == "!" || currentToken.value == "-"))
     {
         advance(); // Переходим к следующему токену
         auto right = parseUnary(); // Рекурсивно разбираем правую часть выражения
@@ -307,7 +307,7 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
             if (!check(TokenType::RightParen))
             {
                 do
-                {
+                { 
                     arguments.push_back(parseExpression()); // Если аргумент разобран, добавляем его в вектор
                 } while (match(TokenType::Comma));
             }
@@ -317,6 +317,44 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         }
 
         return std::make_shared<IdentifierNode>(currentToken.value); // Создаём узел идентификатора
+    }
+    else if (currentToken.type == TokenType::LeftBracket)
+    {
+        std::shared_ptr<BlockNode> body = std::make_shared<BlockNode>();
+
+        do 
+        {
+            advance();
+
+            auto value = parseExpression(); 
+
+            body->statements.push_back(value);
+        } while(current().type == TokenType::Comma);
+
+        return body;
+    }
+    else if (currentToken.type == TokenType::LeftBrace)
+    {
+        std::shared_ptr<BlockNode> body = std::make_shared<BlockNode>();
+
+        do 
+        {
+            std::shared_ptr<KeyValueNode> key_value = std::make_shared<KeyValueNode>();
+
+            advance();
+
+            auto key = parseExpression(); // {[here] : value}
+            key_value->key = key; 
+
+            consume(TokenType::Colon, "Expected : after key"); // Ну сжираем нахуй : между ними
+
+            auto value = parseExpression(); // {key : [here]}
+            key_value->value = value;
+
+            body->statements.push_back(key_value);
+        } while(current().type == TokenType::Comma);
+
+        return body;
     }
     else if (currentToken.type == TokenType::LeftParen) // Если токен - левая скобка
     {

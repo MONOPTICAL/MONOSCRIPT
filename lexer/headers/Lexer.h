@@ -55,6 +55,7 @@ private:
     std::string currentTokenValue;
     bool isStringnotFinished = false;
     bool isInMultilineComment = false;
+    bool isInMultilineExpression = false;
 
     void addToken(TokenType type, const std::string& value);
     TokenType IdentifyTokenType(const char& value) const;
