@@ -91,6 +91,7 @@ void Lexer::tokenize()
                 currentTokenValue = y;
                 continue;
             }
+
             else if (type == TokenType::Identifier && currentTokenType == TokenType::Identifier)
             {
                 currentTokenValue += y;
@@ -218,7 +219,8 @@ const std::vector<std::vector<Token>> &Lexer::getTokens() const
 void Lexer::addToken(TokenType type, const std::string &value)
 {
     std::string trimmed = ParsingFunctions::trim(value); // for safety reasons
-    IC(trimmed);
+    char first = trimmed[0]; if(first-0 < 33) return; // ёбанный компилятор сука
+    //IC(trimmed);
     Token token = {type, trimmed, currentLine, currentIndex};
     currentTokens.push_back(token);
 }
@@ -235,7 +237,7 @@ TokenType Lexer::IdentifyTokenType(const char &value) const
         return TokenType::Number;
     else if (value == '"')
         return TokenType::String;
-    else if (value == '+' || value == '-' || value == '*' || value == '/' || value == '^' || value == '=' || value == '!' || value == '<' || value == '>')
+    else if (value == '+' || value == '-' || value == '*' || value == '%' || value == '/' || value == '^' || value == '=' || value == '!' || value == '<' || value == '>')
         return TokenType::Operator;
     else if (value == '(')
         return TokenType::LeftParen;
@@ -292,12 +294,14 @@ TokenType Lexer::IsKeyword(const std::string &value) const
         "i32", "i64", "bool", "string", "void", "array", "map", "float", "struct", "class" 
     };
 
-    if (std::find(keywords.begin(), keywords.end(), value) != keywords.end())
+    std::string trimmedValue = ParsingFunctions::trim(value);
+
+    if (std::find(keywords.begin(), keywords.end(), trimmedValue) != keywords.end())
     {
         return TokenType::Keyword;
     }
 
-    if (std::find(builtinTypes.begin(), builtinTypes.end(), value) != builtinTypes.end())
+    if (std::find(builtinTypes.begin(), builtinTypes.end(), trimmedValue) != builtinTypes.end())
     {
         return TokenType::Type; // Treat builtin types as keywords
     }

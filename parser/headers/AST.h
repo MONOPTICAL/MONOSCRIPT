@@ -141,5 +141,12 @@ class NullNode : public ASTNode {
     public:
         NullNode() = default;
 };
+
+class KeyValueNode : public ASTNode {
+    public:
+        KeyValueNode() = default;
+        std::shared_ptr<ASTNode> key;
+        std::shared_ptr<ASTNode> value;
+};
     
 #endif // AST_H

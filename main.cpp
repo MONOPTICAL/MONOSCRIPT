@@ -24,9 +24,22 @@ class ASTDebugger {
                 }
                 debug(func->body, indent + 2);
             }
+            else if(auto ifNode = std::dynamic_pointer_cast<IfNode>(node))
+            {
+                printIndent(indent); std::cout << "IF condition: \n";
+                debug(ifNode->condition, indent + 2);
+                printIndent(indent); std::cout << "Then Block: \n";
+                debug(ifNode->thenBlock, indent + 2);
+                printIndent(indent); std::cout << "Else Block: \n";
+                debug(ifNode->elseBlock, indent + 2);
+            }
             else if (auto For = std::dynamic_pointer_cast<ForNode>(node))
             {
                 printIndent(indent); std::cout << "For, iter_var: " << For->varName << "(auto)\n";
+                printIndent(indent); std::cout << "Iterable: \n";
+                debug(For->iterable, indent + 2);
+                printIndent(indent); std::cout << "Body: \n";
+                debug(For->body, indent + 2);
 
             }
             else if (auto block = std::dynamic_pointer_cast<BlockNode>(node)) {
@@ -57,7 +70,7 @@ class ASTDebugger {
                 printIndent(indent); std::cout << "Value: " << num->value << " - <i32/i64>" << "\n";
             }
             else if (auto str = std::dynamic_pointer_cast<StringNode>(node)) {
-                printIndent(indent); std::cout << "Value: \"" << str->value << " - <string>" << "\"\n";
+                printIndent(indent); std::cout << "Value: " << str->value << " - <string>" << "\n";
             }
             else if (auto boolean = std::dynamic_pointer_cast<BooleanNode>(node)) {
                 printIndent(indent); std::cout << "Value: " << (boolean->value ? "true" : "false") << " - <bool>" << "\n";
@@ -69,6 +82,18 @@ class ASTDebugger {
             else if (auto null = std::dynamic_pointer_cast<NullNode>(node))
             {
                 printIndent(indent); std::cout << "Value: <null>" << "\n";
+            }
+            else if(auto retrn = std::dynamic_pointer_cast<ReturnNode>(node))
+            {
+                printIndent(indent); std::cout << "Return: " << "\n";
+                debug(retrn->expression, indent+2);
+            }
+            else if(auto keyValue = std::dynamic_pointer_cast<KeyValueNode>(node))
+            {
+                printIndent(indent); std::cout << "Key: " << "\n";
+                debug(keyValue->key, indent+2);
+                printIndent(indent); std::cout << "Value: " << "\n";
+                debug(keyValue->value, indent+2);
             }
             else {
                 printIndent(indent); std::cout << "Unknown AST node\n";
@@ -100,7 +125,6 @@ int main()
     Lexer lexer(sourceCode);
     lexer.tokenize();
     const std::vector<std::vector<Token>> X = lexer.getTokens();
-
 
     Parser parser(X);
     std::shared_ptr<ProgramNode> program = parser.parse();

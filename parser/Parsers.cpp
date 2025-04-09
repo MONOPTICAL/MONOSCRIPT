@@ -39,6 +39,10 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
         int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока if
         nextLine(); // Переходим к следующему токену
         auto body = parseBlock(expectedIndent); // Парсим тело функции
+                      // КОСТЫЛЬ АЛЕРТ 
+        lineIndex--; // Без этого он скипает 2 линии а не одну так как в parse 
+                    // После того как мы тута возвращаем и из-за этого он может проебать какие то значения
+                   // Только уёбище ленивое перепиши это 
         return std::make_shared<FunctionNode>(functionName, returnType, parameters, body); // Создаём узел функции
     }
     else
@@ -53,6 +57,7 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
 
 std::shared_ptr<ASTNode> Parser::parseIf()
 {
+    //IC(current().value, peek().value, lineIndex, tokenIndex);
     // Проверяем, что текущий токен - это ключевое слово if
     consume(TokenType::Keyword, "Expected 'if' keyword"); 
     // Мы не делаем проверку здесь на наличие круглой скобки, так как это может быть выражение без скобок
@@ -67,11 +72,19 @@ std::shared_ptr<ASTNode> Parser::parseIf()
     //IC(expectedIndent, current().value, peek().value, lineIndex, tokenIndex);
     auto thenBlock = parseBlock(expectedIndent);
     std::shared_ptr<BlockNode> elseBlock = nullptr;
-    if (check(TokenType::Keyword) && peek().value == "else")
+    tokenIndex = expectedIndent-2;
+    //IC(current().value, peek().value, lineIndex, tokenIndex, expectedIndent);
+    //if (tokenIndex!=(expectedIndent-1)) 
+
+    if (check(TokenType::Pipe) && peek().value == "else")
     {
-        advance(); // consume 'else'
+        nextLine(); // consume 'else'
         elseBlock = parseBlock(expectedIndent);
     }
+                  // КОСТЫЛЬ АЛЕРТ
+    lineIndex--; // Без этого он скипает 2 линии а не одну так как в parse 
+                // После того как мы тута возвращаем и из-за этого он может проебать какие то значения
+               // Только уёбище ленивое перепиши это 
     return std::make_shared<IfNode>(condition, thenBlock, elseBlock);
 }
 
@@ -95,14 +108,17 @@ std::shared_ptr<ASTNode> Parser::parseFor()
     }
     consume(TokenType::Keyword, "Expected 'in' keyword"); // Проверяем наличие ключевого слова in
 
-    auto variable = parseExpression(); // Парсим переменную для итерации
+    auto iterable = parseExpression(); // Парсим переменную для итерации
 
     int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока for
     nextLine(); // Переходим к следующему токену 
     //IC(expectedIndent, current().value, peek().value, lineIndex, tokenIndex);
     auto body = parseBlock(expectedIndent); // Парсим тело цикла for
-
-    return std::make_shared<ForNode>(iterationVariable, variable, body); // Создаём узел цикла for
+                  // КОСТЫЛЬ АЛЕРТ 
+    lineIndex--; // Без этого он скипает 2 линии а не одну так как в parse 
+                // После того как мы тута возвращаем и из-за этого он может проебать какие то значения
+               // Только уёбище ленивое перепиши это 
+    return std::make_shared<ForNode>(iterationVariable, iterable, body); // Создаём узел цикла for
 }
 
 std::shared_ptr<BlockNode> Parser::parseBlock(int expectedIndent)
@@ -114,9 +130,9 @@ std::shared_ptr<BlockNode> Parser::parseBlock(int expectedIndent)
     |
     */
    auto block = std::make_shared<BlockNode>();
-
    while (!isEndOfFile()) {
         int actualIndent = getIndentLevel(lines[lineIndex]);
+        //IC(current().value, peek().value, lineIndex, tokenIndex, actualIndent, expectedIndent);
         if (actualIndent < expectedIndent) break;
         if (actualIndent > expectedIndent)
             throw std::runtime_error("Unexpected indentation at line " + std::to_string(lineIndex));
@@ -141,7 +157,6 @@ std::shared_ptr<ASTNode> Parser::parseReturn()
     return 0
     */
     consume(TokenType::Keyword, "Expected 'return' keyword"); // Проверяем наличие ключевого слова return
-    advance(); // Переходим к следующему токену
     auto expression = parseExpression(); // Парсим выражение после return
     return std::make_shared<ReturnNode>(expression); // Создаём узел возврата
 }
@@ -164,6 +179,7 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
     std::string type;                                           // Переменная для хранения типа
     std::string variableName;                                   // Переменная для хранения имени переменной
     bool finalFlag = false;                                     // Флаг для проверки наличия ключевого слова final
+
     if(isConst)
     {                                     
         std::string keyWord = current().value;                  // Сохраняем текущее значение токена
@@ -178,7 +194,7 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
         advance();                                                 // Переходим к следующему токену
     }
 
-    if(current().type == TokenType::Type && (current().value != "array" || current().value != "map"))                       // Проверяем наличие типа
+    if(current().type == TokenType::Type && (current().value != "array" && current().value != "map"))                       // Проверяем наличие типа
     {
         type = current().value;                                 // Сохраняем тип переменной
         consume(TokenType::Type, "Expected type");              // Проверяем наличие типа
@@ -217,13 +233,13 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
         {Identifier, "customType"} {Identifier, "i"}
         И если посмотреть так образно то у них одинаковое окончание с Identifier и одинаковый оператор присваивания
         */
-        //IC();
         type = getFullType(); // Получаем полный тип переменной               
-        variableName = current().value;                         // Сохраняем имя переменной
+        variableName = current().value;
+
         consume(TokenType::Identifier, "Expected identifier");  // Проверяем наличие идентификатора
-        if(!check(TokenType::Operator) || current().value != "^=") // Проверяем наличие оператора присваивания
+        if(!check(TokenType::Operator) || current().value != "=") // Проверяем наличие оператора присваивания
         {
-            throw std::runtime_error("Parser Error: Expected '^=' operator after dynamic variable declaration at line " + std::to_string(current().line) +
+            throw std::runtime_error("Parser Error: Expected '=' operator after static variable declaration at line " + std::to_string(current().line) +
                 ", column " + std::to_string(current().column) +
                 ": " + current().value);
         }
@@ -239,6 +255,7 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
             ", column " + std::to_string(current().column) +
             ": " + current().value);
     }
+
     return std::make_shared<VariableAssignNode>(variableName, isConst, type ,expression); // Создаём узел присваивания переменной
 }
 
@@ -249,24 +266,23 @@ std::shared_ptr<ASTNode> Parser::parseCall()
     [functionName]([expression], [expression], ...)
     bubbleSort(arr, 0, 10)
     */
+    std::shared_ptr<CallNode> callNode = std::make_shared<CallNode>();
+    callNode->callee = current().value;
     consume(TokenType::Identifier, "Expected function name"); // Проверяем наличие идентификатора функции
-    advance(); // Переходим к следующему токену
-    if (check(TokenType::LeftParen))
-    {
-        advance(); // Переходим к следующему токену
-        
-        std::vector<std::shared_ptr<ASTNode>> arguments; // Вектор аргументов функции
-        if (!check(TokenType::RightParen))
-        {
-            do
-            {
-                arguments.push_back(parseExpression()); // Если аргумент разобран, добавляем его в вектор
-            } while (match(TokenType::Comma));
-        }
+    consume(TokenType::LeftParen, "Expected '(' after function name");
+    
+    std::vector<std::shared_ptr<ASTNode>> arguments; // Вектор аргументов функции
 
-        consume(TokenType::RightParen, "Expected ')' after function arguments"); // Проверяем наличие правой скобки
-        return std::make_shared<CallNode>(current().value, arguments); // Создаём узел вызова функции
+    if (!check(TokenType::RightParen)) // Если после ( там нету сразу ) значит есть аргументы ёпта
+    {
+        do
+        {
+            arguments.push_back(parseExpression()); // Если аргумент разобран, добавляем его в вектор
+        } while (match(TokenType::Comma));
     }
 
-    return std::make_shared<IdentifierNode>(current().value); // Создаём узел идентификатора
+    consume(TokenType::RightParen, "Expected ')' after function arguments"); // Проверяем наличие правой скобки
+    callNode->arguments = arguments;
+
+    return callNode; // Создаём узел идентификатора
 }
