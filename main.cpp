@@ -88,12 +88,23 @@ class ASTDebugger {
                 printIndent(indent); std::cout << "Return: " << "\n";
                 debug(retrn->expression, indent+2);
             }
+            else if(auto breakNode = std::dynamic_pointer_cast<BreakNode>(node))
+            {
+                printIndent(indent); std::cout << "Break: Break Statement" << "\n";
+            }
             else if(auto keyValue = std::dynamic_pointer_cast<KeyValueNode>(node))
             {
                 printIndent(indent); std::cout << "Key: " << "\n";
                 debug(keyValue->key, indent+2);
                 printIndent(indent); std::cout << "Value: " << "\n";
                 debug(keyValue->value, indent+2);
+            }
+            else if(auto whileNode = std::dynamic_pointer_cast<WhileNode>(node))
+            {
+                printIndent(indent); std::cout << "While, Condition: \n";
+                debug(whileNode->condition, indent+2);
+                printIndent(indent); std::cout << "While, Body: \n";
+                debug(whileNode->body, indent+2);
             }
             else {
                 printIndent(indent); std::cout << "Unknown AST node\n";

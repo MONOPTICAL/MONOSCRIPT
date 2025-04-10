@@ -267,7 +267,6 @@ TokenType Lexer::IdentifyTokenType(const char &value) const
 TokenType Lexer::IsKeyword(const std::string &value) const
 {
     std::vector <std::string> keywords = {
-        "echo", // Print to console
         "if",  // If statement
         "and", // Logical AND
         "or", // Logical OR

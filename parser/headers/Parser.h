@@ -38,6 +38,7 @@ private:
     std::shared_ptr<ASTNode> parseAssignment(bool);
     std::shared_ptr<ASTNode> parseIf();
     std::shared_ptr<ASTNode> parseFor();
+    std::shared_ptr<ASTNode> parseWhile();
     std::shared_ptr<ASTNode> parseReturn();
     std::shared_ptr<ASTNode> parseCall();
     /*
@@ -82,6 +83,8 @@ return [expression]
     std::shared_ptr<ASTNode> parseBinary(int precedence = 0);
     std::shared_ptr<ASTNode> parseUnary();
     std::shared_ptr<ASTNode> parsePrimary();
+
+    std::shared_ptr<ASTNode> parseDotNotation();
 
     // вспомогательное
     void consume(TokenType, const std::string& errMsg);

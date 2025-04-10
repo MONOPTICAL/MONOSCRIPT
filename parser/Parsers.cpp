@@ -121,6 +121,28 @@ std::shared_ptr<ASTNode> Parser::parseFor()
     return std::make_shared<ForNode>(iterationVariable, iterable, body); // Создаём узел цикла for
 }
 
+std::shared_ptr<ASTNode> Parser::parseWhile()
+{
+    /*
+    While statement: 
+    while (expression)
+    |   {body}
+    */
+    consume(TokenType::Keyword, "Expected 'while' keyword"); // Проверяем наличие ключевого слова while
+    auto condition = parseExpression();
+
+    int expectedIndent = getIndentLevel(lines[lineIndex]) + 1;
+    nextLine();
+
+    auto body = parseBlock(expectedIndent);
+                  // КОСТЫЛЬ АЛЕРТ 
+    lineIndex--; // Без этого он скипает 2 линии а не одну так как в parse 
+                // После того как мы тута возвращаем и из-за этого он может проебать какие то значения
+               // Только уёбище ленивое перепиши это 
+
+    return std::make_shared<WhileNode>(condition, body);
+}
+
 std::shared_ptr<BlockNode> Parser::parseBlock(int expectedIndent)
 {
     /*
