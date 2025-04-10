@@ -57,6 +57,10 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     {
         return parseFor();
     }
+    else if (currentToken.type == TokenType::Keyword && currentToken.value == "while")
+    {
+        return parseWhile();
+    }
     // Return statement
         // return [expression]
         // return 0
@@ -65,11 +69,25 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     {
         return parseReturn();
     }
+    // Break statement
+        // break
+        // ↑ if we have keyword break, we have break statement
+    else if (currentToken.type == TokenType::Keyword && currentToken.value == "break")
+    {
+        return std::make_shared<BreakNode>(); // А тут и в continue нехуй заморачиваться, правильно? правильно
+    }
+    // Continue statement
+        // continue
+        // ↑ if we have keyword continue, we have continue statement
+    else if (currentToken.type == TokenType::Keyword && currentToken.value == "continue")
+    {
+        return std::make_shared<ContinueNode>();
+    }
     // Dynamic variable declaration or assignment
         // [variableName] = [expression] or [variableName] ^= [expression]
         // i = 0 or i ^= 0
-        // ↑ if we have identifier, and next token is operator, we have dynamic variable declaration or assignment
-    else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::Operator)
+        // ↑ if we have identifier, and next token is operator and is not dot(Dot annotation), we have dynamic variable declaration or assignment
+    else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::Operator && peek().value != ".")
     {
         return parseAssignment(false);
     }

@@ -66,6 +66,16 @@ class ForNode : public ASTNode {
         std::shared_ptr<ASTNode> iterable;
         std::shared_ptr<BlockNode> body;
 };
+
+class WhileNode : public ASTNode {
+    public:
+        WhileNode() = default;
+        WhileNode(std::shared_ptr<ASTNode> condition, std::shared_ptr<BlockNode> body)
+            : condition(condition), body(body) {}
+        std::shared_ptr<ASTNode> condition;
+        std::shared_ptr<BlockNode> body;
+
+};
     
 class ReturnNode : public ASTNode {
     public:
@@ -148,5 +158,26 @@ class KeyValueNode : public ASTNode {
         std::shared_ptr<ASTNode> key;
         std::shared_ptr<ASTNode> value;
 };
+
+class BreakNode : public ASTNode {
+    public:
+        BreakNode() = default;
+};
     
+class ContinueNode : public ASTNode {
+    public:
+        ContinueNode() = default;
+};
+
+// Ну тут короче и dot и [] должны быть
+// Я рот ебал их разделять
+class AccessExpression : public ASTNode {
+    public: 
+        AccessExpression() = default;
+        AccessExpression(std::string memberName, std::shared_ptr<ASTNode> expression)
+            :   memberName(memberName), expression(expression) {};
+        std::string memberName;
+        std::shared_ptr<ASTNode> expression;
+};
+
 #endif // AST_H

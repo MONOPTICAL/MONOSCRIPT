@@ -218,9 +218,9 @@ int Parser::getPrecedence(const Token &token) const
     if (token.type != TokenType::Operator && token.type != TokenType::Keyword) return -1;
     if (token.value == "or") return 1; // keyword
     if (token.value == "and") return 2; // keyword
-    if (token.value == "==" || token.value == "<" || token.value == ">") return 3; // operator
+    if (token.value == "==" || token.value == "<" || token.value == ">" || token.value == "!=" || token.value == "<=" || token.value == ">=") return 3; // operator
     if (token.value == "+" || token.value == "-") return 4; // operator
-    if (token.value == "*" || token.value == "/") return 5; // operator
+    if (token.value == "*" || token.value == "/" || token.value == "%") return 5; // operator
 
     return -1; // Для компилятора, чтобы не ругался на -Wreturn-type
 }
@@ -361,6 +361,7 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         advance(); // Переходим к следующему токену
         auto expression = parseExpression(); // Разбираем выражение внутри скобок
 
+        IC(current().value, peek().value, lineIndex, tokenIndex);
         consume(TokenType::RightParen, "Expected ')' after expression"); // Проверяем наличие правой скобки
         return expression; // Возвращаем разобранное выражение
     }
@@ -381,4 +382,16 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
     throw std::runtime_error("Parser Error: Unknown primary expression at line " + std::to_string(currentToken.line) +
         ", column " + std::to_string(currentToken.column) +
         ": " + currentToken.value);
+}
+
+std::shared_ptr<ASTNode> Parser::parseDotNotation()
+{
+    /*
+    Значит ёпта, сюда мы получаем примерно такую хуйню
+    arr.get(4), 
+    randomStruct.randomInt,
+    randomStruct.anotherRandomStruct.randomFunc(ну и тут хуйня какая то)
+    я ща закомичу и потом сделаю
+    */
+    return std::shared_ptr<ASTNode>();
 }

@@ -140,7 +140,7 @@ i32, i64, bool, string, void, array, map, float, struct, class
 |   |   echo(arr[i])
 
 [void]main()
-|   array<i32> nums ^= [5, 3, 1, 4, 2]
+|   array<i32> nums = [5, 3, 1, 4, 2]
 |   echo("Before sort:")
 |   printArray(nums)
 |
