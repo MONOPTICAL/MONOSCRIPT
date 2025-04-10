@@ -286,7 +286,8 @@ TokenType Lexer::IsKeyword(const std::string &value) const
         "final", // Final keyword for initialization
         "public", // Public access modifier
         "private", // Private access modifier
-        "this" // Class access
+        "this", // Class access
+        "none"
     }; 
 
     std::vector<std::string> builtinTypes = {

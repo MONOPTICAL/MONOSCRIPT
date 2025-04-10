@@ -227,7 +227,7 @@ int Parser::getPrecedence(const Token &token) const
 
 std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
 {
-    auto left = parseUnary();
+    auto left = parseUnary(); // 2
 
     while (true)
     {
@@ -236,7 +236,7 @@ std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
         if (currentPrecedence < precedence) break; // Если текущий приоритет меньше, чем заданный, выходим из цикла
 
         advance(); // Переходим к следующему токену
-        auto right = parseBinary(currentPrecedence); // Рекурсивно разбираем правую часть выражения
+        auto right = parseBinary(currentPrecedence); // NumberNode - 2, NumberNode - 4
 
         left = std::make_shared<BinaryOpNode>(left, currentToken.value, right); // Создаём новый узел бинарной операции
     }
@@ -296,7 +296,7 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         advance(); // Переходим к следующему токену
         return std::make_shared<StringNode>(currentToken.value); // Создаём узел строки
     }
-    else if (currentToken.type == TokenType::Identifier) // Если токен - идентификатор
+    else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::LeftParen) // Если токен - идентификатор
     {
         advance(); // Переходим к следующему токену
         if (check(TokenType::LeftParen))
@@ -331,6 +331,7 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
             body->statements.push_back(value);
         } while(current().type == TokenType::Comma);
 
+        consume(TokenType::RightBracket, "Expected ']' after array arguments");
         return body;
     }
     else if (currentToken.type == TokenType::LeftBrace)
@@ -354,6 +355,7 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
             body->statements.push_back(key_value);
         } while(current().type == TokenType::Comma);
 
+        consume(TokenType::RightBrace, "Expected '}' after map arguments");
         return body;
     }
     else if (currentToken.type == TokenType::LeftParen) // Если токен - левая скобка
@@ -377,8 +379,17 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
             advance(); // Переходим к следующему токену
             return std::make_shared<NullNode>(); // Создаём узел null
         }
+        else if (currentToken.value == "none")
+        {
+            advance(); // Переходим к следующему токену
+            return std::make_shared<NoneNode>(); // Создаём узел none
+        }
     }
-    
+    else if (currentToken.type == TokenType::Identifier && (peek().value != "." || peek().value != "["))
+    {
+        advance();
+        return std::make_shared<IdentifierNode>(currentToken.value);
+    }
     throw std::runtime_error("Parser Error: Unknown primary expression at line " + std::to_string(currentToken.line) +
         ", column " + std::to_string(currentToken.column) +
         ": " + currentToken.value);
@@ -393,5 +404,30 @@ std::shared_ptr<ASTNode> Parser::parseDotNotation()
     randomStruct.anotherRandomStruct.randomFunc(ну и тут хуйня какая то)
     я ща закомичу и потом сделаю
     */
-    return std::shared_ptr<ASTNode>();
+    std::shared_ptr<AccessExpression> main = std::make_shared<AccessExpression>();
+    do
+    {
+        std::string memberName;
+        if(!(check(TokenType::Identifier) || check(TokenType::Type)))
+        {
+            std::runtime_error("соси");
+        } // Точечная нотация может быть только у идентификаторов и типов данных
+        memberName = current().value;
+        IC(memberName);
+        advance();
+
+        consume(TokenType::Dot, "еблан ты бля после идентификатора должна быть точка");
+        auto expression = parseExpression();
+
+        if(main->memberName.size() < 1)
+        {
+            main->memberName = memberName;
+            main->notation = ".";
+            main->expression = expression;
+        }
+        IC(main->memberName, main->expression);
+    } while (check(TokenType::Dot));
+
+
+    return main;
 }

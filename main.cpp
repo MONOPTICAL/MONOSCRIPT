@@ -47,8 +47,13 @@ class ASTDebugger {
                 for (const auto& stmt : block->statements) debug(stmt, indent + 2);
             }
             else if (auto assign = std::dynamic_pointer_cast<VariableAssignNode>(node)) {
-                printIndent(indent); std::cout << (assign->isConst ? "Const " : "Final ") << assign->type << " " << assign->name << "\n";
+                printIndent(indent); std::cout << "Assign, type: " << (assign->isConst ? "Const " : "Final ") << assign->type << ", Identifier: " << assign->name << "\n";
                 debug(assign->expression, indent + 2);
+            }
+            else if (auto reassign = std::dynamic_pointer_cast<VariableReassignNode>(node))
+            {
+                printIndent(indent); std::cout << "Reassign, identifier: " << reassign->name << "\n";
+                debug(reassign->expression, indent + 2); 
             }
             else if (auto call = std::dynamic_pointer_cast<CallNode>(node)) {
                 printIndent(indent); std::cout << "Call: " << call->callee << "(...)\n";
@@ -59,12 +64,21 @@ class ASTDebugger {
                 debug(bin->left, indent + 2);
                 debug(bin->right, indent + 2);
             }
+            else if (auto access = std::dynamic_pointer_cast<AccessExpression>(node)) {
+                printIndent(indent); std::cout << "Access Notation: " << access->notation << " Member: " << access->memberName << "\n";
+                debug(access->expression, indent + 2);
+            }
             else if (auto un = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
                 printIndent(indent); std::cout << "UnaryOp: " << un->op << "\n";
                 debug(un->operand, indent + 2);
             }
             else if (auto ident = std::dynamic_pointer_cast<IdentifierNode>(node)) {
                 printIndent(indent); std::cout << "Value: " << ident->name << " - <identifier>" << "\n";
+            }
+            else if (auto structNode = std::dynamic_pointer_cast<StructNode>(node))
+            {
+                printIndent(indent); std::cout << "Struct, name: " << structNode->name << "\n";
+                debug(structNode->body, indent+2);
             }
             else if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
                 printIndent(indent); std::cout << "Value: " << num->value << " - <i32/i64>" << "\n";
@@ -75,32 +89,29 @@ class ASTDebugger {
             else if (auto boolean = std::dynamic_pointer_cast<BooleanNode>(node)) {
                 printIndent(indent); std::cout << "Value: " << (boolean->value ? "true" : "false") << " - <bool>" << "\n";
             }
-            else if (auto floatNum = std::dynamic_pointer_cast<FloatNumberNode>(node))
-            {
+            else if (auto floatNum = std::dynamic_pointer_cast<FloatNumberNode>(node)) {
                 printIndent(indent); std::cout << "Value: " << floatNum->value << " - <float>" << "\n";
             }
-            else if (auto null = std::dynamic_pointer_cast<NullNode>(node))
-            {
+            else if (auto null = std::dynamic_pointer_cast<NullNode>(node)) {
                 printIndent(indent); std::cout << "Value: <null>" << "\n";
             }
-            else if(auto retrn = std::dynamic_pointer_cast<ReturnNode>(node))
-            {
+            else if (auto none = std::dynamic_pointer_cast<NoneNode>(node)){
+                printIndent(indent); std::cout << "Value: <none>" << "\n";
+            }
+            else if(auto retrn = std::dynamic_pointer_cast<ReturnNode>(node)) {
                 printIndent(indent); std::cout << "Return: " << "\n";
                 debug(retrn->expression, indent+2);
             }
-            else if(auto breakNode = std::dynamic_pointer_cast<BreakNode>(node))
-            {
+            else if(auto breakNode = std::dynamic_pointer_cast<BreakNode>(node)) {
                 printIndent(indent); std::cout << "Break: Break Statement" << "\n";
             }
-            else if(auto keyValue = std::dynamic_pointer_cast<KeyValueNode>(node))
-            {
+            else if(auto keyValue = std::dynamic_pointer_cast<KeyValueNode>(node)){
                 printIndent(indent); std::cout << "Key: " << "\n";
                 debug(keyValue->key, indent+2);
                 printIndent(indent); std::cout << "Value: " << "\n";
                 debug(keyValue->value, indent+2);
             }
-            else if(auto whileNode = std::dynamic_pointer_cast<WhileNode>(node))
-            {
+            else if(auto whileNode = std::dynamic_pointer_cast<WhileNode>(node)) {
                 printIndent(indent); std::cout << "While, Condition: \n";
                 debug(whileNode->condition, indent+2);
                 printIndent(indent); std::cout << "While, Body: \n";

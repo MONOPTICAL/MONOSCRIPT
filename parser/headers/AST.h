@@ -29,6 +29,14 @@ class FunctionNode : public ASTNode {
         std::shared_ptr<ASTNode> body; // BlockNode
 };
 
+class StructNode : public ASTNode {
+    public:
+        StructNode() = default;
+        StructNode(const std::string& name, std::shared_ptr<ASTNode> body) : name(name), body(body) {}
+        std::string name;
+        std::shared_ptr<ASTNode> body;
+};
+
 class BlockNode : public ASTNode {
     public:
         BlockNode() = default;
@@ -44,6 +52,15 @@ class VariableAssignNode : public ASTNode {
         std::string name;
         std::string type;
         bool isConst;
+        std::shared_ptr<ASTNode> expression;
+};
+
+class VariableReassignNode : public ASTNode {
+    public:
+        VariableReassignNode() = default;
+        VariableReassignNode(const std::string& name, std::shared_ptr<ASTNode> expression) 
+            : name(name), expression(expression) {}
+        std::string name;
         std::shared_ptr<ASTNode> expression;
 };
     
@@ -152,6 +169,11 @@ class NullNode : public ASTNode {
         NullNode() = default;
 };
 
+class NoneNode : public ASTNode {
+    public:
+        NoneNode() = default;
+};
+
 class KeyValueNode : public ASTNode {
     public:
         KeyValueNode() = default;
@@ -177,6 +199,7 @@ class AccessExpression : public ASTNode {
         AccessExpression(std::string memberName, std::shared_ptr<ASTNode> expression)
             :   memberName(memberName), expression(expression) {};
         std::string memberName;
+        std::string notation;
         std::shared_ptr<ASTNode> expression;
 };
 

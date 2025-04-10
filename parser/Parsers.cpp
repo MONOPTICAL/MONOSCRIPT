@@ -212,7 +212,6 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
                 ": " + current().value);
         }
         keyWord != "const" ? finalFlag = true : finalFlag = false; // Если токен - это const, то finalFlag = false, иначе finalFlag = true
-        //IC(finalFlag);
         advance();                                                 // Переходим к следующему токену
     }
 
@@ -223,10 +222,9 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
         variableName = current().value;                         // Сохраняем имя переменной
         consume(TokenType::Identifier, "Expected identifier");  // Проверяем наличие идентификатора
         if(!check(TokenType::Operator) || current().value != "=") // Проверяем наличие оператора присваивания
-        {
-            throw std::runtime_error("Parser Error: Expected '=' operator after static variable declaration at line " + std::to_string(current().line) +
-                ", column " + std::to_string(current().column) +
-                ": " + current().value);
+        {   
+            std::shared_ptr<NoneNode> none = std::make_shared<NoneNode>();
+            return std::make_shared<VariableAssignNode>(variableName, isConst, type, none);
         }
     }
     else if(current().type == TokenType::Identifier && peek().value == "^=") // Проверяем наличие идентификатора
@@ -240,6 +238,15 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
                 ", column " + std::to_string(current().column) +
                 ": " + current().value);
         }
+    }
+    else if(current().type == TokenType::Identifier && peek().value == "=")
+    {
+        // ну тут тогда простой assignment
+        variableName = current().value;                         // Сохраняем имя переменной
+        consume(TokenType::Identifier, "Expected identifier");  // Проверяем наличие идентификатора
+        consume(TokenType::Operator, "Expected = operator");
+        auto expression = parseExpression();
+        return std::make_shared<VariableReassignNode>(variableName, expression);
     }
     else
     {   // Тут обрабатываются случаи с динамической инициализацией переменной и с кастомным типом(например, array<i32>)
@@ -261,9 +268,8 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
         consume(TokenType::Identifier, "Expected identifier");  // Проверяем наличие идентификатора
         if(!check(TokenType::Operator) || current().value != "=") // Проверяем наличие оператора присваивания
         {
-            throw std::runtime_error("Parser Error: Expected '=' operator after static variable declaration at line " + std::to_string(current().line) +
-                ", column " + std::to_string(current().column) +
-                ": " + current().value);
+            std::shared_ptr<NoneNode> none = std::make_shared<NoneNode>();
+            return std::make_shared<VariableAssignNode>(variableName, isConst, type, none);
         }
     }
     // Здесь мы уже у оператора присваивания, который идёт после имени переменной
@@ -307,4 +313,32 @@ std::shared_ptr<ASTNode> Parser::parseCall()
     callNode->arguments = arguments;
 
     return callNode; // Создаём узел идентификатора
+}
+
+std::shared_ptr<ASTNode> Parser::parseStruct()
+{
+    /*
+|   // Struct definition
+|   [struct] User
+|   | string name = "name"
+|   | i32 age = 42
+|   | bool isActive = true
+    */
+   
+    consume(TokenType::LeftBracket, "Expected '[' before struct declaration"); // Проверяем наличие левой скобки
+    consume(TokenType::Type, "Expected 'struct' keyword"); // Проверяем наличие ключевого слова struct
+    consume(TokenType::RightBracket, "Expected ']' before struct declaration"); // Проверяем наличие левой скобки
+
+    std::string name = current().value; // Сохраняем имя структуры
+    consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора структуры
+    
+    int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока структуры
+    nextLine(); // Переходим к следующему токену
+    auto body = parseBlock(expectedIndent); // Парсим тело структуры
+                  // КОСТЫЛЬ АЛЕРТ
+    lineIndex--; // Без этого он скипает 2 линии а не одну так как в parse
+                // После того как мы тута возвращаем и из-за этого он может проебать какие то значения
+               // Только уёбище ленивое перепиши это    
+    
+    return std::make_shared<StructNode>(name, body); // Создаём узел структуры
 }

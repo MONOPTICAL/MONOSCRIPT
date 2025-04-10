@@ -41,6 +41,7 @@ private:
     std::shared_ptr<ASTNode> parseWhile();
     std::shared_ptr<ASTNode> parseReturn();
     std::shared_ptr<ASTNode> parseCall();
+    std::shared_ptr<ASTNode> parseStruct();
     /*
     parseStruct
     parseClass

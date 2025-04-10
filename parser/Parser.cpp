@@ -37,9 +37,14 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         // [Type]functionName([Type]: variableName ...)
         // [array<i32>]bubbleSort(array<i32>: arr)
         // ↑ if we have left bracket, we have function declaration
-    if (currentToken.type == TokenType::LeftBracket)
+    if (currentToken.type == TokenType::LeftBracket && getLastTokenInCurrentLine().type == TokenType::RightParen)
     {
         return parseFunction();
+        
+    }
+    else if (currentToken.type == TokenType::LeftBracket && peek().value == "struct")
+    {
+        return parseStruct();
     }
     // If statement
         // if [expression] or if [expression]
@@ -83,11 +88,15 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     {
         return std::make_shared<ContinueNode>();
     }
+    else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::Dot)
+    {
+        return parseDotNotation();
+    }
     // Dynamic variable declaration or assignment
         // [variableName] = [expression] or [variableName] ^= [expression]
         // i = 0 or i ^= 0
         // ↑ if we have identifier, and next token is operator and is not dot(Dot annotation), we have dynamic variable declaration or assignment
-    else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::Operator && peek().value != ".")
+    else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::Operator)
     {
         return parseAssignment(false);
     }
