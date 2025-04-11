@@ -201,6 +201,7 @@ class AccessExpression : public ASTNode {
         std::string memberName;
         std::string notation;
         std::shared_ptr<ASTNode> expression;
+        std::shared_ptr<ASTNode> nextAccess;
 };
 
 #endif // AST_H

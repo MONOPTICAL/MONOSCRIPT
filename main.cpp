@@ -66,7 +66,14 @@ class ASTDebugger {
             }
             else if (auto access = std::dynamic_pointer_cast<AccessExpression>(node)) {
                 printIndent(indent); std::cout << "Access Notation: " << access->notation << " Member: " << access->memberName << "\n";
-                debug(access->expression, indent + 2);
+                if(access->expression)
+                    debug(access->expression, indent + 2);
+                
+                if(access->nextAccess)
+                {
+                    printIndent(indent); std::cout << "Next Access: \n";
+                    debug(access->nextAccess, indent + 2);
+                }
             }
             else if (auto un = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
                 printIndent(indent); std::cout << "UnaryOp: " << un->op << "\n";
