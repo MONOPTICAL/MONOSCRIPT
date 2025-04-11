@@ -133,6 +133,7 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     {
         return parseCall();
     }
+    // убрать это нахуй, какой бля нормальный человек начнёт писать строку с (
     else if (currentToken.type == TokenType::LeftParen)
     {
         return parseExpression();
@@ -143,5 +144,5 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
             ", column " + std::to_string(currentToken.column) +
             ": " + currentToken.value);
     }
-    return nullptr; // Если ничего не найдено, возвращаем nullptr
+    return nullptr;
 }

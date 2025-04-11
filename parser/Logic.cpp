@@ -318,6 +318,10 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
 
         return std::make_shared<IdentifierNode>(currentToken.value); // Создаём узел идентификатора
     }
+    else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::Dot)
+    {
+        return parseDotNotation();
+    }
     else if (currentToken.type == TokenType::LeftBracket)
     {
         std::shared_ptr<BlockNode> body = std::make_shared<BlockNode>();
@@ -404,30 +408,74 @@ std::shared_ptr<ASTNode> Parser::parseDotNotation()
     randomStruct.anotherRandomStruct.randomFunc(ну и тут хуйня какая то)
     я ща закомичу и потом сделаю
     */
-    std::shared_ptr<AccessExpression> main = std::make_shared<AccessExpression>();
+
+    /*
+        test.some.random()
+        1)
+            AccessExpression
+            memberName-> test
+            expression-> null
+            nextAccess-> null
+        2)  
+            AccessExpression
+            memberName-> test
+            expression-> null
+            nextAccess-> AccessExpression
+                         memberName-> some
+                         expression-> null
+                         nextAccess-> null
+        3)
+            AccessExpression
+            memberName-> test
+            expression-> null
+            nextAccess-> AccessExpression
+                         memberName-> some
+                         expression-> null
+                         nextAccess-> AccessExpression
+                                      memberName-> random
+                                      expression-> Function Call
+                                      nextAccess-> null
+
+[void]User()
+|  [User]__init__(string: name, string: password, string: id)
+|  |  User_Password = {"name" : name, "password": password, "id" : id} 
+|  [map<string,string>]GetUserInfo()
+|  |  return User_Info   
+|  map<string,string> User_Info                           
+    */
+    std::shared_ptr<AccessExpression> root = std::make_shared<AccessExpression>();
+    std::shared_ptr<ASTNode> memberName;
+    auto currentNode = root;
     do
     {
-        std::string memberName;
+        auto next = std::make_shared<AccessExpression>();
+
         if(!(check(TokenType::Identifier) || check(TokenType::Type)))
         {
             std::runtime_error("соси");
         } // Точечная нотация может быть только у идентификаторов и типов данных
-        memberName = current().value;
-        IC(memberName);
-        advance();
+        next->memberName = current().value;
+        next->notation = ".";
 
-        consume(TokenType::Dot, "еблан ты бля после идентификатора должна быть точка");
-        auto expression = parseExpression();
-
-        if(main->memberName.size() < 1)
+        if(peek().type == TokenType::LeftParen)
         {
-            main->memberName = memberName;
-            main->notation = ".";
-            main->expression = expression;
+            next->expression = parseCall();
         }
-        IC(main->memberName, main->expression);
-    } while (check(TokenType::Dot));
+        else
+        {
+            //next->expression = std::make_shared<IdentifierNode>(memberName);
+            advance();
+        }
 
+        currentNode->nextAccess = next;
+        currentNode = next;
+        if(root->memberName.size() < 1)
+        {
+            root = next; 
+        }
+        //IC(current().value);
+    } while (match(TokenType::Dot));
 
-    return main;
+    IC(current().value, lineIndex, tokenIndex);
+    return root;
 }
