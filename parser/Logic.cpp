@@ -436,12 +436,12 @@ std::shared_ptr<ASTNode> Parser::parseDotNotation()
                                       expression-> Function Call
                                       nextAccess-> null
 
-[void]User()
-|  [User]__init__(string: name, string: password, string: id)
-|  |  User_Password = {"name" : name, "password": password, "id" : id} 
-|  [map<string,string>]GetUserInfo()
-|  |  return User_Info   
-|  map<string,string> User_Info                           
+    [void]User()
+    |  [User]__init__(string: name, string: password, string: id)
+    |  |  User_Password = {"name" : name, "password": password, "id" : id} 
+    |  [map<string,string>]GetUserInfo()
+    |  |  return User_Info   
+    |  map<string,string> User_Info                           
     */
     std::shared_ptr<AccessExpression> root = std::make_shared<AccessExpression>();
     std::shared_ptr<ASTNode> memberName;

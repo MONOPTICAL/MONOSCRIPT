@@ -80,11 +80,14 @@ map<string, i32> очки ^= {"Alice": 10, "Bob": 8}
 
 ### ✅ Классы и методы
 ```monoscript
-[class] Logger
-| public:
-| | void : logInfo
-| private:
-| | string : secretKey
+[class]User
+public:
+|  [User]__init__(string: name, string: password, string: id)
+|  |  User_Info = {"name" : name, "password": password, "id" : id} 
+|  [map<string,string>]GetUserInfo()
+|  |  return User_Info   
+private:
+|  map<string,string> User_Info
 ```
 
 **Альтернативная реализация методов:**
@@ -113,8 +116,8 @@ return выражение
 ## 🔤 Ключевые слова
 ```
 echo, if, else, for, while, return, break, continue,
-true, false, null, import, const, final,
-in, and, or, is, public, private
+true, false, null, none, import, const, 
+final, in, and, or, is, public, private
 ```
 
 ## 🔢 Встроенные типы

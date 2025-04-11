@@ -71,8 +71,22 @@ class ASTDebugger {
                 
                 if(access->nextAccess)
                 {
-                    printIndent(indent); std::cout << "Next Access: \n";
+                    printIndent(indent+1); std::cout << "Next Access: \n";
                     debug(access->nextAccess, indent + 2);
+                }
+            }
+            else if (auto classNode = std::dynamic_pointer_cast<ClassNode>(node))
+            {
+                printIndent(indent); std::cout << "Class " << classNode->name << "\n";
+                if(classNode->private_body)
+                {
+                    printIndent(indent+1); std::cout << "Private Block:" << "\n";
+                    debug(classNode->private_body, indent+2);
+                }
+                if(classNode->public_body)
+                {
+                    printIndent(indent+1); std::cout << "Public Block:" << "\n";
+                    debug(classNode->public_body, indent+2);
                 }
             }
             else if (auto un = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
@@ -121,7 +135,7 @@ class ASTDebugger {
             else if(auto whileNode = std::dynamic_pointer_cast<WhileNode>(node)) {
                 printIndent(indent); std::cout << "While, Condition: \n";
                 debug(whileNode->condition, indent+2);
-                printIndent(indent); std::cout << "While, Body: \n";
+                printIndent(indent+1); std::cout << "While, Body: \n";
                 debug(whileNode->body, indent+2);
             }
             else {
