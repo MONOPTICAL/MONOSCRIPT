@@ -84,8 +84,10 @@ return [expression]
     std::shared_ptr<ASTNode> parseBinary(int precedence = 0);
     std::shared_ptr<ASTNode> parseUnary();
     std::shared_ptr<ASTNode> parsePrimary();
-
-    std::shared_ptr<ASTNode> parseDotNotation();
+    std::shared_ptr<ASTNode> parseMemberExpression();
+    
+    void parseDotNotation(std::shared_ptr<AccessExpression>);
+    void parseArrayNotation(std::shared_ptr<AccessExpression>);
 
     // вспомогательное
     void consume(TokenType, const std::string& errMsg);
@@ -94,6 +96,8 @@ return [expression]
     int getIndentLevel(const std::vector<Token>& line);
     Token getLastTokenInCurrentLine() const;
     int getPrecedence(const Token& token) const;
+    void throwError(const std::string& errMsg);
+
     std::string getFullType();
 };
     

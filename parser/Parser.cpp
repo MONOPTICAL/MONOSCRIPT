@@ -94,7 +94,7 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     }
     else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::Dot)
     {
-        return parseDotNotation();
+        return parseMemberExpression();
     }
     // Dynamic variable declaration or assignment
         // [variableName] = [expression] or [variableName] ^= [expression]
