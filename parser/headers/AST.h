@@ -204,4 +204,14 @@ class AccessExpression : public ASTNode {
         std::shared_ptr<ASTNode> nextAccess;
 };
 
+class ClassNode : public ASTNode {
+    public:
+        ClassNode() = default;
+        ClassNode(const std::string& name, std::shared_ptr<ASTNode> public_body, std::shared_ptr<ASTNode> private_body) 
+            :   name(name), public_body(public_body), private_body(private_body) {}
+    std::string name;
+    std::shared_ptr<ASTNode> public_body;
+    std::shared_ptr<ASTNode> private_body;
+};
+
 #endif // AST_H

@@ -42,6 +42,10 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         return parseFunction();
         
     }
+    else if (currentToken.type == TokenType::LeftBracket && peek().value == "class")
+    {
+        return parseClass();
+    }
     else if (currentToken.type == TokenType::LeftBracket && peek().value == "struct")
     {
         return parseStruct();

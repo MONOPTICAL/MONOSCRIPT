@@ -342,3 +342,54 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
     
     return std::make_shared<StructNode>(name, body); // Создаём узел структуры
 }
+
+std::shared_ptr<ASTNode> Parser::parseClass()
+{
+    consume(TokenType::LeftBracket, "Expected '[' before struct declaration"); // Проверяем наличие левой скобки
+    consume(TokenType::Type, "Expected 'class' keyword"); // Проверяем наличие ключевого слова struct
+    consume(TokenType::RightBracket, "Expected ']' before struct declaration"); // Проверяем наличие левой скобки
+
+    std::string name = current().value; // Сохраняем имя структуры
+    consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора структуры
+
+    nextLine();
+
+
+    std::shared_ptr<ASTNode> private_body; 
+    std::shared_ptr<ASTNode> public_body;
+    Token currentAccess = current();
+    int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока структуры
+
+    // Первый AccessBlock(private/public)
+    IC(currentAccess.value);
+    if(currentAccess.type == TokenType::Keyword && (currentAccess.value == "public" || currentAccess.value == "private")) // Проверяем наличие ключевого слова public
+    {
+        consume(TokenType::Keyword, "Expected keyword"); // Проверяем наличие ключевого слова public
+        nextLine();
+        if(currentAccess.value == "public")
+            public_body = parseBlock(expectedIndent);
+        else
+            private_body = parseBlock(expectedIndent);
+    }
+    else
+    {
+        throw std::runtime_error("ты еблан бля кто делает класс и не ставит public или private");
+    }
+
+    // Второй AccessBlock(private/public)
+    currentAccess = current();
+    if(currentAccess.type == TokenType::Keyword && (currentAccess.value == "public" || currentAccess.value == "private")) 
+    {
+        consume(TokenType::Keyword, "Expected keyword"); // Проверяем наличие ключевого слова public
+        nextLine();
+        if(currentAccess.value == "public")
+            public_body = parseBlock(expectedIndent);
+        else if(currentAccess.value == "private")
+            private_body = parseBlock(expectedIndent);
+        else
+            throw std::runtime_error("ты еблан бля кто делает класс и не ставит public или private");
+    }
+
+    lineIndex--;
+    return std::make_shared<ClassNode>(name, public_body, private_body); // Создаём узел структуры   
+}
