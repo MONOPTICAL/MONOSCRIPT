@@ -101,6 +101,12 @@ bool Parser::nextLine()
     return true;
 }
 
+void Parser::throwError(const std::string &errMsg)
+{
+    throw std::runtime_error("Parser Error: " + errMsg +
+        " at line " + std::to_string(lineIndex));
+}
+
 /// @brief Проверяет, совпадает ли текущий токен с заданным типом и переходит к следующему токену, если совпадает
 /// @param Token Тип токена, с которым нужно сравнить текущий токен
 /// @param errMsg Сообщение об ошибке, если токен не совпадает с заданным типом
@@ -110,8 +116,7 @@ void Parser::consume(TokenType Token, const std::string &errMsg)
 {
     if (match(Token)) return;
 
-    throw std::runtime_error("Parser Error: " + errMsg +
-        " at line " + std::to_string(lineIndex));
+    throwError(errMsg);
 }
 
 /// @brief  Проверяет, достигнут ли конец файла
@@ -318,13 +323,18 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
 
         return std::make_shared<IdentifierNode>(currentToken.value); // Создаём узел идентификатора
     }
+    else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::LeftBracket)
+    {
+        return parseMemberExpression();
+    }
     else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::Dot)
     {
-        return parseDotNotation();
+        return parseMemberExpression();
     }
     else if (currentToken.type == TokenType::LeftBracket)
     {
         std::shared_ptr<BlockNode> body = std::make_shared<BlockNode>();
+        if(peek().type == TokenType::RightBracket)  return std::make_shared<NoneNode>(); // если нихуя нету в скобках скипай
 
         do 
         {
@@ -399,83 +409,85 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         ": " + currentToken.value);
 }
 
-std::shared_ptr<ASTNode> Parser::parseDotNotation()
+void Parser::parseDotNotation(std::shared_ptr<AccessExpression> next)
 {
-    /*
-    Значит ёпта, сюда мы получаем примерно такую хуйню
-    arr.get(4), 
-    randomStruct.randomInt,
-    randomStruct.anotherRandomStruct.randomFunc(ну и тут хуйня какая то)
-    я ща закомичу и потом сделаю
-    */
+    // Точечная нотация
+    advance(); // пропускаем .
 
-    /*
-        test.some.random()
-        1)
-            AccessExpression
-            memberName-> test
-            expression-> null
-            nextAccess-> null
-        2)  
-            AccessExpression
-            memberName-> test
-            expression-> null
-            nextAccess-> AccessExpression
-                         memberName-> some
-                         expression-> null
-                         nextAccess-> null
-        3)
-            AccessExpression
-            memberName-> test
-            expression-> null
-            nextAccess-> AccessExpression
-                         memberName-> some
-                         expression-> null
-                         nextAccess-> AccessExpression
-                                      memberName-> random
-                                      expression-> Function Call
-                                      nextAccess-> null
+    if (!(check(TokenType::Identifier) || check(TokenType::Type)))
+    {
+        throwError("После точки ожидался идентификатор или тип");
+    }
+    
+    next->memberName = current().value;
 
-    [void]User()
-    |  [User]__init__(string: name, string: password, string: id)
-    |  |  User_Password = {"name" : name, "password": password, "id" : id} 
-    |  [map<string,string>]GetUserInfo()
-    |  |  return User_Info   
-    |  map<string,string> User_Info                           
-    */
+    if(peek().type == TokenType::LeftParen)
+    {
+        next->expression = parseCall();
+    }
+    else 
+        advance();
+    
+    next->notation = ".";
+}
+
+void Parser::parseArrayNotation(std::shared_ptr<AccessExpression> next)
+{
+    // Индексная нотация
+    advance(); // пропускаем [
+    
+    if (check(TokenType::RightBracket))
+    {
+        throwError("Expected primary-expression before ']'");
+    }
+    
+    next->expression = parseExpression();
+    next->notation = "[]";
+    
+    consume(TokenType::RightBracket, "Expected ']' after array notation");
+}
+
+std::shared_ptr<ASTNode> Parser::parseMemberExpression()
+{
     std::shared_ptr<AccessExpression> root = std::make_shared<AccessExpression>();
-    std::shared_ptr<ASTNode> memberName;
     auto currentNode = root;
-    do
+    
+    if (!(check(TokenType::Identifier) || check(TokenType::Type)))
+    {
+        throwError("Expected type or identifier in member expression");
+    }
+    
+    root->memberName = current().value;
+    advance();
+    
+    while (check(TokenType::Dot) || check(TokenType::LeftBracket) || 
+           (check(TokenType::LeftParen) && currentNode->memberName.size() > 0))
     {
         auto next = std::make_shared<AccessExpression>();
-
-        if(!(check(TokenType::Identifier) || check(TokenType::Type)))
+        next->memberName = currentNode->memberName;
+        
+        if (check(TokenType::Dot))
         {
-            std::runtime_error("соси");
-        } // Точечная нотация может быть только у идентификаторов и типов данных
-        next->memberName = current().value;
-        next->notation = ".";
-
-        if(peek().type == TokenType::LeftParen)
+            parseDotNotation(next);
+        }
+        else if (check(TokenType::LeftBracket))
+        {
+            parseArrayNotation(next);
+        }
+        else if (check(TokenType::LeftParen))
         {
             next->expression = parseCall();
+            next->notation = ".";
         }
-        else
-        {
-            //next->expression = std::make_shared<IdentifierNode>(memberName);
-            advance();
-        }
-
+        
         currentNode->nextAccess = next;
         currentNode = next;
-        if(root->memberName.size() < 1)
-        {
-            root = next; 
-        }
-        //IC(current().value);
-    } while (match(TokenType::Dot));
-
-    IC(current().value, lineIndex, tokenIndex);
+    }
+    
+    if (root->nextAccess == nullptr && !root->expression)
+    {
+        return std::make_shared<IdentifierNode>(root->memberName);
+    }
+    
     return root;
 }
