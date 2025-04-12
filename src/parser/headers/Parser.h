@@ -24,7 +24,6 @@ private:
     Token current(); // возвращает текущий токен
     Token advance(); // переходит к следующему токену
     Token peek(); // возвращает следующий токен без перехода к нему
-    std::string peekType();
     bool nextLine(); // переходит к следующей строке токенов
     bool match(TokenType type); // проверяет, совпадает ли текущий токен с заданным типом
                                 // и если да, переходит к следующему токену
@@ -98,6 +97,6 @@ return [expression]
     int getPrecedence(const Token& token) const;
     void throwError(const std::string& errMsg);
 
-    std::string getFullType();
+    std::shared_ptr<TypeNode> getFullType();
 };
     

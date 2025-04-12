@@ -11,6 +11,42 @@ class ASTNode {
         virtual ~ASTNode() = default;
 };
 
+class TypeNode : public ASTNode {
+    public:
+        TypeNode() = default;
+        virtual ~TypeNode() = default;
+        virtual std::string toString() const = 0; // Printing type
+};
+
+class SimpleTypeNode : public TypeNode {
+    public:
+        SimpleTypeNode(const std::string& name) : name(name) {}
+        std::string name;
+
+        std::string toString() const override {
+            return name;
+        }
+};
+
+class GenericTypeNode : public TypeNode {
+    public:
+        GenericTypeNode(const std::string& baseName) : baseName(baseName) {}
+
+        std::string baseName;
+        std::vector<std::shared_ptr<TypeNode>> typeParameters;
+
+        std::string toString() const override {
+            std::string result = baseName + "<";
+            for(size_t i=0; i < typeParameters.size(); ++i)
+            {
+                    if(i>0) result += ", ";
+                    result += typeParameters[i]->toString();
+            }
+            result += ">";
+            return result;
+        }
+};
+
 class ProgramNode : public ASTNode {
     public:
         ProgramNode() = default;
@@ -21,11 +57,11 @@ class ProgramNode : public ASTNode {
 class FunctionNode : public ASTNode {
     public:
         FunctionNode() = default;
-        FunctionNode(const std::string& name, const std::string& returnType, const std::vector<std::pair<std::string, std::string>>& parameters, std::shared_ptr<ASTNode> body) 
+        FunctionNode(const std::string& name, std::shared_ptr<TypeNode> returnType, const std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters, std::shared_ptr<ASTNode> body) 
             : name(name), returnType(returnType), parameters(parameters), body(body) {}
         std::string name;
-        std::string returnType;
-        std::vector<std::pair<std::string, std::string>> parameters; // {type, name}
+        std::shared_ptr<TypeNode> returnType;
+        std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters; // {type, name}
         std::shared_ptr<ASTNode> body; // BlockNode
 };
 
@@ -47,10 +83,10 @@ class BlockNode : public ASTNode {
 class VariableAssignNode : public ASTNode {
     public:
         VariableAssignNode() = default;
-        VariableAssignNode(const std::string& name, bool isConst, const std::string& type, std::shared_ptr<ASTNode> expression) 
+        VariableAssignNode(const std::string& name, bool isConst, std::shared_ptr<TypeNode> type, std::shared_ptr<ASTNode> expression) 
             : name(name), isConst(isConst), type(type), expression(expression) {}
         std::string name;
-        std::string type;
+        std::shared_ptr<TypeNode> type;
         bool isConst;
         std::shared_ptr<ASTNode> expression;
 };

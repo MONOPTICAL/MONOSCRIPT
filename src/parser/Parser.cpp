@@ -22,6 +22,7 @@ std::shared_ptr<ProgramNode> Parser::parse()
                 ": " + current().value);
         }
         if (statement) program->body.push_back(statement);
+        //if (!isEndOfLine()) throwError("Character not parsed at the end of");
         if (!nextLine()) break; // если не удалось перейти к следующей строке, выходим из цикла
     }
     return program;
