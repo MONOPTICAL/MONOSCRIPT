@@ -69,17 +69,25 @@ std::shared_ptr<ASTNode> Parser::parseIf()
     auto condition = parseExpression();
     int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока if
     nextLine(); // Переходим к следующей строке токенов 
-    //IC(expectedIndent, current().value, peek().value, lineIndex, tokenIndex);
+
     auto thenBlock = parseBlock(expectedIndent);
-    std::shared_ptr<BlockNode> elseBlock = nullptr;
-    tokenIndex = expectedIndent-2;
-    //IC(current().value, peek().value, lineIndex, tokenIndex, expectedIndent);
+    std::shared_ptr<ASTNode> elseBlock = nullptr;
+    tokenIndex = expectedIndent-1;
     //if (tokenIndex!=(expectedIndent-1)) 
 
-    if (check(TokenType::Pipe) && peek().value == "else")
+    if (current().value == "else")
     {
-        nextLine(); // consume 'else'
-        elseBlock = parseBlock(expectedIndent);
+        if(peek().value == "if")
+        {
+            advance();
+            elseBlock = parseIf();
+            lineIndex++;
+        }
+        else
+        {
+            nextLine(); // consume 'else'
+            elseBlock = parseBlock(expectedIndent);
+        }
     }
                   // КОСТЫЛЬ АЛЕРТ
     lineIndex--; // Без этого он скипает 2 линии а не одну так как в parse 
@@ -154,8 +162,9 @@ std::shared_ptr<BlockNode> Parser::parseBlock(int expectedIndent)
    auto block = std::make_shared<BlockNode>();
    while (!isEndOfFile()) {
         int actualIndent = getIndentLevel(lines[lineIndex]);
-        //IC(current().value, peek().value, lineIndex, tokenIndex, actualIndent, expectedIndent);
+
         if (actualIndent < expectedIndent) break;
+        
         if (actualIndent > expectedIndent)
             throw std::runtime_error("Unexpected indentation at line " + std::to_string(lineIndex) + " at " + current().value);
 
@@ -170,6 +179,15 @@ std::shared_ptr<BlockNode> Parser::parseBlock(int expectedIndent)
 
    return block;
 }
+
+/*
+if totalScore > 10 and !(totalScore == 15)
+|   echo("Above threshold")
+else if totalScore == 15
+|   echo("Exact match")
+else
+|   echo("Below threshold")
+*/
 
 std::shared_ptr<ASTNode> Parser::parseReturn()
 {

@@ -92,7 +92,7 @@ bool Parser::nextLine()
 void Parser::throwError(const std::string &errMsg)
 {
     throw std::runtime_error("Parser Error: " + errMsg +
-        " at line " + std::to_string(lineIndex));
+        " at line " + std::to_string(lineIndex+1));
 }
 
 /// @brief Проверяет, совпадает ли текущий токен с заданным типом и переходит к следующему токену, если совпадает
@@ -365,7 +365,7 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         advance(); // Переходим к следующему токену
         auto expression = parseExpression(); // Разбираем выражение внутри скобок
 
-        IC(current().value, peek().value, lineIndex, tokenIndex);
+        //IC(current().value, peek().value, lineIndex, tokenIndex);
         consume(TokenType::RightParen, "Expected ')' after expression"); // Проверяем наличие правой скобки
         return expression; // Возвращаем разобранное выражение
     }
