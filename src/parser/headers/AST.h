@@ -55,6 +55,15 @@ class VariableAssignNode : public ASTNode {
         std::shared_ptr<ASTNode> expression;
 };
 
+class ReassignMemberNode : public ASTNode {
+    public:
+        ReassignMemberNode() = default;
+        ReassignMemberNode(std::shared_ptr<ASTNode> accessExpression, std::shared_ptr<ASTNode> expression) 
+            : accessExpression(accessExpression), expression(expression) {}
+        std::shared_ptr<ASTNode> accessExpression;
+        std::shared_ptr<ASTNode> expression;
+};
+
 class VariableReassignNode : public ASTNode {
     public:
         VariableReassignNode() = default;
