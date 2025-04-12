@@ -92,9 +92,28 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     {
         return std::make_shared<ContinueNode>();
     }
-    else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::Dot)
+    else if (currentToken.type == TokenType::Identifier && (peek().type == TokenType::Dot || peek().type == TokenType::LeftBracket))
     {
-        return parseMemberExpression();
+        auto memberExpression = parseMemberExpression();
+
+        if(!isEndOfLine() && check(TokenType::Operator))
+        {
+            if(current().value == "=")
+            {
+                advance();
+                auto reassignNode = std::make_shared<ReassignMemberNode>();
+                reassignNode->accessExpression = memberExpression;
+                reassignNode->expression = parseExpression();
+
+                return reassignNode;
+            }
+            else
+            {
+                throwError("Expected = symbol when assigning value to member expression");
+            }
+        }
+
+        return memberExpression;
     }
     // Dynamic variable declaration or assignment
         // [variableName] = [expression] or [variableName] ^= [expression]

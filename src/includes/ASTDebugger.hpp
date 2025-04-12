@@ -44,13 +44,22 @@ class ASTDebugger
                 printIndent(indent); std::cout << "Block\n";
                 for (const auto& stmt : block->statements) debug(stmt, indent + 2);
             }
+            else if (auto memberReassign = std::dynamic_pointer_cast<ReassignMemberNode>(node))
+            {
+                printIndent(indent); std::cout << "Reassign, identifier: \n";
+                debug(memberReassign->accessExpression, indent+2);
+                printIndent(indent); std::cout << "Reassign, value: \n";
+                debug(memberReassign->expression, indent+2);
+            }
             else if (auto assign = std::dynamic_pointer_cast<VariableAssignNode>(node)) {
                 printIndent(indent); std::cout << "Assign, type: " << (assign->isConst ? "Const " : "Final ") << assign->type << ", Identifier: " << assign->name << "\n";
+                printIndent(indent); std::cout << "Assign, value: \n";
                 debug(assign->expression, indent + 2);
             }
             else if (auto reassign = std::dynamic_pointer_cast<VariableReassignNode>(node))
             {
                 printIndent(indent); std::cout << "Reassign, identifier: " << reassign->name << "\n";
+                printIndent(indent); std::cout << "Reassign, value: \n";
                 debug(reassign->expression, indent + 2); 
             }
             else if (auto call = std::dynamic_pointer_cast<CallNode>(node)) {
