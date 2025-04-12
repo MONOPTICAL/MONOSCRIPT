@@ -112,11 +112,11 @@ class VariableReassignNode : public ASTNode {
 class IfNode : public ASTNode {
     public:
         IfNode() = default;
-        IfNode(std::shared_ptr<ASTNode> condition, std::shared_ptr<BlockNode> thenBlock, std::shared_ptr<BlockNode> elseBlock = nullptr) 
+        IfNode(std::shared_ptr<ASTNode> condition, std::shared_ptr<BlockNode> thenBlock, std::shared_ptr<ASTNode> elseBlock = nullptr) 
             : condition(condition), thenBlock(thenBlock), elseBlock(elseBlock) {}
         std::shared_ptr<ASTNode> condition;
         std::shared_ptr<BlockNode> thenBlock;
-        std::shared_ptr<BlockNode> elseBlock; // может быть nullptr
+        std::shared_ptr<ASTNode> elseBlock; // может быть и if
 };
     
 class ForNode : public ASTNode {
