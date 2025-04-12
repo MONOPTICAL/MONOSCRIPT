@@ -12,7 +12,7 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
     */
     consume(TokenType::LeftBracket, "Expected '[' before function declaration"); // Проверяем наличие левой скобки
 
-    std::string returnType = getFullType(); // Получаем полный тип функции
+    std::shared_ptr<TypeNode> returnType = getFullType(); // Получаем полный тип функции
     consume(TokenType::RightBracket, "Expected ']' before function declaration"); 
     std::string functionName = current().value; // Сохраняем имя функции
     consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора
@@ -20,13 +20,13 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
     if (check(TokenType::LeftParen)) // Если следующий токен - это левая скобка, то это функция с параметрами
     {
         advance(); // Переходим к следующему токену
-        std::vector<std::pair<std::string, std::string>> parameters; // Вектор параметров функции
+        std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters; // Вектор параметров функции
 
         if (!check(TokenType::RightParen)) // Если следующий токен - это не правая скобка, то это функция с параметрами
         {
             do
             {
-                std::string paramType = getFullType(); // Получаем полный тип параметра функции
+                std::shared_ptr<TypeNode> paramType = getFullType(); // Получаем полный тип параметра функции
                 consume(TokenType::Colon, "Expected ':' after parameter type"); // Проверяем наличие двоеточия после типа параметра функции
                 std::string paramName = current().value; // Сохраняем имя параметра функции
                 consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора параметра функции
@@ -157,7 +157,7 @@ std::shared_ptr<BlockNode> Parser::parseBlock(int expectedIndent)
         //IC(current().value, peek().value, lineIndex, tokenIndex, actualIndent, expectedIndent);
         if (actualIndent < expectedIndent) break;
         if (actualIndent > expectedIndent)
-            throw std::runtime_error("Unexpected indentation at line " + std::to_string(lineIndex));
+            throw std::runtime_error("Unexpected indentation at line " + std::to_string(lineIndex) + " at " + current().value);
 
         //IC(actualIndent, expectedIndent, current().value, peek().value, lineIndex, tokenIndex);
         // пропустить Pipe токены
@@ -198,7 +198,7 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
     const i32 i = 0 -- константа с статической инициализацией
     final i ^= 0  -- константа с динамической инициализацией
     */                           
-    std::string type;                                           // Переменная для хранения типа
+    std::shared_ptr<TypeNode> type;                                           // Переменная для хранения типа
     std::string variableName;                                   // Переменная для хранения имени переменной
     bool finalFlag = false;                                     // Флаг для проверки наличия ключевого слова final
 
@@ -217,7 +217,7 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
 
     if(current().type == TokenType::Type && (current().value != "array" && current().value != "map"))                       // Проверяем наличие типа
     {
-        type = current().value;                                 // Сохраняем тип переменной
+        type = std::make_shared<SimpleTypeNode>(current().value);                                 // Сохраняем тип переменной
         consume(TokenType::Type, "Expected type");              // Проверяем наличие типа
         variableName = current().value;                         // Сохраняем имя переменной
         consume(TokenType::Identifier, "Expected identifier");  // Проверяем наличие идентификатора
@@ -229,7 +229,7 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
     }
     else if(current().type == TokenType::Identifier && peek().value == "^=") // Проверяем наличие идентификатора
     {
-        type = "auto";
+        type = std::make_shared<SimpleTypeNode>("auto");
         variableName = current().value;                         // Сохраняем имя переменной
         consume(TokenType::Identifier, "Expected identifier");  // Проверяем наличие идентификатора
         if(!check(TokenType::Operator) || current().value != "^=") // Проверяем наличие оператора присваивания
@@ -357,14 +357,16 @@ std::shared_ptr<ASTNode> Parser::parseClass()
 
     std::shared_ptr<ASTNode> private_body; 
     std::shared_ptr<ASTNode> public_body;
-    Token currentAccess = current();
     int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока структуры
 
+    tokenIndex = expectedIndent - 1;
+    Token currentAccess = current();
+
     // Первый AccessBlock(private/public)
-    IC(currentAccess.value);
     if(currentAccess.type == TokenType::Keyword && (currentAccess.value == "public" || currentAccess.value == "private")) // Проверяем наличие ключевого слова public
     {
-        consume(TokenType::Keyword, "Expected keyword"); // Проверяем наличие ключевого слова public
+        consume(TokenType::Keyword, "Expected access expression after class statement"); // Проверяем наличие ключевого слова public
+        consume(TokenType::Colon, "Expected : after class access expression");
         nextLine();
         if(currentAccess.value == "public")
             public_body = parseBlock(expectedIndent);
@@ -373,21 +375,24 @@ std::shared_ptr<ASTNode> Parser::parseClass()
     }
     else
     {
-        throw std::runtime_error("ты еблан бля кто делает класс и не ставит public или private");
+        throw std::runtime_error("Expected access expression after class statement");
     }
 
     // Второй AccessBlock(private/public)
+    tokenIndex = expectedIndent - 1;
     currentAccess = current();
+
     if(currentAccess.type == TokenType::Keyword && (currentAccess.value == "public" || currentAccess.value == "private")) 
     {
         consume(TokenType::Keyword, "Expected keyword"); // Проверяем наличие ключевого слова public
+        consume(TokenType::Colon, "Expected : after class access expression");
         nextLine();
         if(currentAccess.value == "public")
             public_body = parseBlock(expectedIndent);
         else if(currentAccess.value == "private")
             private_body = parseBlock(expectedIndent);
         else
-            throw std::runtime_error("ты еблан бля кто делает класс и не ставит public или private");
+            throw std::runtime_error("Expected access expression after class statement");
     }
 
     lineIndex--;

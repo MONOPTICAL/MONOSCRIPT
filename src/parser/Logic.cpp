@@ -78,18 +78,6 @@ Token Parser::peek()
     return Token{TokenType::None, "", -1, -1};
 }
 
-/// @brief Возвращает полный тип токена при этом не переходя к следующему токену
-/// @return Полный тип токена, если он существует, иначе возвращает пустую строку
-std::string Parser::peekType()
-{
-    int backupIndex = tokenIndex;
-    int backupLineIndex = lineIndex;
-    std::string type = getFullType();
-    tokenIndex = backupIndex;
-    lineIndex = backupLineIndex;
-    return type;
-}
-
 /// @brief Переходит к следующей строке токенов
 /// @details Если достигнут конец файла, возвращает false. Иначе увеличивает индекс строки на 1 и сбрасывает индекс токена на 0
 /// @return true, если удалось перейти к следующей строке, иначе возвращает false
@@ -173,46 +161,44 @@ Token Parser::getLastTokenInCurrentLine() const
 /// @brief Возвращает полный тип токена
 /// @details Может быть случий когда пользователь использует array<i32> или array<string> и т.д. и такие случии обрабатываются в Lexer как {Type, "array"} {Operator, "<"} {Type, "i32"} {Operator, ">"}
 /// @return Полный тип токена, если он существует, иначе возвращает пустую строку
-std::string Parser::getFullType()
+std::shared_ptr<TypeNode> Parser::getFullType()
 {
-    std::string fullType;
-
-    if(check(TokenType::Type) || check(TokenType::Identifier))
-    {
-        fullType += current().value; // добавляем текущий токен к полному типу
-        advance(); // переходим к следующему токену
+    Token currentToken = current();
+    if (currentToken.type != TokenType::Type && currentToken.type != TokenType::Identifier) {
+        throwError("Expected type identifier");
     }
-    else 
-    {
-        throw std::runtime_error("Parser Error: Expected type at line " + std::to_string(lineIndex));
-    }
-
-    if (check(TokenType::Operator) && current().value == "<")
-    {
-        fullType += "<";
-        advance(); // пропускаем <
-
-        while (true)
-        {
-            fullType += getFullType(); // рекурсивно получаем вложенный тип
-
+    
+    std::string baseName = current().value;
+    advance();
+    
+    // Проверяем, является ли это параметризованным типом (generic)
+    if (check(TokenType::Operator) && current().value == "<") {
+        advance(); // Пропускаем <
+        
+        auto genericType = std::make_shared<GenericTypeNode>(baseName);
+        
+        // Парсим параметры типа
+        do {
+            genericType->typeParameters.push_back(getFullType());
+            
             if (check(TokenType::Comma)) {
-                fullType += ", ";
-                advance();
-            }
-            else if (check(TokenType::Operator) && current().value == ">") {
-                fullType += ">";
-                advance();
+                advance(); // Пропускаем ,
+            } else {
                 break;
             }
-            else {
-                throw std::runtime_error("Parser Error: Expected ',' or '>' inside generic type at line " +
-                    std::to_string(current().line));
-            }
+        } while (true);
+        
+        // Проверяем закрывающий >
+        if (!check(TokenType::Operator) && !(current().value == "<")) {
+            throwError("Expected > to close generic type");
         }
+        advance(); // Пропускаем >
+        
+        return genericType;
+    } else {
+        // Простой тип
+        return std::make_shared<SimpleTypeNode>(baseName);
     }
-
-    return fullType; // возвращаем полный тип
 }
 
 /// @brief Получает приоритет токена
@@ -350,8 +336,10 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
     }
     else if (currentToken.type == TokenType::LeftBrace)
     {
-        std::shared_ptr<BlockNode> body = std::make_shared<BlockNode>();
+        if(peek().type == TokenType::RightBrace)  return std::make_shared<NoneNode>(); 
 
+        std::shared_ptr<BlockNode> body = std::make_shared<BlockNode>();
+        
         do 
         {
             std::shared_ptr<KeyValueNode> key_value = std::make_shared<KeyValueNode>();
@@ -416,7 +404,7 @@ void Parser::parseDotNotation(std::shared_ptr<AccessExpression> next)
 
     if (!(check(TokenType::Identifier) || check(TokenType::Type)))
     {
-        throwError("После точки ожидался идентификатор или тип");
+        throwError("Expected Identifier or Type after dot notation");
     }
     
     next->memberName = current().value;
