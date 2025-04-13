@@ -26,11 +26,11 @@ class ASTDebugger
             }
             else if(auto ifNode = std::dynamic_pointer_cast<IfNode>(node))
             {
-                printIndent(indent); std::cout << "[IF], Condition: \n";
+                printIndent(indent); std::cout << "[IF CONDITION]: \n";
                 debug(ifNode->condition, indent + 2);
                 printIndent(indent); std::cout << "[IF], Then Block: \n";
                 debug(ifNode->thenBlock, indent + 2);
-                printIndent(indent); std::cout << "[IF], Else Block: \n";
+                printIndent(indent); std::cout << "[ELSE], Else Block: \n";
                 debug(ifNode->elseBlock, indent + 2);
             }
             else if (auto For = std::dynamic_pointer_cast<ForNode>(node))

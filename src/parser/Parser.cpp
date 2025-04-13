@@ -165,9 +165,8 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     }
     else
     {
-        throw std::runtime_error("Parser Error: Unknown statement at line " + std::to_string(currentToken.line) +
-            ", column " + std::to_string(currentToken.column) +
-            ": " + currentToken.value);
+        if(currentToken.line != -1)
+            throwError("Unknown statement");
     }
     return nullptr;
 }
