@@ -84,8 +84,10 @@ map<string, i32> очки ^= {"Alice": 10, "Bob": 8}
 public:
 |  [User]__init__(string: name, string: password, string: id)
 |  |  User_Info = {"name" : name, "password": password, "id" : id} 
+|
 |  [map<string,string>]GetUserInfo()
 |  |  return User_Info   
+|
 private:
 |  map<string,string> User_Info
 ```
@@ -117,7 +119,7 @@ return выражение
 ```
 echo, if, else, for, while, return, break, continue,
 true, false, null, none, import, const, 
-final, in, and, or, is, public, private
+final, in, and, or, is, public, private, define
 ```
 
 ## 🔢 Встроенные типы
