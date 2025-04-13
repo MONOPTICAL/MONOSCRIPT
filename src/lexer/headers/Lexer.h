@@ -5,14 +5,18 @@
 #include <string>
 #include <vector>
 #include <cctype>
+#include <algorithm>
+#include <optional>
 #include "Token.h"
 #include "ParsingFunctions.h"
+#include "../../includes/icecream.hpp"
 
 class Lexer
 {
 public:
     Lexer(const std::string& sourceCode);
     void tokenize();
+    void printTokens();
     const std::vector<std::vector<Token>>& getTokens() const; // Returns a vector of vectors of tokens
     /* Token Vector:
     "i ^= 4"
@@ -45,15 +49,21 @@ private:
     std::vector<std::string> sourceCode;
     std::vector<Token> currentTokens;
     std::vector<std::vector<Token>> allTokens; // Vector of vectors to store tokens for each line
+    std::vector<char> firstLettersInBuiltTypes;
     int currentLine;
     int currentIndex;
     TokenType currentTokenType;
     std::string currentTokenValue;
     bool isStringnotFinished = false;
+    bool isInMultilineComment = false;
+    bool isInMultilineExpression = false;
 
     void addToken(TokenType type, const std::string& value);
     TokenType IdentifyTokenType(const char& value) const;
     TokenType IsKeyword(const std::string& value) const;
+    std::optional<char> peek(int offset) const;
+    void resetValues();
+    void removeEmpty();
 };
 
 #endif // LEXER_H
