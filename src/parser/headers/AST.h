@@ -57,9 +57,10 @@ class ProgramNode : public ASTNode {
 class FunctionNode : public ASTNode {
     public:
         FunctionNode() = default;
-        FunctionNode(const std::string& name, std::shared_ptr<TypeNode> returnType, const std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters, std::shared_ptr<ASTNode> body) 
-            : name(name), returnType(returnType), parameters(parameters), body(body) {}
+        FunctionNode(const std::string& name, const std::string& associated, std::shared_ptr<TypeNode> returnType, const std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters, std::shared_ptr<ASTNode> body) 
+            : name(name), associated(associated), returnType(returnType), parameters(parameters), body(body) {}
         std::string name;
+        std::string associated;
         std::shared_ptr<TypeNode> returnType;
         std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters; // {type, name}
         std::shared_ptr<ASTNode> body; // BlockNode
