@@ -202,6 +202,11 @@ void Lexer::tokenize()
 
 const std::vector<std::vector<Token>> &Lexer::getTokens() const
 {
+    return allTokens;
+}
+
+void Lexer::printTokens()
+{
     std::cout << "\nTokens for each line:" << std::endl;
     int currentLineFor = 1;
     for (const auto &lineTokens : allTokens)
@@ -214,7 +219,6 @@ const std::vector<std::vector<Token>> &Lexer::getTokens() const
         std::cout << std::endl;
         currentLineFor++;
     }
-    return allTokens;
 }
 
 void Lexer::addToken(TokenType type, const std::string &value)

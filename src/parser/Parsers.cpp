@@ -200,7 +200,12 @@ std::shared_ptr<ASTNode> Parser::parseReturn()
     return 0
     */
     consume(TokenType::Keyword, "Expected 'return' keyword"); // Проверяем наличие ключевого слова return
-    auto expression = parseExpression(); // Парсим выражение после return
+    std::shared_ptr<ASTNode> expression;
+    if(current().column != -1)
+        expression = parseExpression(); 
+    else
+        expression = std::make_shared<NullNode>();
+
     return std::make_shared<ReturnNode>(expression); // Создаём узел возврата
 }
 
