@@ -16,6 +16,7 @@ class Lexer
 public:
     Lexer(const std::string& sourceCode);
     void tokenize();
+    void printTokens();
     const std::vector<std::vector<Token>>& getTokens() const; // Returns a vector of vectors of tokens
     /* Token Vector:
     "i ^= 4"
