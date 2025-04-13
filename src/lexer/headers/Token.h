@@ -14,10 +14,13 @@ enum class TokenType {
     RightParen, 
     LeftBracket,
     RightBracket,
+    LeftBrace,
+    RightBrace,
     Comma, 
     Semicolon,
     Colon,
-    Pipe
+    Pipe,
+    Dot
 };
 
 struct Token {
@@ -45,6 +48,9 @@ inline std::string TokenTypeToString(TokenType type)
     case TokenType::Keyword: return "Keyword";
     case TokenType::Pipe: return "Pipe";
     case TokenType::Type: return "Type";
+    case TokenType::Dot: return "Dot";
+    case TokenType::LeftBrace: return "LeftBrace";
+    case TokenType::RightBrace: return "RightBrace";
     default: return "Unknown";
     }
 }

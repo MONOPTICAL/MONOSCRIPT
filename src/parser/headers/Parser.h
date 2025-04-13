@@ -1,7 +1,13 @@
-#include "../lexer/headers/Token.h"
-#include "./AST.h"
+#include "../../lexer/headers/Token.h"
+#include "../../includes/icecream.hpp"
+#include "AST.h"
 #include <memory>
 #include <stdexcept>
+#include <string_view>
+#include <iostream>
+#include <optional>
+#include <algorithm>
+
 class Parser {
 public:
     Parser(const std::vector<std::vector<Token>>& tokens);
@@ -27,12 +33,18 @@ private:
     std::shared_ptr<ASTNode> parseStatement();
     std::shared_ptr<ASTNode> parseExpression();
     std::shared_ptr<FunctionNode> parseFunction();
-    std::shared_ptr<BlockNode> parseBlock();
-    std::shared_ptr<ASTNode> parseAssignment();
+    std::shared_ptr<BlockNode> parseBlock(int);
+    std::shared_ptr<ASTNode> parseAssignment(bool);
     std::shared_ptr<ASTNode> parseIf();
     std::shared_ptr<ASTNode> parseFor();
+    std::shared_ptr<ASTNode> parseWhile();
     std::shared_ptr<ASTNode> parseReturn();
-    std::shared_ptr<ASTNode> parseCallOrVariable();
+    std::shared_ptr<ASTNode> parseCall();
+    std::shared_ptr<ASTNode> parseStruct();
+    std::shared_ptr<ASTNode> parseClass();
+    /*
+    parseClass
+    */
 /*
 все возможные случаи это
 _______________________________________
@@ -71,12 +83,20 @@ return [expression]
     std::shared_ptr<ASTNode> parseBinary(int precedence = 0);
     std::shared_ptr<ASTNode> parseUnary();
     std::shared_ptr<ASTNode> parsePrimary();
+    std::shared_ptr<ASTNode> parseMemberExpression();
+    
+    void parseDotNotation(std::shared_ptr<AccessExpression>);
+    void parseArrayNotation(std::shared_ptr<AccessExpression>);
 
     // вспомогательное
     void consume(TokenType, const std::string& errMsg);
-    bool isEndOfFile() const;
+    bool isEndOfFile() const; 
+    bool isEndOfLine() const; // проверяет, достигнут ли конец строки
     int getIndentLevel(const std::vector<Token>& line);
     Token getLastTokenInCurrentLine() const;
     int getPrecedence(const Token& token) const;
+    void throwError(const std::string& errMsg);
+
+    std::shared_ptr<TypeNode> getFullType();
 };
     
