@@ -12,11 +12,22 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
     */
     consume(TokenType::LeftBracket, "Expected '[' before function declaration"); // Проверяем наличие левой скобки
 
+    std::string association = "";
+
     std::shared_ptr<TypeNode> returnType = getFullType(); // Получаем полный тип функции
     consume(TokenType::RightBracket, "Expected ']' before function declaration"); 
     std::string functionName = current().value; // Сохраняем имя функции
     consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора
 
+    if (check(TokenType::Colon))
+    {
+        consume(TokenType::Colon, "Expected '::' when associating function to class");
+        consume(TokenType::Colon, "Expected '::' when associating function to class");
+        association = current().value;
+        std::swap(functionName, association);
+        consume(TokenType::Identifier, "Class identifier expected after association");
+    }
+    
     if (check(TokenType::LeftParen)) // Если следующий токен - это левая скобка, то это функция с параметрами
     {
         advance(); // Переходим к следующему токену
@@ -39,17 +50,14 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
         int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока if
         nextLine(); // Переходим к следующему токену
         auto body = parseBlock(expectedIndent); // Парсим тело функции
-                      // КОСТЫЛЬ АЛЕРТ 
-        lineIndex--; // Без этого он скипает 2 линии а не одну так как в parse 
-                    // После того как мы тута возвращаем и из-за этого он может проебать какие то значения
-                   // Только уёбище ленивое перепиши это 
-        return std::make_shared<FunctionNode>(functionName, returnType, parameters, body); // Создаём узел функции
+        
+        lineIndex--; // Без этого он скипает 2 линии а не одну
+
+        return std::make_shared<FunctionNode>(functionName, association, returnType, parameters, body); // Создаём узел функции
     }
     else
     {
-        throw std::runtime_error("Parser Error: Expected '(' after function name at line " + std::to_string(current().line) +
-            ", column " + std::to_string(current().column) +
-            ": " + current().value);
+        throwError("Expected '(' after function name");
     }
 
     return nullptr; // Если ничего не найдено, возвращаем nullptr
@@ -89,10 +97,9 @@ std::shared_ptr<ASTNode> Parser::parseIf()
             elseBlock = parseBlock(expectedIndent);
         }
     }
-                  // КОСТЫЛЬ АЛЕРТ
-    lineIndex--; // Без этого он скипает 2 линии а не одну так как в parse 
-                // После того как мы тута возвращаем и из-за этого он может проебать какие то значения
-               // Только уёбище ленивое перепиши это 
+
+    lineIndex--; // Без этого он скипает 2 линии а не одну
+
     return std::make_shared<IfNode>(condition, thenBlock, elseBlock);
 }
 
@@ -110,9 +117,7 @@ std::shared_ptr<ASTNode> Parser::parseFor()
 
     if(current().type != TokenType::Keyword && current().value != "in")
     {
-        throw std::runtime_error("Parser Error: Expected 'in' keyword at line " + std::to_string(current().line) +
-            ", column " + std::to_string(current().column) +
-            ": " + current().value);
+        throwError("Expected 'in' keyword at line");
     }
     consume(TokenType::Keyword, "Expected 'in' keyword"); // Проверяем наличие ключевого слова in
 
@@ -122,10 +127,9 @@ std::shared_ptr<ASTNode> Parser::parseFor()
     nextLine(); // Переходим к следующему токену 
     //IC(expectedIndent, current().value, peek().value, lineIndex, tokenIndex);
     auto body = parseBlock(expectedIndent); // Парсим тело цикла for
-                  // КОСТЫЛЬ АЛЕРТ 
-    lineIndex--; // Без этого он скипает 2 линии а не одну так как в parse 
-                // После того как мы тута возвращаем и из-за этого он может проебать какие то значения
-               // Только уёбище ленивое перепиши это 
+
+    lineIndex--; // Без этого он скипает 2 линии а не одну
+
     return std::make_shared<ForNode>(iterationVariable, iterable, body); // Создаём узел цикла for
 }
 
@@ -143,10 +147,9 @@ std::shared_ptr<ASTNode> Parser::parseWhile()
     nextLine();
 
     auto body = parseBlock(expectedIndent);
-                  // КОСТЫЛЬ АЛЕРТ 
-    lineIndex--; // Без этого он скипает 2 линии а не одну так как в parse 
-                // После того как мы тута возвращаем и из-за этого он может проебать какие то значения
-               // Только уёбище ленивое перепиши это 
+
+    lineIndex--; // Без этого он скипает 2 линии а не одну
+
 
     return std::make_shared<WhileNode>(condition, body);
 }
@@ -166,7 +169,7 @@ std::shared_ptr<BlockNode> Parser::parseBlock(int expectedIndent)
         if (actualIndent < expectedIndent) break;
         
         if (actualIndent > expectedIndent)
-            throw std::runtime_error("Unexpected indentation at line " + std::to_string(lineIndex) + " at " + current().value);
+            throwError("Unexpected indentation");
 
         //IC(actualIndent, expectedIndent, current().value, peek().value, lineIndex, tokenIndex);
         // пропустить Pipe токены
@@ -225,9 +228,7 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
         std::string keyWord = current().value;                  // Сохраняем текущее значение токена
         if (keyWord != "const" && keyWord != "final")           // Проверяем наличие ключевого слова const или final
         {
-            throw std::runtime_error("Parser Error: Expected 'const' or 'final' at line " + std::to_string(current().line) +
-                ", column " + std::to_string(current().column) +
-                ": " + current().value);
+            throwError("Expected 'const' or 'final'");
         }
         keyWord != "const" ? finalFlag = true : finalFlag = false; // Если токен - это const, то finalFlag = false, иначе finalFlag = true
         advance();                                                 // Переходим к следующему токену
@@ -252,9 +253,7 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
         consume(TokenType::Identifier, "Expected identifier");  // Проверяем наличие идентификатора
         if(!check(TokenType::Operator) || current().value != "^=") // Проверяем наличие оператора присваивания
         {
-            throw std::runtime_error("Parser Error: Expected '^=' operator after static variable declaration at line " + std::to_string(current().line) +
-                ", column " + std::to_string(current().column) +
-                ": " + current().value);
+            throwError("Expected '^=' operator after static variable declaration");
         }
     }
     else if(current().type == TokenType::Identifier && peek().value == "=")
@@ -297,9 +296,7 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
     
     if (!expression) // Если выражение не разобрано, выбрасываем исключение
     {
-        throw std::runtime_error("Parser Error: Expected expression after assignment operator at line " + std::to_string(current().line) +
-            ", column " + std::to_string(current().column) +
-            ": " + current().value);
+        throwError("Expected expression after assignment operator");
     }
 
     return std::make_shared<VariableAssignNode>(variableName, isConst, type ,expression); // Создаём узел присваивания переменной
@@ -353,10 +350,8 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
     int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока структуры
     nextLine(); // Переходим к следующему токену
     auto body = parseBlock(expectedIndent); // Парсим тело структуры
-                  // КОСТЫЛЬ АЛЕРТ
-    lineIndex--; // Без этого он скипает 2 линии а не одну так как в parse
-                // После того как мы тута возвращаем и из-за этого он может проебать какие то значения
-               // Только уёбище ленивое перепиши это    
+    
+    lineIndex--; // Без этого он скипает 2 линии а не одну    
     
     return std::make_shared<StructNode>(name, body); // Создаём узел структуры
 }
@@ -395,9 +390,7 @@ std::shared_ptr<ASTNode> Parser::parseClass()
             private_body = parseBlock(expectedIndent);
     }
     else
-    {
-        throw std::runtime_error("Expected access expression after class statement");
-    }
+        throwError("Expected at least one access expression after class statement");
 
     // Второй AccessBlock(private/public)
     tokenIndex = expectedIndent - 1;
@@ -412,8 +405,6 @@ std::shared_ptr<ASTNode> Parser::parseClass()
             public_body = parseBlock(expectedIndent);
         else if(currentAccess.value == "private")
             private_body = parseBlock(expectedIndent);
-        else
-            throw std::runtime_error("Expected access expression after class statement");
     }
 
     lineIndex--;
