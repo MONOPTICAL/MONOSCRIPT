@@ -17,8 +17,6 @@ int main()
         sourceCode += line + "\n";
     }
 
-    std::cout << "Source code:" << std::endl << sourceCode << std::endl;
-
     try {
         Lexer lexer(sourceCode);
         lexer.tokenize();
