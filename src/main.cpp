@@ -19,17 +19,24 @@ int main()
 
     std::cout << "Source code:" << std::endl << sourceCode << std::endl;
 
-    Lexer lexer(sourceCode);
-    lexer.tokenize();
-    const std::vector<std::vector<Token>> X = lexer.getTokens();
-
-    Parser parser(X);
-    std::shared_ptr<ProgramNode> program = parser.parse();
-    if (program) {
-        ASTDebugger::debug(program);
-    } else {
-        std::cerr << "Failed to parse the source code." << std::endl;
+    try {
+        Lexer lexer(sourceCode);
+        lexer.tokenize();
+        const std::vector<std::vector<Token>> X = lexer.getTokens();
+    
+        Parser parser(X);
+        std::shared_ptr<ProgramNode> program = parser.parse();
+        if (program) {
+            ASTDebugger::debug(program);
+        } else {
+            std::cerr << "Failed to parse the source code." << std::endl;
+        }
+    } catch (const std::runtime_error& e) {
+        std::cerr << e.what() << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "Exception: " << e.what() << std::endl;
     }
+    
 
     
     return 0;

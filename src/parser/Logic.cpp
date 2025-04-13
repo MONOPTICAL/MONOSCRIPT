@@ -91,8 +91,24 @@ bool Parser::nextLine()
 
 void Parser::throwError(const std::string &errMsg)
 {
-    throw std::runtime_error("Parser Error: " + errMsg +
-        " at line " + std::to_string(lineIndex+1));
+    std::string sourceFragment = "";
+    if (lineIndex < lines.size()) 
+    {
+        std::string lineStr = "";
+        for (const auto& token : lines[lineIndex]) 
+        {
+            lineStr += token.value + " ";
+        }
+        
+        sourceFragment = "\n|>  " + lineStr + " <|\n";
+        sourceFragment = std::string(sourceFragment.size()-2, '-') + sourceFragment + std::string(sourceFragment.size()-2, '-');
+    }
+    
+    throw std::runtime_error(
+        "Parser Error [line " + std::to_string(lineIndex+1) + 
+        (tokenIndex < lines[lineIndex].size() ? ", column " + std::to_string(lines[lineIndex][tokenIndex].column) : "") +
+        "]: " + errMsg + "\n\nSOURCE(FILENAME) - placeholders\n" + sourceFragment
+    );
 }
 
 /// @brief Проверяет, совпадает ли текущий токен с заданным типом и переходит к следующему токену, если совпадает
@@ -238,7 +254,7 @@ std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
 std::shared_ptr<ASTNode> Parser::parseUnary()
 {
     Token currentToken = current();
-    if (currentToken.type == TokenType::Operator && (currentToken.value == "!" || currentToken.value == "-"))
+    if (currentToken.type == TokenType::Operator && (currentToken.value == "!" || currentToken.value == "-" || currentToken.value == "?"))
     {
         advance(); // Переходим к следующему токену
         auto right = parseUnary(); // Рекурсивно разбираем правую часть выражения
@@ -385,6 +401,14 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         {
             advance(); // Переходим к следующему токену
             return std::make_shared<NoneNode>(); // Создаём узел none
+        }
+        else if (currentToken.value == "defiend")
+        {
+            advance();
+            auto call = std::make_shared<CallNode>();
+            call->callee = "defiend";
+            call->arguments.push_back(parseExpression());
+            return call;
         }
     }
     else if (currentToken.type == TokenType::Identifier && (peek().value != "." || peek().value != "["))

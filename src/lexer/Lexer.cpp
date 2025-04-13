@@ -188,7 +188,8 @@ void Lexer::tokenize()
                 addToken(IsKeyword(currentTokenValue), currentTokenValue); // Add the token to the current line
             else 
                 addToken(currentTokenType, currentTokenValue); // Add the last token of the line to the current line
-
+        if (isStringnotFinished)
+            throw std::runtime_error("Tokenizer Error: String not finished properly at line " + std::to_string(currentLine));
         allTokens.push_back(currentTokens); // Add the current line tokens to the allTokens vector
         currentTokens.clear(); // Clear the current tokens for the next line
         currentIndex = -1; // Reset the current index for the next line
@@ -287,7 +288,8 @@ TokenType Lexer::IsKeyword(const std::string &value) const
         "public", // Public access modifier
         "private", // Private access modifier
         "this", // Class access
-        "none"
+        "none", // None value
+        "defiend"
     }; 
 
     std::vector<std::string> builtinTypes = {
