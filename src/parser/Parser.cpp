@@ -14,6 +14,7 @@ std::shared_ptr<ProgramNode> Parser::parse()
     while (!isEndOfFile())
     {
         if (check(TokenType::None)) break; // конец файла
+        int currentLine = lineIndex;
         auto statement = parseStatement();
         if (!statement)
         {
@@ -22,7 +23,7 @@ std::shared_ptr<ProgramNode> Parser::parse()
                 ": " + current().value);
         }
         if (statement) program->body.push_back(statement);
-        //if (!isEndOfLine()) throwError("Character not parsed at the end of");
+        if (!isEndOfLine() && (currentLine == lineIndex)) throwError("Character(" + current().value + ") not parsed at the end of");
         if (!nextLine()) break; // если не удалось перейти к следующей строке, выходим из цикла
     }
     return program;
@@ -164,7 +165,7 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     }
     else
     {
-        std::runtime_error("Parser Error: Unknown statement at line " + std::to_string(currentToken.line) +
+        throw std::runtime_error("Parser Error: Unknown statement at line " + std::to_string(currentToken.line) +
             ", column " + std::to_string(currentToken.column) +
             ": " + currentToken.value);
     }

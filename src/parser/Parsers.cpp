@@ -363,12 +363,15 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
 
 std::shared_ptr<ASTNode> Parser::parseClass()
 {
-    consume(TokenType::LeftBracket, "Expected '[' before struct declaration"); // Проверяем наличие левой скобки
+    consume(TokenType::LeftBracket, "Expected '[' before class declaration"); // Проверяем наличие левой скобки
     consume(TokenType::Type, "Expected 'class' keyword"); // Проверяем наличие ключевого слова struct
-    consume(TokenType::RightBracket, "Expected ']' before struct declaration"); // Проверяем наличие левой скобки
+    consume(TokenType::RightBracket, "Expected ']' before class declaration"); // Проверяем наличие левой скобки
 
     std::string name = current().value; // Сохраняем имя структуры
     consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора структуры
+
+    if(current().line != -1)
+        throwError("Unexpected symbol(" +  current().value + ") in the end of class declaration");
 
     nextLine();
 
