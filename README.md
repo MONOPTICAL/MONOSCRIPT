@@ -135,8 +135,8 @@ i32, i64, bool, string, void, array, map, float, struct, class
 |   |   for j in range(0, n - 1)
 |   |   |   if arr[j] > arr[j + 1]
 |   |   |   |   temp ^= arr[j]
-|   |   |   |   arr[j] ^= arr[j + 1]
-|   |   |   |   arr[j + 1] ^= temp
+|   |   |   |   arr[j] = arr[j + 1]
+|   |   |   |   arr[j + 1] = temp
 
 [void]printArray(array<i32>: arr)
 |   for i in range(0, len(arr))
