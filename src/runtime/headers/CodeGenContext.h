@@ -36,21 +36,10 @@ public:
 
      // Функция для получения типа None/Null (зависит от вашей семантики)
     llvm::Constant* getNoneValue() {
-        // Вариант 1: Использовать нулевой указатель определенного типа
-        // Например, если у вас есть специальный тип для None
-        // llvm::Type* noneType = ...; // Получить или создать llvm::StructType для None
-        // return llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(noneType));
-
-        // Вариант 2: Использовать специальное значение (если применимо)
-        // Например, если все значения - указатели, можно использовать nullptr
-        // Для простоты, пока используем нулевой указатель на i8* (как для строк)
         return llvm::ConstantPointerNull::get(llvm::Type::getInt8Ty(TheContext)->getPointerTo());
     }
 
     llvm::Constant* getNullValue() {
-         // Часто Null представляется как нулевой указатель
-         // Тип указателя должен соответствовать ожидаемому контексту,
-         // но часто можно использовать i8* и кастовать при необходимости.
         return llvm::ConstantPointerNull::get(llvm::Type::getInt8Ty(TheContext)->getPointerTo());
     }
 };

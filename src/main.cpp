@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
     bool showAST = false;
     bool showIR = false;
     bool shouldRun = false;
-    std::string inputFile;
+    std::string inputFile = "test_module";
     
     // Парсинг аргументов командной строки
     for (int i = 1; i < argc; ++i) {
@@ -118,7 +118,7 @@ int main(int argc, char* argv[]) {
             // Генерация и вывод IR, если требуется
             if (showIR) {
                 // Создаем контекст кодогенерации
-                CodeGenContext context("test_module");
+                CodeGenContext context(inputFile);
                 ASTGen visitor(context);
                 
                 // Pass visitor as a non-temporary variable

@@ -42,7 +42,15 @@ void ASTGen::visit(ProgramNode& node) {
 
 void ASTGen::visit(FunctionNode& node) {
     LogWarning("visit не полностью реализован для FunctionNode: " + node.name);
-    
+
+    // Сохраняем текущую точку вставки
+    llvm::BasicBlock* currentBlock = nullptr;
+    llvm::Function* currentFunction = nullptr;
+    if (context.Builder.GetInsertBlock()) {
+        currentBlock = context.Builder.GetInsertBlock();
+        currentFunction = currentBlock->getParent();
+    }
+
     // Создаем минимальную заглушку функции
     std::vector<llvm::Type*> paramTypes;
     for (auto& param : node.parameters) {
@@ -85,6 +93,10 @@ void ASTGen::visit(FunctionNode& node) {
         } else {
             context.Builder.CreateRet(llvm::Constant::getNullValue(returnLLVMType));
         }
+    }
+
+    if (currentBlock) {
+        context.Builder.SetInsertPoint(currentBlock);
     }
     
     // Восстанавливаем старую таблицу символов
@@ -132,7 +144,7 @@ void ASTGen::visit(VariableAssignNode& node) {
     bool isGlobalContext = (currentBlock == nullptr);
     
     if (isGlobalContext) {
-        Declarations::handleGlobalVariable(context, node, varType, node.isConst);
+        Declarations::handleGlobalVariable(context, node, varType);
         return;
     }
     
@@ -179,7 +191,6 @@ void ASTGen::visit(ReturnNode& node) {
         node.expression->accept(*this);
     }
     
-    llvm::Function* currentFunction = context.Builder.GetInsertBlock()->getParent();
     if (!result) {
         result = context.Builder.CreateRetVoid();
     } else {
