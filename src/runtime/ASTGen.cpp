@@ -144,19 +144,19 @@ void ASTGen::visit(VariableAssignNode& node) {
     bool isGlobalContext = (currentBlock == nullptr);
     
     if (isGlobalContext) {
-        Declarations::handleGlobalVariable(context, node, varType);
+        result = Declarations::handleGlobalVariable(context, node, varType);
         return;
     }
     
     // Проверяем является ли выражение структурой данных (array или map)
     std::shared_ptr<BlockNode> blockExpr = std::dynamic_pointer_cast<BlockNode>(node.expression);
     if (blockExpr) {
-        Arrays::handleArrayInitialization(context, node, varType, blockExpr);
+        result = Arrays::handleArrayInitialization(context, node, varType, blockExpr);
         return;
     }
     
     // Обычное присваивание (не массив или массив с одним выражением)
-    Declarations::handleSimpleAssignment(context, node, varType);
+    result = Declarations::handleSimpleAssignment(context, node, varType);
 }
 
 void ASTGen::visit(ReassignMemberNode& node) {
@@ -185,17 +185,7 @@ void ASTGen::visit(WhileNode& node) {
 }
 
 void ASTGen::visit(ReturnNode& node) {
-    LogWarning("visit для ReturnNode: вычисляю выражение и генерирую return");
-    
-    if (node.expression) {
-        node.expression->accept(*this);
-    }
-    
-    if (!result) {
-        result = context.Builder.CreateRetVoid();
-    } else {
-        result = context.Builder.CreateRet(result);
-    }
+    result = Statements::handleReturnStatement(context, node);
 }
 
 void ASTGen::visit(CallNode& node) {

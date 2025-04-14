@@ -6,6 +6,17 @@
 #include "runtime/headers/ASTVisitors.h"
 #include <llvm/IR/Module.h>         // Для llvm::Module
 #include <llvm/Support/raw_ostream.h> // Для llvm::outs()
+#include <llvm/IRReader/IRReader.h> // Для parseIR
+#include <llvm/Support/MemoryBuffer.h> // Для MemoryBuffer
+#include <llvm/Support/SourceMgr.h> // Для SMDiagnostic
+// For Execution
+// ----------------------------------------------
+#include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/ExecutionEngine/Orc/LLJIT.h>
+#include <llvm/ExecutionEngine/GenericValue.h>
+#include <llvm/Support/TargetSelect.h>
+// ----------------------------------------------
+#include <llvm/Support/Error.h> // Для ExitOnError
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -23,6 +34,60 @@ void printHelp(const char* programName) {
               << "  --debug-ir             Показать только IR\n"
               << "\nЕсли ФАЙЛ не указан, ввод читается со стандартного ввода.\n"
               << std::endl;
+}
+
+int executeModule(llvm::Module* module) {
+    llvm::InitializeNativeTarget();
+    llvm::InitializeNativeTargetAsmPrinter();
+    llvm::InitializeNativeTargetAsmParser();
+
+    llvm::ExitOnError ExitOnErr;
+    ExitOnErr.setBanner("Error JIT: ");
+
+    // JIT
+    auto JIT = ExitOnErr(llvm::orc::LLJITBuilder().create());
+
+    // --- Клонирование модуля ---
+    auto Ctx = std::make_unique<llvm::LLVMContext>();
+    std::unique_ptr<llvm::Module> ClonedModule;
+
+    { // Ограничиваем область видимости буфера и потока
+        llvm::SmallString<0> IRBuffer;
+        llvm::raw_svector_ostream OS(IRBuffer);
+        module->print(OS, nullptr); // Сериализуем оригинальный модуль в буфер
+
+        llvm::SMDiagnostic Err;
+        ClonedModule = llvm::parseIR(
+            *llvm::MemoryBuffer::getMemBuffer(IRBuffer.str()), // Создаем MemoryBuffer из строки
+            Err,
+            *Ctx // Используем новый контекст для клонированного модуля
+        );
+
+        if (!ClonedModule) {
+            std::cerr << "Ошибка при клонировании модуля для JIT: ";
+            Err.print("executeModule", llvm::errs());
+            return 1;
+        }
+    }
+    // --- Конец клонирования ---
+
+
+    // ThreadSafeModule и добавляем в JIT
+    llvm::orc::ThreadSafeModule TSM(std::move(ClonedModule), std::move(Ctx));
+    ExitOnErr(JIT->addIRModule(std::move(TSM)));
+
+    // main
+    auto MainSymbol = ExitOnErr(JIT->lookup("main"));
+
+    // int(*)()
+    auto MainFn = MainSymbol.toPtr<int(*)()>();
+
+    // Вызываем функцию
+    std::cout << "Выполнение функции main()...\n";
+    int Result = MainFn();
+    std::cout << "Функция main() завершена.\n";
+
+    return Result;
 }
 
 int main(int argc, char* argv[]) {
@@ -46,8 +111,6 @@ int main(int argc, char* argv[]) {
             showTokens = true;
         } else if (arg == "--debug-ast") {
             showAST = true;
-        } else if (arg == "--debug-ir") {
-            showIR = true;
         } else if (arg == "--run") {
             shouldRun = true;
         } else if (arg[0] != '-') {
@@ -106,6 +169,7 @@ int main(int argc, char* argv[]) {
         // Синтаксический анализ
         Parser parser(tokens);
         std::shared_ptr<ProgramNode> program = parser.parse();
+        CodeGenContext context(inputFile);
         
         if (program) {
             // Вывод AST, если требуется
@@ -118,7 +182,6 @@ int main(int argc, char* argv[]) {
             // Генерация и вывод IR, если требуется
             if (showIR) {
                 // Создаем контекст кодогенерации
-                CodeGenContext context(inputFile);
                 ASTGen visitor(context);
                 
                 // Pass visitor as a non-temporary variable
@@ -133,7 +196,18 @@ int main(int argc, char* argv[]) {
             // Запуск программы, если требуется
             if (shouldRun) {
                 std::cout << "\n--- Запуск программы ---" << std::endl;
-                std::cout << "Запуск пока не реализован. Работа над IR продолжается." << std::endl;
+                try {
+            
+                    if (context.TheModule != nullptr) { 
+                         int result = executeModule(context.TheModule.get());
+                         std::cout << "Программа выполнена. Результат: " << result << std::endl;
+                    } else {
+                         std::cerr << "Ошибка: Не удалось получить модуль LLVM для выполнения." << std::endl;
+                    }
+            
+                } catch (const std::exception& e) {
+                    std::cerr << "Ошибка при выполнении: " << e.what() << std::endl;
+                }
                 std::cout << "--- Конец запуска ---\n" << std::endl;
             }
         } else {

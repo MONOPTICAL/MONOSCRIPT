@@ -24,19 +24,27 @@ llvm_map_components_to_libnames(llvm_libs
   core
   support
   irreader
+  executionengine
+  mcjit             
+  orcjit           
+  target            
+  # X86 
+  # -------
+  X86CodeGen
+  X86AsmParser
+  X86Desc
+  X86Info
+  # -------
   analysis
   transformutils
   instcombine
   instrumentation
-  ipo 
+  ipo
   vectorize
   scalaropts
   objcarcopts
   passes
-  native
-  asmprinter
-  mcjit
-  executionengine
+  asmprinter        
 )
 
 add_executable(ms # Create an executable target named ms
@@ -50,8 +58,7 @@ add_executable(ms # Create an executable target named ms
     src/runtime/CodeGenContext.cpp
     src/runtime/codegen/Declarations.cpp
     src/runtime/codegen/Arrays.cpp
+    src/runtime/codegen/Statements.cpp
 )
 
-llvm_map_components_to_libnames(llvm_libs support core irreader)
-
-target_link_libraries(ms ${llvm_libs})
+target_link_libraries(ms PRIVATE ${llvm_libs})
