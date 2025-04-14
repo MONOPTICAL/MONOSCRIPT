@@ -28,7 +28,7 @@ llvm_map_components_to_libnames(llvm_libs
   transformutils
   instcombine
   instrumentation
-  ipo
+  ipo 
   vectorize
   scalaropts
   objcarcopts

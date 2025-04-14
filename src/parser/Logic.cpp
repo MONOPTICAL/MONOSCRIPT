@@ -301,7 +301,7 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
     else if (currentToken.type == TokenType::String) // Если токен - строка
     {
         advance(); // Переходим к следующему токену
-        return std::make_shared<StringNode>(currentToken.value); // Создаём узел строки
+        return std::make_shared<StringNode>(currentToken.value.substr(1, currentToken.value.length()-2)); // Создаём узел строки обризаяя кавычки
     }
     else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::LeftParen) // Если токен - идентификатор
     {

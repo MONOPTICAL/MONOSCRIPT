@@ -82,6 +82,9 @@
         "numbers": "cpp",
         "semaphore": "cpp",
         "cinttypes": "cpp",
-        "text_encoding": "cpp"
+        "text_encoding": "cpp",
+        "fstream": "cpp",
+        "set": "cpp",
+        "map": "cpp"
     }
 }
