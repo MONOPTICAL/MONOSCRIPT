@@ -11,22 +11,43 @@ namespace Statements {
         }
 
         llvm::Value* result = codeGen.getResult();
-        llvm::Type* returnType = context.Builder.GetInsertBlock()->getParent()->getReturnType();
+        llvm::Function* currentFunction = context.Builder.GetInsertBlock()->getParent();
+        llvm::Type* returnType = currentFunction->getReturnType();
         llvm::Type* returnValueType = result->getType();
-
-        if (!result) {
-            result = context.Builder.CreateRetVoid();
-        } else {
-            if (returnValueType != returnType) {
+        
+        if (!result) 
+        {
+            if (returnType->isVoidTy()) 
+            {
+                return context.Builder.CreateRetVoid();
+            } 
+            else 
+            {
+                codeGen.LogWarning("Не удалось сгенерировать значение для return");
+                llvm::Value* null = context.getNullValue();
+                return context.Builder.CreateRet(null);
+            }
+        } 
+        else 
+        {
+            if (returnValueType != returnType && !(returnType->isArrayTy())) 
+            {
                 codeGen.LogWarning("Тип возвращаемого значения не совпадает с типом функции");
                 if (returnValueType->isPointerTy()) {
                     codeGen.LogWarning("переходим по указателю и возвращаем голое значение(не указатель)");
                         
                     result = context.Builder.CreateLoad(returnType, result, "load");
+                    return context.Builder.CreateRet(result);
                 }
             }
-            result = context.Builder.CreateRet(result);
-            return result;
+
+            if (returnValueType->isPointerTy()) {
+                codeGen.LogWarning("возвращаем массив");
+                result = context.Builder.CreateLoad(returnType, result, "load");
+            }
+
+            return context.Builder.CreateRet(result);
         }
+        return nullptr; // <-- TODO: check
     }
 }
