@@ -21,8 +21,8 @@ namespace Declarations
                 value = context.Builder.CreateSIToFP(value, varType, "floatconv");
             } else if (varType->isIntegerTy() && value->getType()->isFloatTy()) { // float -> int
                 value = context.Builder.CreateFPToSI(value, varType, "intconv");
-            } else { // Другие преобразования типов
-                codeGen.LogWarning("[CRITICAL]Типы не совпадают: " + std::to_string(varType->getTypeID()) + " != " + std::to_string(value->getType()->getTypeID()));
+            } else if (node.type->toString() == "auto")  { // Другие преобразования типов
+                varType = value->getType();
             }
         }
         
@@ -70,7 +70,7 @@ namespace Declarations
         if (!varType->isArrayTy()) {
             codeGen.LogWarning("Переменная " + node.name + " является массивом но динамический инициализированый");
             auto TypeNode = std::make_shared<GenericTypeNode>("array");
-            TypeNode->typeParameters.push_back(context.GetTypeByASTNode(blockExpr->statements[0]));
+            TypeNode->typeParameters.push_back(context.getTypeByASTNode(blockExpr->statements[0]));
             varType = context.getLLVMType(TypeNode);
             if (!varType) {
                 codeGen.LogWarning("Не удалось получить тип для массива " + node.name);
@@ -192,7 +192,7 @@ namespace Declarations
         if (varType->isPointerTy())
         {
             // Если тип указатель, то получаем тип элемента и меняем тип переменной
-            auto typeOfTheValue = context.GetTypeByASTNode(node.expression);
+            auto typeOfTheValue = context.getTypeByASTNode(node.expression);
             varType = context.getLLVMType(typeOfTheValue);
         }
         

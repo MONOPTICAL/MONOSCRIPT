@@ -26,7 +26,7 @@ namespace Arrays
         if (!varType->isArrayTy()) {
             codeGen.LogWarning("Переменная " + node.name + " является массивом но динамический инициализированый");
             auto TypeNode = std::make_shared<GenericTypeNode>("array");
-            TypeNode->typeParameters.push_back(context.GetTypeByASTNode(blockExpr->statements[0]));
+            TypeNode->typeParameters.push_back(context.getTypeByASTNode(blockExpr->statements[0]));
             varType = context.getLLVMType(TypeNode);
             if (!varType) {
                 codeGen.LogWarning("Не удалось получить тип для массива " + node.name);

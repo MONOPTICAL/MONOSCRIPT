@@ -43,7 +43,7 @@ llvm::Type* CodeGenContext::getLLVMType(std::shared_ptr<TypeNode> typeNode) {
     return llvm::PointerType::getUnqual(TheContext);
 }
 
-std::shared_ptr<TypeNode> CodeGenContext::GetTypeByASTNode(std::shared_ptr<ASTNode> node) {
+std::shared_ptr<TypeNode> CodeGenContext::getTypeByASTNode(std::shared_ptr<ASTNode> node) {
     if (auto typeNode = std::dynamic_pointer_cast<TypeNode>(node)) {
         return typeNode;
     }

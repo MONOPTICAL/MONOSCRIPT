@@ -243,7 +243,7 @@ std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
         if (currentPrecedence < precedence) break; // Если текущий приоритет меньше, чем заданный, выходим из цикла
 
         advance(); // Переходим к следующему токену
-        auto right = parseBinary(currentPrecedence); // NumberNode - 2, NumberNode - 4
+        auto right = parseBinary(currentPrecedence);
 
         left = std::make_shared<BinaryOpNode>(left, currentToken.value, right); // Создаём новый узел бинарной операции
     }

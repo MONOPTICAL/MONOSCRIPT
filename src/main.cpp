@@ -47,6 +47,12 @@ int executeModule(llvm::Module* module) {
     // JIT
     auto JIT = ExitOnErr(llvm::orc::LLJITBuilder().create());
 
+    auto& jitDylib = JIT->getMainJITDylib();
+    jitDylib.addGenerator(
+        cantFail(llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
+            JIT->getDataLayout().getGlobalPrefix()))
+    );
+
     // --- Клонирование модуля ---
     auto Ctx = std::make_unique<llvm::LLVMContext>();
     std::unique_ptr<llvm::Module> ClonedModule;
@@ -114,7 +120,6 @@ int main(int argc, char* argv[]) {
         } else if (arg == "--run") {
             shouldRun = true;
         } else if (arg[0] != '-') {
-            // Предполагаем, что это имя входного файла
             inputFile = arg;
         } else {
             std::cerr << "Неизвестная опция: " << arg << "\n";
@@ -125,7 +130,7 @@ int main(int argc, char* argv[]) {
     
     // Если нет флагов отладки и не указан флаг запуска, по умолчанию показываем всё
     if (!showTokens && !showAST && !showIR && !shouldRun) {
-        showTokens = showAST = showIR = true;
+        showTokens = showAST = showIR = shouldRun = true;
     }
     
     // Чтение исходного кода
@@ -178,6 +183,8 @@ int main(int argc, char* argv[]) {
                 ASTDebugger::debug(program);
                 std::cout << "--- Конец AST ---\n" << std::endl;
             }
+
+            /*
             
             // Генерация и вывод IR, если требуется
             if (showIR) {
@@ -210,6 +217,7 @@ int main(int argc, char* argv[]) {
                 }
                 std::cout << "--- Конец запуска ---\n" << std::endl;
             }
+            */
         } else {
             std::cerr << "Ошибка: не удалось разобрать исходный код." << std::endl;
             return 1;

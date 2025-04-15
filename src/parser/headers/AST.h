@@ -4,9 +4,6 @@
 #include <string>
 #include <vector>
 
-class CodeGenContext;
-namespace llvm { class Value; } // Также предварительно объявляем llvm::Value
-
 class ASTNodeVisitor {
     public:
         virtual ~ASTNodeVisitor() = default;
@@ -40,12 +37,26 @@ class ASTNodeVisitor {
         virtual void visit(class ClassNode& node) = 0;
 };
 
-class ASTNode {
+class TypeNode;
+
+class ASTNode : public std::enable_shared_from_this<ASTNode> {
     public:
         int line; // номер строки в исходном коде
         int column; // номер столбца в исходном коде
+
+        std::shared_ptr<TypeNode> inferredType; // Выводимый тип узла (для IR)
+
+        std::shared_ptr<TypeNode> implicitCastTo; // Неявное приведение к типу (для IR)
+
+        
+
         virtual ~ASTNode() = default;
+
         virtual void accept(ASTNodeVisitor& visitor) = 0; // Метод для обхода узла
+
+        std::shared_ptr<ASTNode> shared_from_this() {
+            return std::enable_shared_from_this<ASTNode>::shared_from_this();
+        }
 };
 
 class TypeNode : public ASTNode {
