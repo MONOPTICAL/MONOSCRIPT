@@ -15,7 +15,7 @@ class ASTDebugger
                 printIndent(indent); std::cout << "[ProgramNode]\n";
                 for (const auto& stmt : prog->body) debug(stmt, indent + 2);
             }
-            else if (auto func = std::dynamic_pointer_cast<FunctionNode>(node)) {
+            else if (auto func = std::dynamic_pointer_cast<FunctionNode>(node)) { 
                 printIndent(indent); std::cout << "[Function] " << func->name << "[" << func->associated << "]" << "(...) Return";
                 debug(func->returnType, 1);
                 for (const auto& param : func->parameters) {

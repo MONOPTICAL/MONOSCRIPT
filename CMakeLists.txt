@@ -54,11 +54,18 @@ add_executable(ms # Create an executable target named ms
     src/parser/Logic.cpp 
     src/parser/Parser.cpp 
     src/parser/Parsers.cpp
-    src/runtime/ASTGen.cpp
-    src/runtime/CodeGenContext.cpp
-    src/runtime/codegen/Declarations.cpp
-    src/runtime/codegen/Arrays.cpp
-    src/runtime/codegen/Statements.cpp
+    src/visitors/Register.cpp
+    src/visitors/BuiltIn.cpp
+    src/visitors/SymanticVisitor/Expressions.cpp
+    src/visitors/SymanticVisitor/Statements.cpp
+    src/visitors/SymanticVisitor/Types.cpp
+    src/visitors/SymanticVisitor/Utils.cpp
+    src/visitors/SymanticVisitor/NotFinished.cpp
+#    src/runtime/ASTGen.cpp
+#    src/runtime/CodeGenContext.cpp
+#    src/runtime/codegen/Declarations.cpp
+#    src/runtime/codegen/Arrays.cpp
+#    src/runtime/codegen/Statements.cpp
 )
 
 target_link_libraries(ms PRIVATE ${llvm_libs})
