@@ -117,7 +117,7 @@ return выражение
 
 ## 🔤 Ключевые слова
 ```
-echo, if, else, for, while, return, break, continue,
+if, else, for, while, return, break, continue,
 true, false, null, none, import, const, 
 final, in, and, or, is, public, private, define
 ```
