@@ -85,6 +85,8 @@
         "text_encoding": "cpp",
         "fstream": "cpp",
         "set": "cpp",
-        "map": "cpp"
+        "map": "cpp",
+        "csignal": "cpp",
+        "unordered_set": "cpp"
     }
 }

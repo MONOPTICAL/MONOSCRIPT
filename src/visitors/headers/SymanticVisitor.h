@@ -4,40 +4,52 @@
 #include "../../parser/headers/AST.h"
 #include "../../includes/icecream.hpp"
 #include "Register.h"
+#include "BuiltIn.h"
 
 struct Context {
     std::unordered_map<std::string, std::shared_ptr<ASTNode>> variables;
     std::unordered_map<std::string, std::shared_ptr<ASTNode>> functions;
     std::string currentFunctionName;
-    std::vector<std::string> functionArgs;
-    std::string returnType;
+    std::shared_ptr<TypeNode> returnType;
+    bool returnedValue = false;
 };
 
 class SymanticVisitor : public ASTNodeVisitor {
 
 private:
 
-    std::vector<Context>                                        contexts;
+    std::vector<Context>                                            contexts;
 
-    std::vector<std::string>                                    types;
+    std::vector<std::string>                                        types;
 
-    Registry                                                    registry;
+    Registry                                                        registry;
+
+    /*
+    Проверяет, существует ли переменная в реестре(если переданный node является идентификатором)
+    */
+    std::shared_ptr<TypeNode>                                       checkForIdentifier(std::shared_ptr<ASTNode>& node);
+
     
 public:
-                        SymanticVisitor() 
-                        {
-                            // Инициализация встроенных типов
-                            registry.addBuiltinType("i8", std::make_shared<SimpleTypeNode>("i8"));
-                            registry.addBuiltinType("i32", std::make_shared<SimpleTypeNode>("i32"));
-                            registry.addBuiltinType("i64", std::make_shared<SimpleTypeNode>("i64"));
-                            registry.addBuiltinType("float", std::make_shared<SimpleTypeNode>("float"));
-                            registry.addBuiltinType("bool", std::make_shared<SimpleTypeNode>("bool"));
-                            registry.addBuiltinType("string", std::make_shared<SimpleTypeNode>("string"));
-                            registry.addBuiltinType("void", std::make_shared<SimpleTypeNode>("void"));
-                            registry.addBuiltinType("null", std::make_shared<SimpleTypeNode>("null"));
-                            registry.addBuiltinType("none", std::make_shared<SimpleTypeNode>("none"));
+                                                                    SymanticVisitor() 
+                                                                    {
+                                                                        // Инициализация контекста
+                                                                        Context globalContext = {
+                                                                            .variables = {},
+                                                                            .functions = {},
+                                                                            .currentFunctionName = "",
+                                                                            .returnType = nullptr
+                                                                        };
+                                                                        contexts.push_back(globalContext);
 
-                        };
+                                                                        // Инициализация встроенных типов
+                                                                        registerBuiltInTypes(registry);
+
+                                                                        // Инициализация встроенных функций
+                                                                        registerBuiltInFunctions(registry);
+                                                                    };
+
+    void                                                            debugContexts();
     
     void                                                            LogError(const std::string& message);
 
@@ -70,8 +82,5 @@ public:
     void                                                            visit(AccessExpression& node) override;
     void                                                            visit(ClassNode& node) override;
 };
-
-
-
 
 #endif // SYMANTICVISITOR_H
