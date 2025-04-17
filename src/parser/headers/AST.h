@@ -123,6 +123,7 @@ class FunctionNode : public ASTNode {
         std::string associated;
         std::shared_ptr<TypeNode> returnType;
         std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters; // {type, name}
+        std::vector<std::pair<std::string, LambdaNode>> lambdas; // {type, name}
         std::shared_ptr<ASTNode> body; // BlockNode
         
         void accept(ASTNodeVisitor& visitor) override {

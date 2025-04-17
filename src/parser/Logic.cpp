@@ -228,7 +228,7 @@ int Parser::getPrecedence(const Token &token) const
     if (token.value == "|>") return 3; // keyword
     if (token.value == "==" || token.value == "<" || token.value == ">" || token.value == "!=" || token.value == "<=" || token.value == ">=") return 4; // operator
     if (token.value == "+" || token.value == "-") return 5; // operator
-    if (token.value == "*" || token.value == "/" || token.value == "%") return 6; // operator
+    if (token.value == "*" || token.value == "/" || token.value == "%" || token.value == "**") return 6; // operator
 
     return -1; // Для компилятора, чтобы не ругался на -Wreturn-type
 }
@@ -276,6 +276,9 @@ std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
 
         left = std::make_shared<BinaryOpNode>(left, currentToken.value, right); // Создаём новый узел бинарной операции
     }
+
+    if(precedence==0 && movedLine) // Если мы перешли на следующую строку и это не конец файла
+        lineIndex--;
 
     return left; // Возвращаем разобранное выражение
 }
@@ -395,6 +398,7 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         {
             std::shared_ptr<TypeNode> paramType = getFullType(); // Получаем полный тип параметра функции
             consume(TokenType::Colon, "Expected ':' after parameter type"); // Проверяем наличие двоеточия после типа параметра функции
+
             std::string paramName = current().value; // Сохраняем имя параметра функции
             consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора параметра функции
 

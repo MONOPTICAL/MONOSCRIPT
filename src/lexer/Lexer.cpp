@@ -154,6 +154,12 @@ void Lexer::tokenize()
                     resetValues();
                     continue;
                 }
+                else if (currentTokenValue == "**")
+                {
+                    addToken(TokenType::Operator, "**"); // Add the token to the current line
+                    resetValues();
+                    continue;
+                }
                 else if (currentTokenValue == "->")
                 {
                     addToken(TokenType::Arrow, "->"); // Add the token to the current line
@@ -316,7 +322,7 @@ TokenType Lexer::IsKeyword(const std::string &value) const
     }; 
 
     std::vector<std::string> builtinTypes = {
-        "i1", "i8", "i32", "i64", "string", "void", "array", "map", "float", "struct"
+        "i1", "i8", "i32", "i64", "string", "void", "array", "map", "float", "struct", "func"
     };
 
     std::string trimmedValue = ParsingFunctions::trim(value);
