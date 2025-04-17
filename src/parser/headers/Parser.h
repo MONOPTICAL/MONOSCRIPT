@@ -18,6 +18,7 @@ private:
     int lineIndex; // индекс текущей строки токенов
     int tokenIndex; // индекс текущего токена в строке
     int currentIndent; // текущий уровень отступа
+    bool isPipe;
     std::shared_ptr<ASTNode> currentNode; // указатель на текущий узел AST
 
     // указатель на текущий токен

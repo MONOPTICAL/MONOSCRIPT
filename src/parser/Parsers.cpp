@@ -47,6 +47,15 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
                     Params: 
                         func<i8, i8> : "@0" - последний параметр это return type а все остальные это параметры функции
                     */
+                    std::string paramName;
+                    if (check(TokenType::Identifier))
+                    {
+                        paramName = current().value; // Сохраняем имя параметра функции 
+                        consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора параметра функции
+                    }
+                    else
+                        paramName = "@" + std::to_string(lambdaCounter++);
+
                     consume(TokenType::LeftParen, "Expected '(' after function type"); // Проверяем наличие левой скобки после типа параметра функции
                     std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> params;
                     do
@@ -69,8 +78,7 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
                     }
                     genericType->typeParameters.push_back(returnType); // Добавляем тип возвращаемого значения в параметры функции
 
-                    std::string paramName = "@" + std::to_string(lambdaCounter++); // Сохраняем имя параметра функции
-
+                    IC(paramName, genericType->toString(), returnType->toString());
                     parameters.push_back({genericType, paramName}); // Добавляем параметр в вектор параметров функции
                 }
                 else

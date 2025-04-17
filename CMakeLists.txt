@@ -62,6 +62,7 @@ add_executable(ms # Create an executable target named ms
     src/visitors/TypeSymbolVisitor/Utils.cpp
     src/visitors/TypeSymbolVisitor/NotFinished.cpp
     src/visitors/TypeSymbolVisitor/StructClass.cpp
+    src/visitors/TypeSymbolVisitor/Operators.cpp
 #   src/runtime/ASTGen.cpp
 #   src/runtime/CodeGenContext.cpp
 #   src/runtime/codegen/Declarations.cpp

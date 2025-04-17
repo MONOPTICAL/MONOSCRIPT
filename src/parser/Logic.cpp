@@ -233,10 +233,12 @@ int Parser::getPrecedence(const Token &token) const
     return -1; // Для компилятора, чтобы не ругался на -Wreturn-type
 }
 
-std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
+std::shared_ptr<ASTNode> Parser::parseBinary(int precedence) 
 {
+    IC(precedence);
     auto left = parseUnary(); // 2
-    bool movedLine = false; // Флаг для проверки, был ли сделан переход на следующую строку
+    int initialLine = lineIndex;  // Запоминаем начальную строку
+    int movedLine = 0; // Флаг для проверки, был ли сделан переход на следующую строку
 
     while (true)
     {
@@ -245,23 +247,28 @@ std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
         // Если дошли до конца строки — пробуем перейти на следующую строку с pipe
         if (currentToken.type == TokenType::None)
         {
-            // Если это не конец файла, пробуем перейти на следующую строку
+            // Проверяем, что следующая строка существует
             if (!isEndOfFile() && lineIndex + 1 < lines.size())
             {
-                nextLine();
-                movedLine = true; // Устанавливаем флаг, что мы перешли на следующую строку
-
-                tokenIndex = getIndentLevel(lines[lineIndex]); // Перепрыгиваем через пайпы/отступы
-
-                // Проверяем, есть ли pipe-оператор
-                if (check(TokenType::PipeArrow))
+                // Получаем уровень отступа следующей строки
+                int nextIndent = getIndentLevel(lines[lineIndex + 1]);
+                // Проверяем, что в следующей строке после отступов есть PipeArrow
+                if (nextIndent < lines[lineIndex + 1].size() &&
+                    lines[lineIndex + 1][nextIndent].type == TokenType::PipeArrow)
                 {
+                    nextLine();
+                    movedLine++;
+                    IC("slide", lineIndex, precedence, movedLine);
+
+                    tokenIndex = getIndentLevel(lines[lineIndex]); // Перепрыгиваем через пайпы/отступы
+
+                    isPipe = true;
                     currentToken = current();
                     currentPrecedence = getPrecedence(currentToken);
                 }
                 else
                 {
-                    break; // Нет pipe — выходим из цикла
+                    break; // Нет pipe — выходим из цикла, не переходим на строку
                 }
             }
             else
@@ -276,9 +283,6 @@ std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
 
         left = std::make_shared<BinaryOpNode>(left, currentToken.value, right); // Создаём новый узел бинарной операции
     }
-
-    if(precedence==0 && movedLine) // Если мы перешли на следующую строку и это не конец файла
-        lineIndex--;
 
     return left; // Возвращаем разобранное выражение
 }
