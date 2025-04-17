@@ -165,25 +165,22 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
         validateCollectionElements(node.type, node.expression, isAuto);
         IC("exit");
     }
-    else 
+    
+    else
     {
         node.expression->accept(*this);
         auto expressionType = node.expression->inferredType->toString();
-
-        // Проверяем тип выражения
-        if (expressionType != varType) {
-            if (varType == "auto")
-                node.type = node.expression->inferredType;
-            else if (
-                (varType == "i32" || varType == "i64" || varType == "i8")
-                && (expressionType == "i32" || expressionType == "i64" || expressionType == "i8" || expressionType == "i1")
-            )
+        if (expressionType != "none" || expressionType != "string")
+        {        
+            IC(expressionType, varType);
+            // Проверяем тип выражения
+            castNumbersInBinaryTree(node.expression, isAuto ? "auto" : expressionType);
+            if (isAuto)
             {
-                node.expression->implicitCastTo = node.type;
+                
             }
-            else if (expressionType != "none")
-                LogError("Type mismatch: expected " + varType + ", got " + expressionType);
         }
+        IC("exitted");
     }
     // Добавляем переменную в реестр
     auto varNode = std::make_shared<VariableAssignNode>(node.name, node.isConst, node.type, node.expression);

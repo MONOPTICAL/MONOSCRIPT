@@ -29,13 +29,13 @@ private:
     */
     std::shared_ptr<TypeNode>                                       checkForIdentifier(std::shared_ptr<ASTNode>& node);
 
-    void                                                            numCast(std::shared_ptr<ASTNode>& left 
-                                                                    , std::shared_ptr<ASTNode>& right
-                                                                    , const std::string& op);
+    void                                                            castNumbersInBinaryTree(
+                                                                        std::shared_ptr<ASTNode> node, 
+                                                                        const std::string& expectedType);
     
     void                                                            validateCollectionElements(
-                                                                    const std::shared_ptr<TypeNode>& expectedType,
-                                                                    const std::shared_ptr<ASTNode>& expr,
+                                                                        const std::shared_ptr<TypeNode>& expectedType,
+                                                                        const std::shared_ptr<ASTNode>& expr,
                                                                         bool isAuto);
 
     void                                                            applyImplicitCastToNumeric(
@@ -43,8 +43,12 @@ private:
                                                                         const std::shared_ptr<ASTNode>& expr,
                                                                         int maxRank,
                                                                         bool isAuto);
-                                                                
 
+    void                                                            handlePlusOperator(
+                                                                        BinaryOpNode& node, 
+                                                                        std::shared_ptr<TypeNode> leftType, 
+                                                                        std::shared_ptr<TypeNode> rightType);
+                                                                
 public:
                                                                     TypeSymbolVisitor() 
                                                                     {
