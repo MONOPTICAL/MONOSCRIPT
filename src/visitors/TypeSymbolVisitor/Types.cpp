@@ -1,6 +1,6 @@
-#include "../headers/SymanticVisitor.h"
+#include "../headers/TypeSymbolVisitor.h"
 
-void SymanticVisitor::visit(SimpleTypeNode &node)
+void TypeSymbolVisitor::visit(SimpleTypeNode &node)
 {
     // Проверяем, существует ли тип в реестре
     auto type = registry.findType(node.name);
@@ -10,7 +10,7 @@ void SymanticVisitor::visit(SimpleTypeNode &node)
     node.inferredType = type;
 }
 
-void SymanticVisitor::visit(GenericTypeNode &node)
+void TypeSymbolVisitor::visit(GenericTypeNode &node)
 {
     // Проверяем, существует ли базовый тип в реестре
     auto baseType = registry.findType(node.baseName);
@@ -26,7 +26,7 @@ void SymanticVisitor::visit(GenericTypeNode &node)
     node.inferredType = baseType;
 }
 
-void SymanticVisitor::visit(IdentifierNode& node)
+void TypeSymbolVisitor::visit(IdentifierNode& node)
 {
     // Проверяем, существует ли переменная в реестре
     auto it = contexts.back().variables.find(node.name);
@@ -34,43 +34,46 @@ void SymanticVisitor::visit(IdentifierNode& node)
         LogError("Variable not found: " + node.name);
     }
 
-    this->debugContexts();
     IC();
     node.inferredType = checkForIdentifier(it->second);
+    IC(
+        node.name,
+        node.inferredType->toString()
+    );
 }
 
-void SymanticVisitor::visit(NumberNode& node)
+void TypeSymbolVisitor::visit(NumberNode& node)
 {
-    node.inferredType = registry.findType("i32"); // Тут пока что i32 потом разделим на i8, i32, i64
+    node.inferredType = registry.findType(node.type->toString()); // Тут пока что i32 потом разделим на i8, i32, i64
     IC(
         node.value,
         node.inferredType->toString()
     );
 }
 
-void SymanticVisitor::visit(FloatNumberNode& node)
+void TypeSymbolVisitor::visit(FloatNumberNode& node)
 {
     node.inferredType = registry.findType("float");
 }
 
-void SymanticVisitor::visit(StringNode& node)
+void TypeSymbolVisitor::visit(StringNode& node)
 {
     node.inferredType = registry.findType("string");
 }
 
-void SymanticVisitor::visit(BooleanNode& node)
-{
-    node.inferredType = registry.findType("bool");
-}
-
-void SymanticVisitor::visit(NullNode& node)
+void TypeSymbolVisitor::visit(NullNode& node)
 {
     node.inferredType = registry.findType("null");
 }
 
-void SymanticVisitor::visit(NoneNode& node)
+void TypeSymbolVisitor::visit(NoneNode& node)
 {
     node.inferredType = registry.findType("none");
 }
 
-
+void TypeSymbolVisitor::visit(KeyValueNode& node) {
+    node.key->accept(*this);
+    node.value->accept(*this);
+    auto keyType = checkForIdentifier(node.key);
+    auto valueType = checkForIdentifier(node.value);
+}

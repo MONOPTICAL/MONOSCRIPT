@@ -85,6 +85,27 @@ void registerBuiltInFunctions(Registry& registry)
             nullptr                                                                         // Тело функции
         )
     );
+
+    // Cast функции
+    registry.addBuiltinFunction(
+        "toString",                                                                         // Имя функции
+        std::make_shared<FunctionNode>(
+            "toString", 
+            "", 
+            std::make_shared<SimpleTypeNode>("string"),                                      // Тип возвращаемого значения
+            std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>>
+            {
+                std::make_pair(std::make_shared<SimpleTypeNode>("i32"), "arg1"),
+                std::make_pair(std::make_shared<SimpleTypeNode>("i64"), "arg2"),
+                std::make_pair(std::make_shared<SimpleTypeNode>("float"), "arg3"),
+                std::make_pair(std::make_shared<SimpleTypeNode>("bool"), "arg4"),
+                std::make_pair(std::make_shared<SimpleTypeNode>("null"), "arg5"),
+                std::make_pair(std::make_shared<SimpleTypeNode>("none"), "arg6")
+            },                                                                              // Все возможные аргументы
+
+            nullptr                                                                         // Тело функции
+        )
+    );
 }
 
 void registerBuiltInTypes(Registry& registry) 
@@ -92,11 +113,11 @@ void registerBuiltInTypes(Registry& registry)
     /*
         Встроенные типы:
 
+        i1
         i8
         i32
         i64
         float
-        bool
         string
         null
         none
@@ -106,14 +127,15 @@ void registerBuiltInTypes(Registry& registry)
     */
 
     // Добавление встроенных типов
+    registry.addBuiltinType("i1", std::make_shared<SimpleTypeNode>("i1"));
     registry.addBuiltinType("i8", std::make_shared<SimpleTypeNode>("i8"));
     registry.addBuiltinType("i32", std::make_shared<SimpleTypeNode>("i32"));
     registry.addBuiltinType("i64", std::make_shared<SimpleTypeNode>("i64"));
     registry.addBuiltinType("float", std::make_shared<SimpleTypeNode>("float"));
-    registry.addBuiltinType("bool", std::make_shared<SimpleTypeNode>("bool"));
     registry.addBuiltinType("string", std::make_shared<SimpleTypeNode>("string"));
     registry.addBuiltinType("null", std::make_shared<SimpleTypeNode>("null"));
     registry.addBuiltinType("none", std::make_shared<SimpleTypeNode>("none"));
+    registry.addBuiltinType("auto", std::make_shared<SimpleTypeNode>("auto"));
 
     // Добавление встроенных типов массивов и карт
     // Потому что один хуй они являются base типами для GenericTypeNode

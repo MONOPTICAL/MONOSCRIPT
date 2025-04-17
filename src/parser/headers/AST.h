@@ -27,7 +27,6 @@ class ASTNodeVisitor {
         virtual void visit(class NumberNode& node) = 0;
         virtual void visit(class FloatNumberNode& node) = 0;
         virtual void visit(class StringNode& node) = 0;
-        virtual void visit(class BooleanNode& node) = 0;
         virtual void visit(class NullNode& node) = 0;
         virtual void visit(class NoneNode& node) = 0;
         virtual void visit(class KeyValueNode& node) = 0;
@@ -300,8 +299,10 @@ class IdentifierNode : public ASTNode {
 class NumberNode : public ASTNode {
     public:
         NumberNode() = default;
-        NumberNode(int value) : value(value) {}
+        NumberNode(int value, std::shared_ptr<TypeNode> type) : value(value), type(type) {}
         int value;
+        std::shared_ptr<TypeNode> type; // тип числа (i32, i64, i8, i1)
+
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);
@@ -330,17 +331,6 @@ class StringNode : public ASTNode {
         }
 };
 
-class BooleanNode : public ASTNode {
-    public:
-        BooleanNode() = default;
-        BooleanNode(bool value) : value(value) {}
-        bool value;
-
-        void accept(ASTNodeVisitor& visitor) override {
-            visitor.visit(*this);
-        }
-};
-
 class NullNode : public ASTNode {
     public:
         NullNode() = default;
@@ -362,8 +352,11 @@ class NoneNode : public ASTNode {
 class KeyValueNode : public ASTNode {
     public:
         KeyValueNode() = default;
+
         std::shared_ptr<ASTNode> key;
         std::shared_ptr<ASTNode> value;
+
+        std::string keyName;
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);

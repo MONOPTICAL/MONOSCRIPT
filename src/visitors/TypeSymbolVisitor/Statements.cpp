@@ -1,13 +1,13 @@
-#include "../headers/SymanticVisitor.h"
-
-void SymanticVisitor::visit(ProgramNode &node)
+#include "../headers/TypeSymbolVisitor.h"
+#include <string_view>
+void TypeSymbolVisitor::visit(ProgramNode &node)
 {
     for (const auto& statement : node.body) {
         statement->accept(*this);
     }
 }
 
-void SymanticVisitor::visit(FunctionNode &node)
+void TypeSymbolVisitor::visit(FunctionNode &node)
 {
     // Проверяем, существует ли функция в реестре(в текущем контексте или глобальном)
     if(contexts.back().functions.find(node.name) != contexts.back().functions.end()) {
@@ -16,8 +16,19 @@ void SymanticVisitor::visit(FunctionNode &node)
         }
         LogError("Function already defined: " + node.name);
     }
-    
-    std::unordered_map<std::string, std::shared_ptr<ASTNode>> args = {};
+
+    /*
+    Пока что не проверяем, что функция является методом класса
+    Так как не реализован класс
+    if (node.associated != "") {
+        // Проверяем, существует ли класс в реестре
+        auto it = contexts.back().variables.find(node.associated);
+        if (it == contexts.back().variables.end()) {
+            LogError("Class not found: " + node.associated);
+        }
+    }
+    */
+    std::unordered_map<std::string, std::shared_ptr<TypeNode>> args = {};
 
     // Проходим по параметрам функции
     for (const auto& param : node.parameters) {
@@ -43,7 +54,13 @@ void SymanticVisitor::visit(FunctionNode &node)
 
     // Добавляем параметры функции в текущий контекст
     for (const auto& param : args) {
-        currentFunction.variables[param.first] = std::make_shared<VariableAssignNode>(param.first, false, std::dynamic_pointer_cast<TypeNode>(param.second), nullptr);
+        auto varNode = std::make_shared<VariableAssignNode>(
+            param.first, false, std::dynamic_pointer_cast<TypeNode>(param.second), nullptr);
+        
+        varNode->inferredType = varNode->type; // <-- инициализация inferredType
+
+        // Добавляем переменную в реестр
+        currentFunction.variables[param.first] = varNode;
     }
 
     // Если функция находится в глобальном контексте, то добавляем ее в глобальный реестр(глобальный контекст - это первый элемент в векторе)
@@ -68,14 +85,14 @@ void SymanticVisitor::visit(FunctionNode &node)
     node.inferredType = node.returnType; // Устанавливаем тип функции
 }
 
-void SymanticVisitor::visit(BlockNode &node)
+void TypeSymbolVisitor::visit(BlockNode &node)
 {
     for (const auto& statement : node.statements) {
         statement->accept(*this);
     }
 }
 
-void SymanticVisitor::visit(VariableAssignNode &node)
+void TypeSymbolVisitor::visit(VariableAssignNode &node)
 {
     // Проверяем, существует ли переменная в реестре
     if (contexts.back().variables.find(node.name) != contexts.back().variables.end()) {
@@ -84,37 +101,89 @@ void SymanticVisitor::visit(VariableAssignNode &node)
 
     // Проверяем тип переменной
     node.type->accept(*this);
+    std::string varType = node.type->toString();
+    IC(varType);
+    if (
+        varType == "none"
+        || varType == "null"
+        || varType == "void"
+    ) {
+        LogError("Type cannot be " + varType);
+    }
 
+    if (varType == "auto")
+    {
+        if (auto block = std::dynamic_pointer_cast<BlockNode>(node.expression))
+        {
+            if (std::dynamic_pointer_cast<KeyValueNode>(block->statements[0]))
+            {
+                auto keyValue = std::dynamic_pointer_cast<KeyValueNode>(block->statements[0]);
+                keyValue->key->accept(*this);
+                keyValue->value->accept(*this);
+
+                auto genericType = std::make_shared<GenericTypeNode>("map");
+                genericType->typeParameters.push_back(keyValue->key->inferredType);
+                genericType->typeParameters.push_back(keyValue->value->inferredType);
+
+                node.type = genericType;
+                varType = genericType->toString();
+            }
+            else
+            {
+                auto firstStatement = block->statements[0];
+                firstStatement->accept(*this);
+
+                auto genericType = std::make_shared<GenericTypeNode>("array");
+                genericType->typeParameters.push_back(firstStatement->inferredType);
+
+                node.type = genericType;
+                varType = genericType->toString();
+            }
+        }
+    }
+    // Проверяем выражение является ли оно дженериком
+
+    debugContexts();
+    
+    if (varType.starts_with("array")
+        || varType.starts_with("map")
+    ) {
+        validateCollectionElements(node.type, node.expression);
+        IC("exit");
+    }
+    else 
+    {
+        node.expression->accept(*this);
+        auto expressionType = node.expression->inferredType->toString();
+
+        // Проверяем тип выражения
+        if (expressionType != varType) {
+            if (varType == "auto")
+                node.type = node.expression->inferredType;
+            else if (
+                (varType == "i32" || varType == "i64" || varType == "i8")
+                && (expressionType == "i32" || expressionType == "i64" || expressionType == "i8" || expressionType == "i1")
+            )
+            {
+                node.expression->implicitCastTo = node.type;
+            }
+            else if (expressionType != "none")
+                LogError("Type mismatch: expected " + varType + ", got " + expressionType);
+        }
+    }
     // Добавляем переменную в реестр
-    contexts.back().variables[node.name] = std::make_shared<VariableAssignNode>(node.name, node.isConst, node.type, nullptr);
-    
-    if (auto varAssign =std::dynamic_pointer_cast<VariableAssignNode>(contexts.back().variables[node.name])) {
-        
-        IC( 
-            varAssign->name ,
-            varAssign->type->toString() ,
-            varAssign->isConst
-        );
+    auto varNode = std::make_shared<VariableAssignNode>(node.name, node.isConst, node.type, node.expression);
+    varNode->inferredType = node.type; // Устанавливаем тип переменной
 
-    }
-
-    // Проверяем выражение
-    node.expression->accept(*this);
-    
-    // Проверяем тип выражения
-    if (node.expression->inferredType->toString() != node.type->toString()) {
-        LogError("Type mismatch: expected " + node.type->toString() + ", got " + node.expression->inferredType->toString());
-    }
+    contexts.back().variables[node.name] = varNode;
 }
 
-void SymanticVisitor::visit(ReturnNode &node)
+void TypeSymbolVisitor::visit(ReturnNode &node)
 {
     // Проверяем, существует ли функция в реестре
     if (contexts.back().currentFunctionName.empty()) {
         LogError("Return statement outside of function");
     }
-
-    
 
     // Проверяем тип возвращаемого значения
     if (node.expression) {

@@ -14,7 +14,7 @@ struct Context {
     bool returnedValue = false;
 };
 
-class SymanticVisitor : public ASTNodeVisitor {
+class TypeSymbolVisitor : public ASTNodeVisitor {
 
 private:
 
@@ -29,9 +29,16 @@ private:
     */
     std::shared_ptr<TypeNode>                                       checkForIdentifier(std::shared_ptr<ASTNode>& node);
 
+    void                                                            numCast(std::shared_ptr<ASTNode>& left 
+                                                                    , std::shared_ptr<ASTNode>& right
+                                                                    , const std::string& op);
     
+    void                                                            validateCollectionElements(
+                                                                    const std::shared_ptr<TypeNode>& expectedType,
+                                                                    const std::shared_ptr<ASTNode>& expr);
+
 public:
-                                                                    SymanticVisitor() 
+                                                                    TypeSymbolVisitor() 
                                                                     {
                                                                         // Инициализация контекста
                                                                         Context globalContext = {
@@ -73,7 +80,6 @@ public:
     void                                                            visit(NumberNode& node) override;
     void                                                            visit(FloatNumberNode& node) override;
     void                                                            visit(StringNode& node) override;
-    void                                                            visit(BooleanNode& node) override;
     void                                                            visit(NullNode& node) override;
     void                                                            visit(NoneNode& node) override;
     void                                                            visit(KeyValueNode& node) override;
