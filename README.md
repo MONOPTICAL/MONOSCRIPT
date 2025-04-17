@@ -87,7 +87,7 @@ map<string, i32> очки ^= {"Alice": 10, "Bob": 8}
 [void]Logger::logInfo()
 |   echo("Логирование")
 ```
-или в самом классе:
+или в самой структуре:
 ```cpp
 [void]logInfo()
 |   echo("Логирование")
