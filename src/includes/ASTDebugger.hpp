@@ -33,6 +33,16 @@ class ASTDebugger
                 printIndent(indent); std::cout << "[ELSE], Else Block: \n";
                 debug(ifNode->elseBlock, indent + 2);
             }
+            else if (auto lambda = std::dynamic_pointer_cast<LambdaNode>(node))
+            {
+                printIndent(indent); std::cout << "[Lambda], Return Type: " << lambda->returnType->toString() << "\n";
+                for (const auto& param : lambda->parameters) {
+                    printIndent(indent + 2); std::cout << "Param: " << param.second << " "; 
+                    debug(param.first, 1);
+                }
+                printIndent(indent); std::cout << "[Lambda], Body: \n";
+                debug(lambda->body, indent + 2);
+            }
             else if (auto For = std::dynamic_pointer_cast<ForNode>(node))
             {
                 printIndent(indent); std::cout << "[For], iter_var: " << For->varName << "(auto)\n";
@@ -41,6 +51,18 @@ class ASTDebugger
                 printIndent(indent); std::cout << "[For], Body: \n";
                 debug(For->body, indent + 2);
 
+            }
+            else if (auto use = std::dynamic_pointer_cast<ImportNode>(node)) {
+                printIndent(indent); 
+                std::cout << "[Use], Path: ";
+                for (size_t i = 0; i < use->path.size(); ++i) {
+                    std::cout << use->path[i];
+                    if (i != use->path.size() - 1) std::cout << ".";
+                }
+                std::cout << "\n";
+                if (!use->alias.empty()) {
+                    printIndent(indent); std::cout << "[Use], Alias: " << use->alias << "\n";
+                }
             }
             else if (auto block = std::dynamic_pointer_cast<BlockNode>(node)) {
                 printIndent(indent); std::cout << "[Block]:\n";

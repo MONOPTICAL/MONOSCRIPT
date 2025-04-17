@@ -41,3 +41,13 @@ void TypeSymbolVisitor::visit(ContinueNode& node) {
 void TypeSymbolVisitor::visit(AccessExpression& node) {
     // TODO: реализовать обработку AccessExpression
 }
+
+void TypeSymbolVisitor::visit(ImportNode &node)
+{
+    // TODO: реализовать обработку ImportNode
+}
+
+void TypeSymbolVisitor::visit(LambdaNode &node)
+{
+    // TODO: реализовать обработку LambdaNode
+}

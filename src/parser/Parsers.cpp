@@ -134,12 +134,15 @@ std::shared_ptr<ASTNode> Parser::parseFor()
         throwError("Expected 'in' keyword at line");
     }
     consume(TokenType::Keyword, "Expected 'in' keyword"); // Проверяем наличие ключевого слова in
-
+    
+    int currentLine = lineIndex; // Сохраняем текущую линию
     auto iterable = parseExpression(); // Парсим переменную для итерации
+    if (currentLine < lineIndex) // Если мы не перешли на следующую линию, то это не for
+        lineIndex--;
 
     int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока for
     nextLine(); // Переходим к следующему токену 
-    //IC(expectedIndent, current().value, peek().value, lineIndex, tokenIndex);
+
     auto body = parseBlock(expectedIndent); // Парсим тело цикла for
 
     lineIndex--; // Без этого он скипает 2 линии а не одну
@@ -373,4 +376,36 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
     lineIndex--; // Без этого он скипает 2 линии а не одну    
     
     return std::make_shared<StructNode>(name, body); // Создаём узел структуры
+}
+
+std::shared_ptr<ASTNode> Parser::parseUse()
+{
+    std::vector<std::string> path;
+    std::string alias;
+
+    consume(TokenType::Keyword, "Expected 'use' keyword"); // Проверяем наличие ключевого слова use
+    nextLine();
+
+    while (!isEndOfFile() && check(TokenType::PipeArrow))
+    {
+        consume(TokenType::PipeArrow, "Expected '|>' at start of import entry");
+    
+        do {
+            path.push_back(current().value);
+            consume(TokenType::Identifier, "Expected identifier in import path");
+        } while (match(TokenType::Arrow));
+    
+        if (match(TokenType::Colon)) {
+            alias = current().value;
+            consume(TokenType::Identifier, "Expected alias name after ':'");
+        }
+    
+        // Только если не конец файла — переходи к следующей строке
+        if (!isEndOfFile())
+            nextLine();
+    }
+
+    IC(path, alias);
+    lineIndex--; // Без этого он скипает 2 линии а не одну
+    return std::make_shared<ImportNode>(path, alias);
 }

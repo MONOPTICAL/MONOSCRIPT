@@ -222,12 +222,13 @@ std::shared_ptr<TypeNode> Parser::getFullType()
 /// @return Все возможные приоритеты токенов: or - 1, and - 2, == - 3, + и - - 4, * и / - 5. Если токен не является оператором или ключевым словом, возвращает -1
 int Parser::getPrecedence(const Token &token) const
 {
-    if (token.type != TokenType::Operator && token.type != TokenType::Keyword) return -1;
+    if (token.type != TokenType::Operator && token.type != TokenType::Keyword && token.type != TokenType::PipeArrow) return -1;
     if (token.value == "or") return 1; // keyword
     if (token.value == "and") return 2; // keyword
-    if (token.value == "==" || token.value == "<" || token.value == ">" || token.value == "!=" || token.value == "<=" || token.value == ">=") return 3; // operator
-    if (token.value == "+" || token.value == "-") return 4; // operator
-    if (token.value == "*" || token.value == "/" || token.value == "%") return 5; // operator
+    if (token.value == "|>") return 3; // keyword
+    if (token.value == "==" || token.value == "<" || token.value == ">" || token.value == "!=" || token.value == "<=" || token.value == ">=") return 4; // operator
+    if (token.value == "+" || token.value == "-") return 5; // operator
+    if (token.value == "*" || token.value == "/" || token.value == "%") return 6; // operator
 
     return -1; // Для компилятора, чтобы не ругался на -Wreturn-type
 }
@@ -235,11 +236,39 @@ int Parser::getPrecedence(const Token &token) const
 std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
 {
     auto left = parseUnary(); // 2
+    bool movedLine = false; // Флаг для проверки, был ли сделан переход на следующую строку
 
     while (true)
     {
         Token currentToken = current(); // + текущий токен, == текущий токен
         int currentPrecedence = getPrecedence(currentToken); // Получаем приоритет текущего токена
+        // Если дошли до конца строки — пробуем перейти на следующую строку с pipe
+        if (currentToken.type == TokenType::None)
+        {
+            // Если это не конец файла, пробуем перейти на следующую строку
+            if (!isEndOfFile() && lineIndex + 1 < lines.size())
+            {
+                nextLine();
+                movedLine = true; // Устанавливаем флаг, что мы перешли на следующую строку
+
+                tokenIndex = getIndentLevel(lines[lineIndex]); // Перепрыгиваем через пайпы/отступы
+
+                // Проверяем, есть ли pipe-оператор
+                if (check(TokenType::PipeArrow))
+                {
+                    currentToken = current();
+                    currentPrecedence = getPrecedence(currentToken);
+                }
+                else
+                {
+                    break; // Нет pipe — выходим из цикла
+                }
+            }
+            else
+            {
+                break; // Конец файла — выходим из цикла
+            }
+        }
         if (currentPrecedence < precedence) break; // Если текущий приоритет меньше, чем заданный, выходим из цикла
 
         advance(); // Переходим к следующему токену
@@ -247,7 +276,7 @@ std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
 
         left = std::make_shared<BinaryOpNode>(left, currentToken.value, right); // Создаём новый узел бинарной операции
     }
-    
+
     return left; // Возвращаем разобранное выражение
 }
 
@@ -350,6 +379,60 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
     {
         return parseMemberExpression();
     }
+    else if (currentToken.type == TokenType::LeftBracket && peek().type == TokenType::Type)
+    {
+        // [i8]func(i8: a) -> a*a
+        advance(); // [
+
+        std::shared_ptr<TypeNode> returnType = getFullType();
+
+        consume(TokenType::RightBracket, "Expected ']' after type in lambda/function literal");
+        consume(TokenType::LeftParen, "Expected '(' after function name"); // Проверяем наличие правой скобки
+
+        // Парсим параметры
+        std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> params;
+        do
+        {
+            std::shared_ptr<TypeNode> paramType = getFullType(); // Получаем полный тип параметра функции
+            consume(TokenType::Colon, "Expected ':' after parameter type"); // Проверяем наличие двоеточия после типа параметра функции
+            std::string paramName = current().value; // Сохраняем имя параметра функции
+            consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора параметра функции
+
+            params.push_back({paramType, paramName}); // Добавляем параметр в вектор параметров функции
+        } while (match(TokenType::Comma)); // Пока следующий токен - это запятая, продолжаем добавлять параметры функции
+    
+        consume(TokenType::RightParen, "Expected ')' after parameters in lambda/function literal");
+
+        // Парсим тело
+        if(check(TokenType::Arrow))
+        {
+            advance(); // Переходим к следующему токену
+            auto body = parseExpression();
+            return std::make_shared<LambdaNode>(returnType, params, body);
+        }
+        else if(check(TokenType::Colon))
+        {
+            int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока if
+            nextLine(); // Переходим к следующему токену
+            IC("s", current().value, peek().value, lineIndex, tokenIndex, expectedIndent);
+            auto body = parseBlock(expectedIndent);
+            IC("e", current().value, peek().value, lineIndex, tokenIndex);
+            lineIndex--; // Без этого он скипает 2 линии а не одну
+            tokenIndex = getIndentLevel(lines[lineIndex]); // Перепрыгиваем через пайпы/отступы
+            return std::make_shared<LambdaNode>(returnType, params, body);
+        }
+        else
+        {
+            throwError("Expected '->' or ':' after parameters in lambda/function literal");
+        }
+
+        // Вернуть FunctionLiteralNode или аналогичный узел
+
+        /*
+        FunctionNode(const std::string& name, const std::string& associated, std::shared_ptr<TypeNode> returnType, const std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters, std::shared_ptr<ASTNode> body) 
+            : name(name), associated(associated), returnType(returnType), parameters(parameters), body(body) {}
+        */
+    }
     else if (currentToken.type == TokenType::LeftBracket)
     {
         std::shared_ptr<BlockNode> body = std::make_shared<BlockNode>();
@@ -423,11 +506,11 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
             advance(); // Переходим к следующему токену
             return std::make_shared<NoneNode>(); // Создаём узел none
         }
-        else if (currentToken.value == "defiend")
+        else if (currentToken.value == "defined")
         {
             advance();
             auto call = std::make_shared<CallNode>();
-            call->callee = "defiend";
+            call->callee = "defined";
             call->arguments.push_back(parseExpression());
             return call;
         }

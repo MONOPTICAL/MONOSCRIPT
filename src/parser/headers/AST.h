@@ -33,6 +33,8 @@ class ASTNodeVisitor {
         virtual void visit(class BreakNode& node) = 0;
         virtual void visit(class ContinueNode& node) = 0;
         virtual void visit(class AccessExpression& node) = 0;
+        virtual void visit(class ImportNode& node) = 0;
+        virtual void visit(class LambdaNode& node) = 0;
 };
 
 class TypeNode;
@@ -126,6 +128,20 @@ class FunctionNode : public ASTNode {
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);
         }
+};
+
+class LambdaNode : public ASTNode {
+    public:
+        std::shared_ptr<TypeNode> returnType;
+        std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters; // {type, name}
+        std::shared_ptr<ASTNode> body;
+    
+        LambdaNode(std::shared_ptr<TypeNode> returnType,
+                            const std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters,
+                            std::shared_ptr<ASTNode> body)
+            : returnType(returnType), parameters(parameters), body(body) {}
+    
+        void accept(ASTNodeVisitor& visitor) override { visitor.visit(*this); }
 };
 
 class StructNode : public ASTNode {
@@ -391,6 +407,22 @@ class AccessExpression : public ASTNode {
         std::string notation;
         std::shared_ptr<ASTNode> expression;
         std::shared_ptr<ASTNode> nextAccess;
+
+        void accept(ASTNodeVisitor& visitor) override {
+            visitor.visit(*this);
+        }
+};
+
+class ImportNode : public ASTNode {
+    public:
+        ImportNode() = default;
+        ImportNode(const std::vector<std::string>& path, const std::string& alias = "")
+        : path(path), alias(alias) {}
+        // Путь импорта: module -> struct -> function ...
+        std::vector<std::string> path;
+        // Алиас (опционально)
+        std::string alias;
+    
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);
