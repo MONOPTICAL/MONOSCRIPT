@@ -35,7 +35,15 @@ private:
     
     void                                                            validateCollectionElements(
                                                                     const std::shared_ptr<TypeNode>& expectedType,
-                                                                    const std::shared_ptr<ASTNode>& expr);
+                                                                    const std::shared_ptr<ASTNode>& expr,
+                                                                        bool isAuto);
+
+    void                                                            applyImplicitCastToNumeric(
+                                                                        const std::shared_ptr<TypeNode>& expectedType,
+                                                                        const std::shared_ptr<ASTNode>& expr,
+                                                                        int maxRank,
+                                                                        bool isAuto);
+                                                                
 
 public:
                                                                     TypeSymbolVisitor() 
@@ -86,7 +94,6 @@ public:
     void                                                            visit(BreakNode& node) override;
     void                                                            visit(ContinueNode& node) override;
     void                                                            visit(AccessExpression& node) override;
-    void                                                            visit(ClassNode& node) override;
 };
 
 #endif // SYMANTICVISITOR_H

@@ -33,7 +33,6 @@ class ASTNodeVisitor {
         virtual void visit(class BreakNode& node) = 0;
         virtual void visit(class ContinueNode& node) = 0;
         virtual void visit(class AccessExpression& node) = 0;
-        virtual void visit(class ClassNode& node) = 0;
 };
 
 class TypeNode;
@@ -392,20 +391,6 @@ class AccessExpression : public ASTNode {
         std::string notation;
         std::shared_ptr<ASTNode> expression;
         std::shared_ptr<ASTNode> nextAccess;
-
-        void accept(ASTNodeVisitor& visitor) override {
-            visitor.visit(*this);
-        }
-};
-
-class ClassNode : public ASTNode {
-    public:
-        ClassNode() = default;
-        ClassNode(const std::string& name, std::shared_ptr<ASTNode> public_body, std::shared_ptr<ASTNode> private_body) 
-            :   name(name), public_body(public_body), private_body(private_body) {}
-    std::string name;
-    std::shared_ptr<ASTNode> public_body;
-    std::shared_ptr<ASTNode> private_body;
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);

@@ -71,25 +71,15 @@ map<string, i32> очки ^= {"Alice": 10, "Bob": 8}
 ```
 - Доступ через индекс: `массив[0]`, `словарь["ключ"]`
 
-### ✅ Структуры
+### ✅ Структуры и методы
 ```cpp
-[struct] User
-| string : name
-| i32 : age
-```
-
-### ✅ Классы и методы
-```cpp
-[class]User
-public:
+[struct]User
+|  map<string,string> User_Info
 |  [User]__init__(string: name, string: password, string: id)
 |  |  User_Info = {"name" : name, "password": password, "id" : id} 
 |
 |  [map<string,string>]GetUserInfo()
 |  |  return User_Info   
-|
-private:
-|  map<string,string> User_Info
 ```
 
 **Альтернативная реализация методов:**
@@ -110,7 +100,7 @@ return выражение
 
 ### ✅ Передача параметров
 - Примитивы (`i1`, `i8`, `i32`, `i64`, `float`, `string`, `bool`) передаются **по значению**.
-- Структуры данных (`map`, `array`, `struct`, `class`) передаются **по ссылке**.
+- Структуры данных (`map`, `array`, `struct`) передаются **по ссылке**.
 - Поведение полностью аналогично **Python**.
 
 ---

@@ -17,6 +17,16 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
         LogError("Function already defined: " + node.name);
     }
 
+    if(!node.associated.empty())
+    {
+        if(registry.findStruct(node.associated) == nullptr) 
+            LogError("Struct not found: " + node.associated);
+
+        if(contexts.size() != 1)
+            LogError("Function " + node.name + " cannot be defined in a non-global context");
+    }
+
+
     /*
     Пока что не проверяем, что функция является методом класса
     Так как не реализован класс
@@ -102,7 +112,11 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
     // Проверяем тип переменной
     node.type->accept(*this);
     std::string varType = node.type->toString();
-    IC(varType);
+    bool isAuto = false;
+
+    if (varType == "auto")
+        isAuto = true;
+
     if (
         varType == "none"
         || varType == "null"
@@ -111,7 +125,7 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
         LogError("Type cannot be " + varType);
     }
 
-    if (varType == "auto")
+    if (isAuto)
     {
         if (auto block = std::dynamic_pointer_cast<BlockNode>(node.expression))
         {
@@ -148,7 +162,7 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
     if (varType.starts_with("array")
         || varType.starts_with("map")
     ) {
-        validateCollectionElements(node.type, node.expression);
+        validateCollectionElements(node.type, node.expression, isAuto);
         IC("exit");
     }
     else 
