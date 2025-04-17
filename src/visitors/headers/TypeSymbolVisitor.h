@@ -94,6 +94,8 @@ public:
     void                                                            visit(BreakNode& node) override;
     void                                                            visit(ContinueNode& node) override;
     void                                                            visit(AccessExpression& node) override;
+    void                                                            visit(ImportNode& node) override;
+    void                                                            visit(LambdaNode& node) override;
 };
 
 #endif // SYMANTICVISITOR_H

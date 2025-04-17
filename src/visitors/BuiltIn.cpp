@@ -106,6 +106,40 @@ void registerBuiltInFunctions(Registry& registry)
             nullptr                                                                         // Тело функции
         )
     );
+
+    registry.addBuiltinFunction(
+        "toInt",                                                                           // Имя функции
+        std::make_shared<FunctionNode>(
+            "toInt", 
+            "", 
+            std::make_shared<SimpleTypeNode>("i32"),                                        // Тип возвращаемого значения
+            std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>>
+            {
+                std::make_pair(std::make_shared<SimpleTypeNode>("string"), "arg1"),
+                std::make_pair(std::make_shared<SimpleTypeNode>("float"), "arg2")
+            },                                                                              // Все возможные аргументы
+
+            nullptr                                                                         // Тело функции
+        )
+    );
+
+    registry.addBuiltinFunction(
+        "toFloat",                                                                          // Имя функции
+        std::make_shared<FunctionNode>(
+            "toFloat", 
+            "", 
+            std::make_shared<SimpleTypeNode>("float"),                                       // Тип возвращаемого значения
+            std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>>
+            {
+                std::make_pair(std::make_shared<SimpleTypeNode>("string"), "arg1"),
+                std::make_pair(std::make_shared<SimpleTypeNode>("i32"), "arg2"),
+                std::make_pair(std::make_shared<SimpleTypeNode>("i64"), "arg3")
+            },                                                                              // Все возможные аргументы
+
+            nullptr                                                                         // Тело функции
+        )
+    );
+
 }
 
 void registerBuiltInTypes(Registry& registry) 
