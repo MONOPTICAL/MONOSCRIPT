@@ -2,7 +2,7 @@
 #include "lexer/headers/Token.h"
 #include "parser/headers/Parser.h"
 #include "includes/ASTDebugger.hpp"
-#include "visitors/headers/SymanticVisitor.h"
+#include "visitors/headers/TypeSymbolVisitor.h"
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -72,9 +72,9 @@ int main(int argc, char* argv[]) {
         Parser parser(tokens);
         auto program = parser.parse();
 
-        SymanticVisitor symanticVisitor;
+        TypeSymbolVisitor typeSymbolVisitor;
 
-        program->accept(symanticVisitor);
+        program->accept(typeSymbolVisitor);
 
         if (showAST && program) {
             std::cout << "\n--- AST ---\n";

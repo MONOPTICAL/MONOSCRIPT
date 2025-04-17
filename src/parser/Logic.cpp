@@ -291,7 +291,24 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
 
         if (intValue.has_value()) // Если число целое
         {
-            return std::make_shared<NumberNode>(intValue.value()); // Создаём узел числа
+            std::shared_ptr<SimpleTypeNode> type;
+            if (intValue.value() == 0 || intValue.value() == 1) // Если число больше i8
+            {
+                type = std::make_shared<SimpleTypeNode>("i1"); // Создаём тип bool
+            }
+            else if (intValue.value() < 255 || intValue.value() > -256) // Если число больше i8
+            {
+                type = std::make_shared<SimpleTypeNode>("i8"); // Создаём тип i8
+            }
+            else if (intValue.value() > 65535 || intValue.value() < -65536) // Если число больше i32
+            {
+                type = std::make_shared<SimpleTypeNode>("i32"); // Создаём тип i32
+            }
+            else if (intValue.value() > 2147483647 || intValue.value() < -2147483648) // Если число больше i32
+            {
+                type = std::make_shared<SimpleTypeNode>("i64"); // Создаём тип i64
+            }
+            return std::make_shared<NumberNode>(intValue.value(), type); // Создаём узел числа
         }
         else
         {
@@ -362,6 +379,8 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
 
             advance();
 
+            key_value->keyName = current().value; // {[here] : value}
+
             auto key = parseExpression(); // {[here] : value}
             key_value->key = key; 
 
@@ -390,7 +409,9 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         if (currentToken.value == "true" || currentToken.value == "false") // Если токен - булевый литерал
         {
             advance(); // Переходим к следующему токену
-            return std::make_shared<BooleanNode>(currentToken.value == "true"); // Создаём узел булевого значения
+            auto type = std::make_shared<SimpleTypeNode>("i1"); // Создаём тип bool
+            auto numberNode = std::make_shared<NumberNode>(currentToken.value == "true", type); // Создаём узел булевого значения
+            return numberNode; // Создаём узел булевого значения
         }
         else if (currentToken.value == "null") // Если токен - null
         {

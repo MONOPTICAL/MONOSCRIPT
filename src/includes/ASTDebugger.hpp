@@ -105,6 +105,9 @@ class ASTDebugger
             }
             else if (auto ident = std::dynamic_pointer_cast<IdentifierNode>(node)) {
                 printIndent(indent); std::cout << "Value: " << ident->name << " - <identifier>" << "\n";
+                if (ident->implicitCastTo) {
+                    printIndent(indent+2); std::cout << "[Implicit Cast To]: " << ident->implicitCastTo->toString() << "\n";
+                }
             }
             else if (auto structNode = std::dynamic_pointer_cast<StructNode>(node))
             {
@@ -112,16 +115,22 @@ class ASTDebugger
                 debug(structNode->body, indent+2);
             }
             else if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
-                printIndent(indent); std::cout << "Value: " << num->value << " - <i32/i64>" << "\n";
+                printIndent(indent); std::cout << "Value: " << num->value << " - <" + num->type->toString() + ">" << "\n";
+                if (num->implicitCastTo) {
+                    printIndent(indent+2); std::cout << "[Implicit Cast To]: " << num->implicitCastTo->toString() << "\n";
+                }
             }
             else if (auto str = std::dynamic_pointer_cast<StringNode>(node)) {
                 printIndent(indent); std::cout << "Value: " << str->value << " - <string>" << "\n";
-            }
-            else if (auto boolean = std::dynamic_pointer_cast<BooleanNode>(node)) {
-                printIndent(indent); std::cout << "Value: " << (boolean->value ? "true" : "false") << " - <bool>" << "\n";
+                if (str->implicitCastTo) {
+                    printIndent(indent+2); std::cout << "[Implicit Cast To]: " << str->implicitCastTo->toString() << "\n";
+                }
             }
             else if (auto floatNum = std::dynamic_pointer_cast<FloatNumberNode>(node)) {
                 printIndent(indent); std::cout << "Value: " << floatNum->value << " - <float>" << "\n";
+                if (floatNum->implicitCastTo) {
+                    printIndent(indent+2); std::cout << "[Implicit Cast To]: " << floatNum->implicitCastTo->toString() << "\n";
+                }
             }
             else if (auto null = std::dynamic_pointer_cast<NullNode>(node)) {
                 printIndent(indent); std::cout << "Value: <null>" << "\n";
