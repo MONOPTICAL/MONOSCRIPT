@@ -118,6 +118,18 @@ void Lexer::tokenize()
 
             if (type == TokenType::Operator && currentTokenType == TokenType::None)
             {
+                /*
+                TODO: Проверь що всё намана ёпт
+                */
+                if ( y == '>' && currentTokens.back().type == TokenType::Pipe )
+                {
+                    currentTokenValue = "|>";
+                    currentTokens.pop_back();
+                    addToken(TokenType::PipeArrow, currentTokenValue);
+                    resetValues();
+                    continue;
+                }
+
                 currentTokenType = type;
                 currentTokenValue = y;
                 continue;
@@ -129,7 +141,7 @@ void Lexer::tokenize()
                 // Просто скипает */
                 if (currentTokenValue == "*/"){resetValues();continue;}
                 
-                if (currentTokenValue != "//" && currentTokenValue != "/*" && currentTokenValue != ">>")
+                if (currentTokenValue != "//" && currentTokenValue != "/*" && currentTokenValue != "->" && currentTokenValue != ">>")
                 {
                     addToken(currentTokenType, currentTokenValue); // Add the token to the current line
                     resetValues();
@@ -142,13 +154,19 @@ void Lexer::tokenize()
                     resetValues();
                     continue;
                 }
+                else if (currentTokenValue == "->")
+                {
+                    addToken(TokenType::Arrow, "->"); // Add the token to the current line
+                    resetValues();
+                    continue;
+                }
                 else if (currentTokenValue == "/*")
                 {
                     resetValues();
                     this->isInMultilineComment = true;
                     continue;
                 }
-                else
+                else // Двойные слеши
                 {
                     resetValues();
                     break;
@@ -196,6 +214,7 @@ void Lexer::tokenize()
         currentTokenType = TokenType::None; // Reset the current token type for the next line
         currentTokenValue = ""; // Reset the current token value for the next line
         currentLine++; // Increment the line number
+
     }
     removeEmpty();
 }
@@ -284,7 +303,7 @@ TokenType Lexer::IsKeyword(const std::string &value) const
         "true", // Boolean true
         "false", // Boolean false
         "null", // Null value
-        "import", // Import module
+        "use", // Import module
         "const", // Constant declaration
         "in", // In operator for iteration
         "is", // Type check operator
@@ -293,11 +312,11 @@ TokenType Lexer::IsKeyword(const std::string &value) const
         "private", // Private access modifier
         "this", // Class access
         "none", // None value
-        "defiend"
+        "defined" // Defined keyword
     }; 
 
     std::vector<std::string> builtinTypes = {
-        "i32", "i64", "bool", "string", "void", "array", "map", "float", "struct", "class" 
+        "i1", "i8", "i32", "i64", "string", "void", "array", "map", "float", "struct"
     };
 
     std::string trimmedValue = ParsingFunctions::trim(value);

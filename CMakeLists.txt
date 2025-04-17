@@ -24,6 +24,17 @@ llvm_map_components_to_libnames(llvm_libs
   core
   support
   irreader
+  executionengine
+  mcjit             
+  orcjit           
+  target            
+  # X86 
+  # -------
+  X86CodeGen
+  X86AsmParser
+  X86Desc
+  X86Info
+  # -------
   analysis
   transformutils
   instcombine
@@ -33,10 +44,7 @@ llvm_map_components_to_libnames(llvm_libs
   scalaropts
   objcarcopts
   passes
-  native
-  asmprinter
-  mcjit
-  executionengine
+  asmprinter        
 )
 
 add_executable(ms # Create an executable target named ms
@@ -46,12 +54,19 @@ add_executable(ms # Create an executable target named ms
     src/parser/Logic.cpp 
     src/parser/Parser.cpp 
     src/parser/Parsers.cpp
-    src/runtime/ASTGen.cpp
-    src/runtime/CodeGenContext.cpp
-    src/runtime/codegen/Declarations.cpp
-    src/runtime/codegen/Arrays.cpp
+    src/visitors/Register.cpp
+    src/visitors/BuiltIn.cpp
+    src/visitors/TypeSymbolVisitor/Expressions.cpp
+    src/visitors/TypeSymbolVisitor/Statements.cpp
+    src/visitors/TypeSymbolVisitor/Types.cpp
+    src/visitors/TypeSymbolVisitor/Utils.cpp
+    src/visitors/TypeSymbolVisitor/NotFinished.cpp
+    src/visitors/TypeSymbolVisitor/StructClass.cpp
+#   src/runtime/ASTGen.cpp
+#   src/runtime/CodeGenContext.cpp
+#   src/runtime/codegen/Declarations.cpp
+#   src/runtime/codegen/Arrays.cpp
+#   src/runtime/codegen/Statements.cpp
 )
 
-llvm_map_components_to_libnames(llvm_libs support core irreader)
-
-target_link_libraries(ms ${llvm_libs})
+target_link_libraries(ms PRIVATE ${llvm_libs})

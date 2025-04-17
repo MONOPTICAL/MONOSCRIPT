@@ -4,9 +4,6 @@
 #include <string>
 #include <vector>
 
-class CodeGenContext;
-namespace llvm { class Value; } // Также предварительно объявляем llvm::Value
-
 class ASTNodeVisitor {
     public:
         virtual ~ASTNodeVisitor() = default;
@@ -30,22 +27,36 @@ class ASTNodeVisitor {
         virtual void visit(class NumberNode& node) = 0;
         virtual void visit(class FloatNumberNode& node) = 0;
         virtual void visit(class StringNode& node) = 0;
-        virtual void visit(class BooleanNode& node) = 0;
         virtual void visit(class NullNode& node) = 0;
         virtual void visit(class NoneNode& node) = 0;
         virtual void visit(class KeyValueNode& node) = 0;
         virtual void visit(class BreakNode& node) = 0;
         virtual void visit(class ContinueNode& node) = 0;
         virtual void visit(class AccessExpression& node) = 0;
-        virtual void visit(class ClassNode& node) = 0;
+        virtual void visit(class ImportNode& node) = 0;
+        virtual void visit(class LambdaNode& node) = 0;
 };
 
-class ASTNode {
+class TypeNode;
+
+class ASTNode : public std::enable_shared_from_this<ASTNode> {
     public:
         int line; // номер строки в исходном коде
         int column; // номер столбца в исходном коде
+
+        std::shared_ptr<TypeNode> inferredType; // Выводимый тип узла (для IR)
+
+        std::shared_ptr<TypeNode> implicitCastTo; // Неявное приведение к типу (для IR)
+
+        
+
         virtual ~ASTNode() = default;
+
         virtual void accept(ASTNodeVisitor& visitor) = 0; // Метод для обхода узла
+
+        std::shared_ptr<ASTNode> shared_from_this() {
+            return std::enable_shared_from_this<ASTNode>::shared_from_this();
+        }
 };
 
 class TypeNode : public ASTNode {
@@ -117,6 +128,20 @@ class FunctionNode : public ASTNode {
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);
         }
+};
+
+class LambdaNode : public ASTNode {
+    public:
+        std::shared_ptr<TypeNode> returnType;
+        std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters; // {type, name}
+        std::shared_ptr<ASTNode> body;
+    
+        LambdaNode(std::shared_ptr<TypeNode> returnType,
+                            const std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters,
+                            std::shared_ptr<ASTNode> body)
+            : returnType(returnType), parameters(parameters), body(body) {}
+    
+        void accept(ASTNodeVisitor& visitor) override { visitor.visit(*this); }
 };
 
 class StructNode : public ASTNode {
@@ -289,8 +314,10 @@ class IdentifierNode : public ASTNode {
 class NumberNode : public ASTNode {
     public:
         NumberNode() = default;
-        NumberNode(int value) : value(value) {}
+        NumberNode(int value, std::shared_ptr<TypeNode> type) : value(value), type(type) {}
         int value;
+        std::shared_ptr<TypeNode> type; // тип числа (i32, i64, i8, i1)
+
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);
@@ -319,17 +346,6 @@ class StringNode : public ASTNode {
         }
 };
 
-class BooleanNode : public ASTNode {
-    public:
-        BooleanNode() = default;
-        BooleanNode(bool value) : value(value) {}
-        bool value;
-
-        void accept(ASTNodeVisitor& visitor) override {
-            visitor.visit(*this);
-        }
-};
-
 class NullNode : public ASTNode {
     public:
         NullNode() = default;
@@ -351,8 +367,11 @@ class NoneNode : public ASTNode {
 class KeyValueNode : public ASTNode {
     public:
         KeyValueNode() = default;
+
         std::shared_ptr<ASTNode> key;
         std::shared_ptr<ASTNode> value;
+
+        std::string keyName;
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);
@@ -394,14 +413,16 @@ class AccessExpression : public ASTNode {
         }
 };
 
-class ClassNode : public ASTNode {
+class ImportNode : public ASTNode {
     public:
-        ClassNode() = default;
-        ClassNode(const std::string& name, std::shared_ptr<ASTNode> public_body, std::shared_ptr<ASTNode> private_body) 
-            :   name(name), public_body(public_body), private_body(private_body) {}
-    std::string name;
-    std::shared_ptr<ASTNode> public_body;
-    std::shared_ptr<ASTNode> private_body;
+        ImportNode() = default;
+        ImportNode(const std::vector<std::string>& path, const std::string& alias = "")
+        : path(path), alias(alias) {}
+        // Путь импорта: module -> struct -> function ...
+        std::vector<std::string> path;
+        // Алиас (опционально)
+        std::string alias;
+    
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);

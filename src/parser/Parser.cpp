@@ -44,10 +44,20 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         return parseFunction();
         
     }
-    else if (currentToken.type == TokenType::LeftBracket && peek().value == "class")
+    // Use statement
+        // use 
+        // |> std -> io : alias
+        // ↑ if we have keyword use, we have use statement
+    else if (currentToken.type == TokenType::Keyword && currentToken.value == "use")
     {
-        return parseClass();
+        return parseUse();
     }
+    // Struct declaration
+        // [struct] User
+        // |> string name = "name"
+        // |> i32 age = 42
+        // |> bool isActive = true
+        // ↑ if we have left bracket and struct keyword, we have struct declaration
     else if (currentToken.type == TokenType::LeftBracket && peek().value == "struct")
     {
         return parseStruct();
