@@ -49,8 +49,22 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
         consume(TokenType::RightParen, "Expected ')' after function parameters"); // Проверяем наличие правой скобки после параметров функции
         int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока if
         nextLine(); // Переходим к следующему токену
-        auto body = parseBlock(expectedIndent); // Парсим тело функции
-        
+
+        std::shared_ptr<BlockNode> body = nullptr; // Создаём указатель на тело функции
+
+        if (getIndentLevel(lines[lineIndex]) == expectedIndent-1)
+        {
+            body = std::make_shared<BlockNode>(); // Создаём тело функции
+        }
+        else if (getIndentLevel(lines[lineIndex]) == expectedIndent)
+        {
+            body = parseBlock(expectedIndent); // Парсим тело функции
+        }
+        else
+        {
+            throwError("Expected indentation after function declaration");
+        }
+
         lineIndex--; // Без этого он скипает 2 линии а не одну
 
         return std::make_shared<FunctionNode>(functionName, association, returnType, parameters, body); // Создаём узел функции
@@ -120,12 +134,15 @@ std::shared_ptr<ASTNode> Parser::parseFor()
         throwError("Expected 'in' keyword at line");
     }
     consume(TokenType::Keyword, "Expected 'in' keyword"); // Проверяем наличие ключевого слова in
-
+    
+    int currentLine = lineIndex; // Сохраняем текущую линию
     auto iterable = parseExpression(); // Парсим переменную для итерации
+    if (currentLine < lineIndex) // Если мы не перешли на следующую линию, то это не for
+        lineIndex--;
 
     int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока for
     nextLine(); // Переходим к следующему токену 
-    //IC(expectedIndent, current().value, peek().value, lineIndex, tokenIndex);
+
     auto body = parseBlock(expectedIndent); // Парсим тело цикла for
 
     lineIndex--; // Без этого он скипает 2 линии а не одну
@@ -361,57 +378,34 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
     return std::make_shared<StructNode>(name, body); // Создаём узел структуры
 }
 
-std::shared_ptr<ASTNode> Parser::parseClass()
+std::shared_ptr<ASTNode> Parser::parseUse()
 {
-    consume(TokenType::LeftBracket, "Expected '[' before class declaration"); // Проверяем наличие левой скобки
-    consume(TokenType::Type, "Expected 'class' keyword"); // Проверяем наличие ключевого слова struct
-    consume(TokenType::RightBracket, "Expected ']' before class declaration"); // Проверяем наличие левой скобки
+    std::vector<std::string> path;
+    std::string alias;
 
-    std::string name = current().value; // Сохраняем имя структуры
-    consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора структуры
-
-    if(current().line != -1)
-        throwError("Unexpected symbol(" +  current().value + ") in the end of class declaration");
-
+    consume(TokenType::Keyword, "Expected 'use' keyword"); // Проверяем наличие ключевого слова use
     nextLine();
 
-
-    std::shared_ptr<ASTNode> private_body; 
-    std::shared_ptr<ASTNode> public_body;
-    int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока структуры
-
-    tokenIndex = expectedIndent - 1;
-    Token currentAccess = current();
-
-    // Первый AccessBlock(private/public)
-    if(currentAccess.type == TokenType::Keyword && (currentAccess.value == "public" || currentAccess.value == "private")) // Проверяем наличие ключевого слова public
+    while (!isEndOfFile() && check(TokenType::PipeArrow))
     {
-        consume(TokenType::Keyword, "Expected access expression after class statement"); // Проверяем наличие ключевого слова public
-        consume(TokenType::Colon, "Expected : after class access expression");
-        nextLine();
-        if(currentAccess.value == "public")
-            public_body = parseBlock(expectedIndent);
-        else
-            private_body = parseBlock(expectedIndent);
-    }
-    else
-        throwError("Expected at least one access expression after class statement");
-
-    // Второй AccessBlock(private/public)
-    tokenIndex = expectedIndent - 1;
-    currentAccess = current();
-
-    if(currentAccess.type == TokenType::Keyword && (currentAccess.value == "public" || currentAccess.value == "private")) 
-    {
-        consume(TokenType::Keyword, "Expected keyword"); // Проверяем наличие ключевого слова public
-        consume(TokenType::Colon, "Expected : after class access expression");
-        nextLine();
-        if(currentAccess.value == "public")
-            public_body = parseBlock(expectedIndent);
-        else if(currentAccess.value == "private")
-            private_body = parseBlock(expectedIndent);
+        consume(TokenType::PipeArrow, "Expected '|>' at start of import entry");
+    
+        do {
+            path.push_back(current().value);
+            consume(TokenType::Identifier, "Expected identifier in import path");
+        } while (match(TokenType::Arrow));
+    
+        if (match(TokenType::Colon)) {
+            alias = current().value;
+            consume(TokenType::Identifier, "Expected alias name after ':'");
+        }
+    
+        // Только если не конец файла — переходи к следующей строке
+        if (!isEndOfFile())
+            nextLine();
     }
 
-    lineIndex--;
-    return std::make_shared<ClassNode>(name, public_body, private_body); // Создаём узел структуры   
+    IC(path, alias);
+    lineIndex--; // Без этого он скипает 2 линии а не одну
+    return std::make_shared<ImportNode>(path, alias);
 }

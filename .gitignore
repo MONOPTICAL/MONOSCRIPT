@@ -1,3 +1,5 @@
 */main
 *.go
 /build
+/.ccls-cache
+/.vscode

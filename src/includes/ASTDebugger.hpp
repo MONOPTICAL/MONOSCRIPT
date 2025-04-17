@@ -15,7 +15,7 @@ class ASTDebugger
                 printIndent(indent); std::cout << "[ProgramNode]\n";
                 for (const auto& stmt : prog->body) debug(stmt, indent + 2);
             }
-            else if (auto func = std::dynamic_pointer_cast<FunctionNode>(node)) {
+            else if (auto func = std::dynamic_pointer_cast<FunctionNode>(node)) { 
                 printIndent(indent); std::cout << "[Function] " << func->name << "[" << func->associated << "]" << "(...) Return";
                 debug(func->returnType, 1);
                 for (const auto& param : func->parameters) {
@@ -33,6 +33,16 @@ class ASTDebugger
                 printIndent(indent); std::cout << "[ELSE], Else Block: \n";
                 debug(ifNode->elseBlock, indent + 2);
             }
+            else if (auto lambda = std::dynamic_pointer_cast<LambdaNode>(node))
+            {
+                printIndent(indent); std::cout << "[Lambda], Return Type: " << lambda->returnType->toString() << "\n";
+                for (const auto& param : lambda->parameters) {
+                    printIndent(indent + 2); std::cout << "Param: " << param.second << " "; 
+                    debug(param.first, 1);
+                }
+                printIndent(indent); std::cout << "[Lambda], Body: \n";
+                debug(lambda->body, indent + 2);
+            }
             else if (auto For = std::dynamic_pointer_cast<ForNode>(node))
             {
                 printIndent(indent); std::cout << "[For], iter_var: " << For->varName << "(auto)\n";
@@ -41,6 +51,18 @@ class ASTDebugger
                 printIndent(indent); std::cout << "[For], Body: \n";
                 debug(For->body, indent + 2);
 
+            }
+            else if (auto use = std::dynamic_pointer_cast<ImportNode>(node)) {
+                printIndent(indent); 
+                std::cout << "[Use], Path: ";
+                for (size_t i = 0; i < use->path.size(); ++i) {
+                    std::cout << use->path[i];
+                    if (i != use->path.size() - 1) std::cout << ".";
+                }
+                std::cout << "\n";
+                if (!use->alias.empty()) {
+                    printIndent(indent); std::cout << "[Use], Alias: " << use->alias << "\n";
+                }
             }
             else if (auto block = std::dynamic_pointer_cast<BlockNode>(node)) {
                 printIndent(indent); std::cout << "[Block]:\n";
@@ -85,26 +107,15 @@ class ASTDebugger
                     debug(access->nextAccess, indent + 2);
                 }
             }
-            else if (auto classNode = std::dynamic_pointer_cast<ClassNode>(node))
-            {
-                printIndent(indent); std::cout << "[Class] - " << classNode->name << "\n";
-                if(classNode->private_body)
-                {
-                    printIndent(indent+1); std::cout << "[Private Block]:" << "\n";
-                    debug(classNode->private_body, indent+2);
-                }
-                if(classNode->public_body)
-                {
-                    printIndent(indent+1); std::cout << "[Public Block]:" << "\n";
-                    debug(classNode->public_body, indent+2);
-                }
-            }
             else if (auto un = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
                 printIndent(indent); std::cout << "UnaryOp: " << un->op << "\n";
                 debug(un->operand, indent + 2);
             }
             else if (auto ident = std::dynamic_pointer_cast<IdentifierNode>(node)) {
                 printIndent(indent); std::cout << "Value: " << ident->name << " - <identifier>" << "\n";
+                if (ident->implicitCastTo) {
+                    printIndent(indent+2); std::cout << "[Implicit Cast To]: " << ident->implicitCastTo->toString() << "\n";
+                }
             }
             else if (auto structNode = std::dynamic_pointer_cast<StructNode>(node))
             {
@@ -112,16 +123,22 @@ class ASTDebugger
                 debug(structNode->body, indent+2);
             }
             else if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
-                printIndent(indent); std::cout << "Value: " << num->value << " - <i32/i64>" << "\n";
+                printIndent(indent); std::cout << "Value: " << num->value << " - <" + num->type->toString() + ">" << "\n";
+                if (num->implicitCastTo) {
+                    printIndent(indent+2); std::cout << "[Implicit Cast To]: " << num->implicitCastTo->toString() << "\n";
+                }
             }
             else if (auto str = std::dynamic_pointer_cast<StringNode>(node)) {
                 printIndent(indent); std::cout << "Value: " << str->value << " - <string>" << "\n";
-            }
-            else if (auto boolean = std::dynamic_pointer_cast<BooleanNode>(node)) {
-                printIndent(indent); std::cout << "Value: " << (boolean->value ? "true" : "false") << " - <bool>" << "\n";
+                if (str->implicitCastTo) {
+                    printIndent(indent+2); std::cout << "[Implicit Cast To]: " << str->implicitCastTo->toString() << "\n";
+                }
             }
             else if (auto floatNum = std::dynamic_pointer_cast<FloatNumberNode>(node)) {
                 printIndent(indent); std::cout << "Value: " << floatNum->value << " - <float>" << "\n";
+                if (floatNum->implicitCastTo) {
+                    printIndent(indent+2); std::cout << "[Implicit Cast To]: " << floatNum->implicitCastTo->toString() << "\n";
+                }
             }
             else if (auto null = std::dynamic_pointer_cast<NullNode>(node)) {
                 printIndent(indent); std::cout << "Value: <null>" << "\n";
