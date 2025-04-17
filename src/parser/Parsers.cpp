@@ -32,6 +32,7 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
     {
         advance(); // Переходим к следующему токену
         std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters; // Вектор параметров функции
+        int lambdaCounter = 0; // Счётчик лямбд
 
         if (!check(TokenType::RightParen)) // Если следующий токен - это не правая скобка, то это функция с параметрами
         {
@@ -39,10 +40,46 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
             {
                 std::shared_ptr<TypeNode> paramType = getFullType(); // Получаем полный тип параметра функции
                 consume(TokenType::Colon, "Expected ':' after parameter type"); // Проверяем наличие двоеточия после типа параметра функции
-                std::string paramName = current().value; // Сохраняем имя параметра функции
-                consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора параметра функции
+                if (paramType->toString() == "func") // Если тип параметра не определён, выбрасываем исключение
+                {
+                    /*
+                    func: (i8: a) -> i8
+                    Params: 
+                        func<i8, i8> : "@0" - последний параметр это return type а все остальные это параметры функции
+                    */
+                    consume(TokenType::LeftParen, "Expected '(' after function type"); // Проверяем наличие левой скобки после типа параметра функции
+                    std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> params;
+                    do
+                    {
+                        std::shared_ptr<TypeNode> paramType = getFullType(); // Получаем полный тип параметра функции
+                        consume(TokenType::Colon, "Expected ':' after parameter type"); // Проверяем наличие двоеточия после типа параметра функции
+                        std::string paramName = current().value; // Сохраняем имя параметра функции
+                        consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора параметра функции
 
-                parameters.push_back({paramType, paramName}); // Добавляем параметр в вектор параметров функции
+                        params.push_back({paramType, paramName}); // Добавляем параметр в вектор параметров функции
+                    } while (match(TokenType::Comma)); // Пока следующий токен - это запятая, продолжаем добавлять параметры функции
+                    consume(TokenType::RightParen, "Expected ')' after parameters in lambda/function literal");
+                    consume(TokenType::Arrow, "Expected '->' after parameters in lambda/function literal"); // Проверяем наличие стрелки после параметров функции
+                    auto returnType = getFullType(); // Получаем полный тип возвращаемого значения функции
+
+                    std::shared_ptr<GenericTypeNode> genericType = std::make_shared<GenericTypeNode>("func"); // Создаём указатель на тип функции
+                    for (const auto& param : params) // Для каждого параметра функции
+                    {
+                        genericType->typeParameters.push_back(param.first); // Добавляем тип параметра в параметры функции
+                    }
+                    genericType->typeParameters.push_back(returnType); // Добавляем тип возвращаемого значения в параметры функции
+
+                    std::string paramName = "@" + std::to_string(lambdaCounter++); // Сохраняем имя параметра функции
+
+                    parameters.push_back({genericType, paramName}); // Добавляем параметр в вектор параметров функции
+                }
+                else
+                {
+                    std::string paramName = current().value; // Сохраняем имя параметра функции
+                    consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора параметра функции
+
+                    parameters.push_back({paramType, paramName}); // Добавляем параметр в вектор параметров функции
+                }
             } while (match(TokenType::Comma)); // Пока следующий токен - это запятая, продолжаем добавлять параметры функции
         }
 
