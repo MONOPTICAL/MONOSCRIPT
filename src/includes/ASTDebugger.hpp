@@ -85,20 +85,6 @@ class ASTDebugger
                     debug(access->nextAccess, indent + 2);
                 }
             }
-            else if (auto classNode = std::dynamic_pointer_cast<ClassNode>(node))
-            {
-                printIndent(indent); std::cout << "[Class] - " << classNode->name << "\n";
-                if(classNode->private_body)
-                {
-                    printIndent(indent+1); std::cout << "[Private Block]:" << "\n";
-                    debug(classNode->private_body, indent+2);
-                }
-                if(classNode->public_body)
-                {
-                    printIndent(indent+1); std::cout << "[Public Block]:" << "\n";
-                    debug(classNode->public_body, indent+2);
-                }
-            }
             else if (auto un = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
                 printIndent(indent); std::cout << "UnaryOp: " << un->op << "\n";
                 debug(un->operand, indent + 2);

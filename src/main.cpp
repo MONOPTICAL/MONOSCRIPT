@@ -72,14 +72,23 @@ int main(int argc, char* argv[]) {
         Parser parser(tokens);
         auto program = parser.parse();
 
+        if (showAST && program) {
+            std::cout << "\n--- AST(1) ---\n";
+            ASTDebugger::debug(program);
+            std::cout << "--- Конец AST(1) ---\n";
+        } else if (!program) {
+            std::cerr << "Ошибка: не удалось разобрать исходный код.\n";
+            return 1;
+        }
+
         TypeSymbolVisitor typeSymbolVisitor;
 
         program->accept(typeSymbolVisitor);
 
         if (showAST && program) {
-            std::cout << "\n--- AST ---\n";
+            std::cout << "\n--- AST(2) ---\n";
             ASTDebugger::debug(program);
-            std::cout << "--- Конец AST ---\n";
+            std::cout << "--- Конец AST(2) ---\n";
         } else if (!program) {
             std::cerr << "Ошибка: не удалось разобрать исходный код.\n";
             return 1;

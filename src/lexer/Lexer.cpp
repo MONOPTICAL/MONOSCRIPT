@@ -297,7 +297,7 @@ TokenType Lexer::IsKeyword(const std::string &value) const
     }; 
 
     std::vector<std::string> builtinTypes = {
-        "i1", "i8", "i32", "i64", "string", "void", "array", "map", "float", "struct", "class" 
+        "i1", "i8", "i32", "i64", "string", "void", "array", "map", "float", "struct"
     };
 
     std::string trimmedValue = ParsingFunctions::trim(value);

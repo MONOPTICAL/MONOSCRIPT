@@ -41,10 +41,7 @@ private:
     std::shared_ptr<ASTNode> parseReturn();
     std::shared_ptr<ASTNode> parseCall();
     std::shared_ptr<ASTNode> parseStruct();
-    std::shared_ptr<ASTNode> parseClass();
-    /*
-    parseClass
-    */
+    
 /*
 все возможные случаи это
 _______________________________________

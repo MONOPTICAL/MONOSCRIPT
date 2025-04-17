@@ -2,10 +2,6 @@
 
 // Заглушки для visit-методов
 
-void TypeSymbolVisitor::visit(StructNode& node) {
-    // TODO: реализовать обработку StructNode
-}
-
 void TypeSymbolVisitor::visit(ReassignMemberNode& node) {
     // TODO: реализовать обработку ReassignMemberNode
 }
@@ -44,12 +40,4 @@ void TypeSymbolVisitor::visit(ContinueNode& node) {
 
 void TypeSymbolVisitor::visit(AccessExpression& node) {
     // TODO: реализовать обработку AccessExpression
-}
-
-void TypeSymbolVisitor::visit(ClassNode& node) {
-    // TODO: реализовать обработку ClassNode
-    /*
-    сделай перед проверкой блоков(public, private) пустой контекст(это будет как общий контекст для public и private)
-    потому что классы никак не привязаны к внешнему контексту
-    */
 }
