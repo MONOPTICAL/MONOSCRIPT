@@ -79,10 +79,6 @@ private:
                                                                             std::shared_ptr<TypeNode> leftType, 
                                                                             std::shared_ptr<TypeNode> rightType);
 
-    void                                                            handleUnaryOperator(
-                                                                            UnaryOpNode& node, 
-                                                                            std::shared_ptr<TypeNode> operandType);
-    
 public:
                                                                     TypeSymbolVisitor() 
                                                                     {

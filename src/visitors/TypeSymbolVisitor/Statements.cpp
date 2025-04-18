@@ -243,32 +243,61 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
     }
 
     std::shared_ptr<VariableAssignNode> varAssign = std::dynamic_pointer_cast<VariableAssignNode>(contexts.back().variables[node.name]);
-    std::string varType = varAssign->inferredType->toString();
+    std::shared_ptr<TypeNode> varType = varAssign->inferredType;
+    std::string varTypeStr = varType->toString();
 
-    node.expression->accept(*this);
-    auto expressionType = node.expression->inferredType->toString();
+    IC(varTypeStr);
+    std::string expressionType;
+    if (varTypeStr.starts_with("array")
+        || varTypeStr.starts_with("map")
+    ) {
+        validateCollectionElements(varType, node.expression, false);
+        auto Block = std::dynamic_pointer_cast<BlockNode>(node.expression);
+        auto Generic = std::dynamic_pointer_cast<GenericTypeNode>(varType);
 
-    if (expressionType != "none" && expressionType != "string") {
-        castNumbersInBinaryTree(node.expression, varType);
+        if (auto keyValue = std::dynamic_pointer_cast<KeyValueNode>(Block->statements[0])) {
+            std::vector<std::string> types = { keyValue->key->inferredType->toString(), keyValue->value->inferredType->toString() };
+            if (types[0] != Generic->typeParameters[0]->toString()) {
+                LogError("Key type mismatch: expected " + Generic->typeParameters[0]->toString() + ", got " + types[0]);
+            }
+            if (types[1] != Generic->typeParameters[1]->toString()) {
+                LogError("Value type mismatch: expected " + Generic->typeParameters[1]->toString() + ", got " + types[1]);
+            }
+            expressionType = "map<" + types[0] + ", " + types[1] + ">";
+        } 
+        else {
+            if (Block->statements[0]->inferredType->toString() != Generic->typeParameters[0]->toString()) {
+                LogError("Element type mismatch: expected " + Generic->typeParameters[0]->toString() + ", got " + Block->statements[0]->inferredType->toString());
+            }
+            expressionType = "array<" + Block->statements[0]->inferredType->toString() + ">";
+        } 
+    }
+    else
+    {
+        node.expression->accept(*this);
+        expressionType = node.expression->inferredType->toString();
+        if (expressionType != "none" && expressionType != "string") {
+            castNumbersInBinaryTree(node.expression, varTypeStr);
 
-        if (node.expression->implicitCastTo)
-            expressionType = node.expression->implicitCastTo->toString();
-        else
-            expressionType = node.expression->inferredType->toString();
+            if (node.expression->implicitCastTo)
+                expressionType = node.expression->implicitCastTo->toString();
+            else
+                expressionType = node.expression->inferredType->toString();
 
-        expressionType = getType(node.expression, expressionType);
+            expressionType = getType(node.expression, expressionType);
 
-        if (varType != "i1") {
-            if (auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.expression)) {
-                if ((binaryOp->op == "and" || binaryOp->op == "or" || binaryOp->op.rfind("icmp_", 0) == 0 || binaryOp->op.rfind("fcmp_", 0) == 0)) {
-                    LogError("Type mismatch: expected i1, got " + expressionType);
+            if (varTypeStr != "i1") {
+                if (auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.expression)) {
+                    if ((binaryOp->op == "and" || binaryOp->op == "or" || binaryOp->op.rfind("icmp_", 0) == 0 || binaryOp->op.rfind("fcmp_", 0) == 0)) {
+                        LogError("Type mismatch: expected i1, got " + expressionType);
+                    }
                 }
             }
         }
     }
 
-    if (expressionType != varType) 
-            LogError("Type mismatch: expected " + varType + ", got " + expressionType);
+    if (expressionType != varTypeStr) 
+            LogError("Type mismatch: expected " + varTypeStr + ", got " + expressionType);
 
     // Добавляем переменную в реестр
     varAssign->expression = node.expression;
