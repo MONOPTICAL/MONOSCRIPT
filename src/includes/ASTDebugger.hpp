@@ -54,14 +54,19 @@ class ASTDebugger
             }
             else if (auto use = std::dynamic_pointer_cast<ImportNode>(node)) {
                 printIndent(indent); 
-                std::cout << "[Use], Path: ";
-                for (size_t i = 0; i < use->path.size(); ++i) {
-                    std::cout << use->path[i];
-                    if (i != use->path.size() - 1) std::cout << ".";
-                }
-                std::cout << "\n";
-                if (!use->alias.empty()) {
-                    printIndent(indent); std::cout << "[Use], Alias: " << use->alias << "\n";
+                std::cout << "[Use], Paths:\n";
+                for (const auto& entry : use->paths) {
+                    printIndent(indent + 2);
+                    // Print the path (vector<string>)
+                    for (size_t i = 0; i < entry.first.size(); ++i) {
+                        std::cout << entry.first[i];
+                        if (i != entry.first.size() - 1) std::cout << ".";
+                    }
+                    // Print alias if present
+                    if (!entry.second.empty()) {
+                        std::cout << " as " << entry.second;
+                    }
+                    std::cout << "\n";
                 }
             }
             else if (auto block = std::dynamic_pointer_cast<BlockNode>(node)) {

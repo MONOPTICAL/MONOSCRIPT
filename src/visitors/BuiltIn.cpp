@@ -163,6 +163,7 @@ void registerBuiltInTypes(Registry& registry)
     // Добавление встроенных типов
     registry.addBuiltinType("i1", std::make_shared<SimpleTypeNode>("i1"));
     registry.addBuiltinType("i8", std::make_shared<SimpleTypeNode>("i8"));
+    registry.addBuiltinType("i16", std::make_shared<SimpleTypeNode>("i16"));
     registry.addBuiltinType("i32", std::make_shared<SimpleTypeNode>("i32"));
     registry.addBuiltinType("i64", std::make_shared<SimpleTypeNode>("i64"));
     registry.addBuiltinType("float", std::make_shared<SimpleTypeNode>("float"));

@@ -86,77 +86,166 @@ void TypeSymbolVisitor::debugContexts()
     std::cout << "---------------------\n";
 }
 
-void TypeSymbolVisitor::numCast(std::shared_ptr<ASTNode> &left, std::shared_ptr<ASTNode> &right, const std::string &op)
-{
-    if (!left) {
-        LogError("Left node is nullptr in numCast");
-        return;
+static int getTypeRank(const std::string& type) {
+    if (type == "i1") return 1;
+    if (type == "i8") return 2;
+    if (type == "i16") return 3;
+    if (type == "i32") return 4;
+    if (type == "i64") return 5;
+    if (type == "float") return 6;
+    return 0;
+}
+
+static std::string getTypeByRank(int rank) {
+    switch (rank) {
+        case 1: return "i1";
+        case 2: return "i8";
+        case 3: return "i16";
+        case 4: return "i32";
+        case 5: return "i64";
+        case 6: return "float";
+        default: return "";
     }
-    if (!right) {
-        LogError("Right node is nullptr in numCast");
-        return;
+}
+
+static std::string getOperation(const std::string& op, const std::string& type) {
+    if (type == "float") {
+        if (op == "add") return "fadd";
+        if (op == "sub") return "fsub";
+        if (op == "mul") return "fmul";
+        if (op == "sdiv") return "fdiv";
+        if (op == "srem") return "frem";
+        if (op.rfind("icmp_", 0) == 0) return "fcmp_" + op.substr(5);
     }
 
-    auto Left = checkForIdentifier(left);
-    auto Right = checkForIdentifier(right);
-    
-    if (!Left) {
-        LogError("Left type is nullptr after checkForIdentifier");
+    return op;
+}
+
+// Рекурсивно выставляет implicitCastTo для всех чисел, если их тип меньше чем targetType
+static void castAllNumbersToType(const std::shared_ptr<ASTNode>& node, const std::string& targetType) {
+    if (!node) return;
+    if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
+        std::string fromType = num->inferredType ? num->inferredType->toString() : (num->type ? num->type->toString() : "");
+        if (fromType != targetType) {
+            num->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
+        }
         return;
     }
-    if (!Right) {
-        LogError("Right type is nullptr after checkForIdentifier");
-        return;
-    }
-    
-    auto leftType = Left->toString();
-    auto rightType = Right->toString();
-    IC(leftType, rightType);
+    if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+        castAllNumbersToType(bin->left, targetType);
+        castAllNumbersToType(bin->right, targetType);
+        std::string implicitCast;
 
-    if (leftType == rightType) {
-        return;
-    }
-
-    if (
-        op == "+"
-        || op == "-"
-        || op == "*"
-        || op == "/"
-        || op == "%"
-        || op == "=="
-        || op == "!="
-        || op == "<"
-        || op == ">"
-        || op == "<="
-        || op == ">="
-    ) {
-        // Promote to the "larger" type if types differ and both are integer types
-        auto getTypeRank = [](const std::string& type) -> int {
-            if (type == "i1") return 1;
-            if (type == "i8") return 2;
-            if (type == "i32") return 3;
-            if (type == "i64") return 4;
-            return 0; // unknown type
-        };
-
-        int leftRank = getTypeRank(leftType);
-        int rightRank = getTypeRank(rightType);
-        
-        if (leftRank > 0 && rightRank > 0 && leftType != rightType) {
-            // Promote the node with the lower type rank to the higher type
-            std::string targetType = (leftRank > rightRank) ? leftType : rightType;
-            if (leftRank < rightRank) {
-            left->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
-            } else if (rightRank < leftRank) {
-            right->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
-            }
-            left->inferredType = std::make_shared<SimpleTypeNode>(targetType);
-            right->inferredType = std::make_shared<SimpleTypeNode>(targetType);
-            return;
+        if (bin->left->implicitCastTo) {
+            implicitCast = bin->left->implicitCastTo->toString();
+        } else if (bin->right->implicitCastTo) {
+            implicitCast = bin->right->implicitCastTo->toString();
+        } else {
+            auto leftType = std::dynamic_pointer_cast<BinaryOpNode>(bin->left);
+            implicitCast = leftType ? leftType->inferredType->toString() : bin->left->inferredType->toString();
+        }
+        if (implicitCast == "float")
+        {
+            bin->op = getOperation(bin->op, "float");
+            bin->inferredType = std::make_shared<SimpleTypeNode>("float");
+        }
+        else
+        {
+            bin->inferredType = std::make_shared<SimpleTypeNode>(implicitCast);
+        }
+    }   
+    if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
+        castAllNumbersToType(unary->operand, targetType);
+        if (unary->operand->implicitCastTo) {
+            unary->implicitCastTo = unary->operand->implicitCastTo;
+        } else {
+            auto leftType = std::dynamic_pointer_cast<BinaryOpNode>(unary->operand);
+            unary->implicitCastTo = leftType ? leftType->inferredType : unary->operand->inferredType;
         }
     }
+}
 
-    LogError("Unsupported operand types for " + op + " : " + leftType + " and " + rightType);
+static bool checkIntLimits(const std::string& type, int value) {
+    if (type == "i1") return value == 0 || value == 1;
+    if (type == "i8") return value >= -128 && value <= 127;
+    if (type == "i16") return value >= -32768 && value <= 32767;
+    if (type == "i32") return value >= -2147483648 && value <= 2147483647;
+    if (type == "i64") return true;
+    return true;
+}
+
+// Второй проход: кастим и валидируем (для не-auto)
+static void castAndValidate(const std::shared_ptr<ASTNode>& node, const std::string& targetType, TypeSymbolVisitor* visitor) {
+    if (!node) return;
+    if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
+        int value = num->value;
+        std::string fromType = num->inferredType ? num->inferredType->toString() : (num->type ? num->type->toString() : "");
+        if (targetType != "float" && !checkIntLimits(targetType, value)) {
+            visitor->LogError("Value " + std::to_string(value) + " does not fit in type " + targetType);
+        }
+        if (fromType != targetType) {
+            num->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
+        }
+        return;
+    }
+    if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+        castAndValidate(bin->left, targetType, visitor);
+        castAndValidate(bin->right, targetType, visitor);
+    }
+    if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
+        castAndValidate(unary->operand, targetType, visitor);
+    }
+}
+
+// Первый проход: ищем максимальный rank
+static void findMaxRank(const std::shared_ptr<ASTNode>& node, int& maxRank) {
+    if (!node) return;
+    if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
+        if (num->inferredType)
+            maxRank = std::max(maxRank, getTypeRank(num->inferredType->toString()));
+        else if (num->type)
+            maxRank = std::max(maxRank, getTypeRank(num->type->toString()));
+        return;
+    }
+    if (auto floatNum = std::dynamic_pointer_cast<FloatNumberNode>(node)) {
+        maxRank = std::max(maxRank, getTypeRank("float"));
+        return;
+    }
+    if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+        findMaxRank(bin->left, maxRank);
+        findMaxRank(bin->right, maxRank);
+    }
+    if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
+        findMaxRank(unary->operand, maxRank);
+    }
+}
+
+
+void TypeSymbolVisitor::castNumbersInBinaryTree(std::shared_ptr<ASTNode> node, const std::string& expectedType) {
+    if (!node) return;
+
+    int maxRank = 0;
+    std::string targetType = expectedType;
+
+    if (expectedType == "auto") {
+        findMaxRank(node, maxRank);
+        targetType = getTypeByRank(maxRank);
+        if (targetType.empty()) {
+            LogError("Cannot deduce type for auto");
+            return;
+        }
+        castAllNumbersToType(node, targetType); // <--- вот это ключевой вызов!
+    } else {
+        // Мы не проверим i1 в другом месте
+        if (expectedType == "i1")
+        {
+            findMaxRank(node, maxRank);
+            targetType = getTypeByRank(maxRank);
+            castAllNumbersToType(node, targetType);
+            return;
+        }
+        castAndValidate(node, targetType, this);
+    }
 }
 
 void TypeSymbolVisitor::validateCollectionElements(
@@ -181,9 +270,10 @@ void TypeSymbolVisitor::validateCollectionElements(
     auto numericRank = [](const std::string& type, int& maxRank) -> int {
         if (type == "i1") { if (maxRank < 1) maxRank = 1; return 1; }
         if (type == "i8") { if (maxRank < 2) maxRank = 2; return 2; }
-        if (type == "i32") { if (maxRank < 3) maxRank = 3; return 3; }
-        if (type == "i64") { if (maxRank < 4) maxRank = 4; return 4; }
-        if (type == "float") { if (maxRank < 5) maxRank = 5; return 5; }
+        if (type == "i16") { if (maxRank < 3) maxRank = 3; return 3; }
+        if (type == "i32") { if (maxRank < 4) maxRank = 4; return 4; }
+        if (type == "i64") { if (maxRank < 5) maxRank = 5; return 5; }
+        if (type == "float") { if (maxRank < 6) maxRank = 6; return 6; }
         return 0; // unknown type
     };
 
@@ -270,9 +360,10 @@ void TypeSymbolVisitor::applyImplicitCastToNumeric(
     switch (maxRank) {
         case 1: targetType = "i1"; break;
         case 2: targetType = "i8"; break;
-        case 3: targetType = "i32"; break;
-        case 4: targetType = "i64"; break;
-        case 5: targetType = "float"; break;
+        case 3: targetType = "i16"; break;
+        case 4: targetType = "i32"; break;
+        case 5: targetType = "i64"; break;
+        case 6: targetType = "float"; break;
         default: return;
     }
 
@@ -285,6 +376,7 @@ void TypeSymbolVisitor::applyImplicitCastToNumeric(
                     if (
                         simple->toString() == "i1" ||
                         simple->toString() == "i8" ||
+                        simple->toString() == "i16" ||
                         simple->toString() == "i32" ||
                         simple->toString() == "i64" ||
                         simple->toString() == "float"
@@ -311,8 +403,9 @@ void TypeSymbolVisitor::applyImplicitCastToNumeric(
     auto checkLimits = [](const std::string& generic, int value) -> bool {
         if (generic == "i1") return value == 0 || value == 1;
         if (generic == "i8") return value >= -128 && value <= 127;
-        if (generic == "i32") return value >= -32768 && value <= 32767;
-        if (generic == "i64") return value >= -2147483648LL && value <= 2147483647LL;
+        if (generic == "i16") return value >= -32768 && value <= 32767;
+        if (generic == "i32") return value >= -2147483648 && value <= 2147483647;
+        if (generic == "i64") return true;
         return true; // float и др. не проверяем, або нахуй надо
     };
 

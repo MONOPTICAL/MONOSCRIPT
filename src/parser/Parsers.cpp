@@ -32,6 +32,7 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
     {
         advance(); // Переходим к следующему токену
         std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters; // Вектор параметров функции
+        int lambdaCounter = 0; // Счётчик лямбд
 
         if (!check(TokenType::RightParen)) // Если следующий токен - это не правая скобка, то это функция с параметрами
         {
@@ -39,10 +40,53 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
             {
                 std::shared_ptr<TypeNode> paramType = getFullType(); // Получаем полный тип параметра функции
                 consume(TokenType::Colon, "Expected ':' after parameter type"); // Проверяем наличие двоеточия после типа параметра функции
-                std::string paramName = current().value; // Сохраняем имя параметра функции
-                consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора параметра функции
+                if (paramType->toString() == "func") // Если тип параметра не определён, выбрасываем исключение
+                {
+                    /*
+                    func: (i8: a) -> i8
+                    Params: 
+                        func<i8, i8> : "@0" - последний параметр это return type а все остальные это параметры функции
+                    */
+                    std::string paramName;
+                    if (check(TokenType::Identifier))
+                    {
+                        paramName = current().value; // Сохраняем имя параметра функции 
+                        consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора параметра функции
+                    }
+                    else
+                        paramName = "@" + std::to_string(lambdaCounter++);
 
-                parameters.push_back({paramType, paramName}); // Добавляем параметр в вектор параметров функции
+                    consume(TokenType::LeftParen, "Expected '(' after function type"); // Проверяем наличие левой скобки после типа параметра функции
+                    std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> params;
+                    do
+                    {
+                        std::shared_ptr<TypeNode> paramType = getFullType(); // Получаем полный тип параметра функции
+                        consume(TokenType::Colon, "Expected ':' after parameter type"); // Проверяем наличие двоеточия после типа параметра функции
+                        std::string paramName = current().value; // Сохраняем имя параметра функции
+                        consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора параметра функции
+
+                        params.push_back({paramType, paramName}); // Добавляем параметр в вектор параметров функции
+                    } while (match(TokenType::Comma)); // Пока следующий токен - это запятая, продолжаем добавлять параметры функции
+                    consume(TokenType::RightParen, "Expected ')' after parameters in lambda/function literal");
+                    consume(TokenType::Arrow, "Expected '->' after parameters in lambda/function literal"); // Проверяем наличие стрелки после параметров функции
+                    auto returnType = getFullType(); // Получаем полный тип возвращаемого значения функции
+
+                    std::shared_ptr<GenericTypeNode> genericType = std::make_shared<GenericTypeNode>("func"); // Создаём указатель на тип функции
+                    for (const auto& param : params) // Для каждого параметра функции
+                    {
+                        genericType->typeParameters.push_back(param.first); // Добавляем тип параметра в параметры функции
+                    }
+                    genericType->typeParameters.push_back(returnType); // Добавляем тип возвращаемого значения в параметры функции
+
+                    parameters.push_back({genericType, paramName}); // Добавляем параметр в вектор параметров функции
+                }
+                else
+                {
+                    std::string paramName = current().value; // Сохраняем имя параметра функции
+                    consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора параметра функции
+
+                    parameters.push_back({paramType, paramName}); // Добавляем параметр в вектор параметров функции
+                }
             } while (match(TokenType::Comma)); // Пока следующий токен - это запятая, продолжаем добавлять параметры функции
         }
 
@@ -79,7 +123,6 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
 
 std::shared_ptr<ASTNode> Parser::parseIf()
 {
-    //IC(current().value, peek().value, lineIndex, tokenIndex);
     // Проверяем, что текущий токен - это ключевое слово if
     consume(TokenType::Keyword, "Expected 'if' keyword"); 
     // Мы не делаем проверку здесь на наличие круглой скобки, так как это может быть выражение без скобок
@@ -188,7 +231,6 @@ std::shared_ptr<BlockNode> Parser::parseBlock(int expectedIndent)
         if (actualIndent > expectedIndent)
             throwError("Unexpected indentation");
 
-        //IC(actualIndent, expectedIndent, current().value, peek().value, lineIndex, tokenIndex);
         // пропустить Pipe токены
         tokenIndex = actualIndent;
 
@@ -380,8 +422,10 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
 
 std::shared_ptr<ASTNode> Parser::parseUse()
 {
-    std::vector<std::string> path;
+    std::map<std::vector<std::string>, std::string> paths;
     std::string alias;
+
+    std::vector<std::string> path;
 
     consume(TokenType::Keyword, "Expected 'use' keyword"); // Проверяем наличие ключевого слова use
     nextLine();
@@ -393,19 +437,27 @@ std::shared_ptr<ASTNode> Parser::parseUse()
         do {
             path.push_back(current().value);
             consume(TokenType::Identifier, "Expected identifier in import path");
+            if (!current().value.empty() && !(check(TokenType::Arrow) || check(TokenType::Colon)))
+                throwError("Import path must be a single word without spaces");
         } while (match(TokenType::Arrow));
     
         if (match(TokenType::Colon)) {
             alias = current().value;
             consume(TokenType::Identifier, "Expected alias name after ':'");
+            if (!current().value.empty())
+                throwError("Alias must be a single word without spaces");
         }
     
+        paths.insert({path, alias}); // Добавляем путь в мапу
+        path.clear(); // Очищаем путь для следующего импорта
+        alias.clear(); // Очищаем алиас для следующего импорта
+
         // Только если не конец файла — переходи к следующей строке
         if (!isEndOfFile())
             nextLine();
     }
 
-    IC(path, alias);
+    IC(paths);
     lineIndex--; // Без этого он скипает 2 линии а не одну
-    return std::make_shared<ImportNode>(path, alias);
+    return std::make_shared<ImportNode>(paths);
 }

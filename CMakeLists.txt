@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.24) 
 project(ms) 
+set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -62,6 +64,7 @@ add_executable(ms # Create an executable target named ms
     src/visitors/TypeSymbolVisitor/Utils.cpp
     src/visitors/TypeSymbolVisitor/NotFinished.cpp
     src/visitors/TypeSymbolVisitor/StructClass.cpp
+    src/visitors/TypeSymbolVisitor/Operators.cpp
 #   src/runtime/ASTGen.cpp
 #   src/runtime/CodeGenContext.cpp
 #   src/runtime/codegen/Declarations.cpp

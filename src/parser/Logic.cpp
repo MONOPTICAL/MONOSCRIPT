@@ -228,15 +228,16 @@ int Parser::getPrecedence(const Token &token) const
     if (token.value == "|>") return 3; // keyword
     if (token.value == "==" || token.value == "<" || token.value == ">" || token.value == "!=" || token.value == "<=" || token.value == ">=") return 4; // operator
     if (token.value == "+" || token.value == "-") return 5; // operator
-    if (token.value == "*" || token.value == "/" || token.value == "%") return 6; // operator
+    if (token.value == "*" || token.value == "/" || token.value == "%" || token.value == "**") return 6; // operator
 
     return -1; // Для компилятора, чтобы не ругался на -Wreturn-type
 }
 
-std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
+std::shared_ptr<ASTNode> Parser::parseBinary(int precedence) 
 {
     auto left = parseUnary(); // 2
-    bool movedLine = false; // Флаг для проверки, был ли сделан переход на следующую строку
+    int initialLine = lineIndex;  // Запоминаем начальную строку
+    int movedLine = 0; // Флаг для проверки, был ли сделан переход на следующую строку
 
     while (true)
     {
@@ -245,23 +246,27 @@ std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
         // Если дошли до конца строки — пробуем перейти на следующую строку с pipe
         if (currentToken.type == TokenType::None)
         {
-            // Если это не конец файла, пробуем перейти на следующую строку
+            // Проверяем, что следующая строка существует
             if (!isEndOfFile() && lineIndex + 1 < lines.size())
             {
-                nextLine();
-                movedLine = true; // Устанавливаем флаг, что мы перешли на следующую строку
+                // Получаем уровень отступа следующей строки
+                int nextIndent = getIndentLevel(lines[lineIndex + 1]);
 
-                tokenIndex = getIndentLevel(lines[lineIndex]); // Перепрыгиваем через пайпы/отступы
-
-                // Проверяем, есть ли pipe-оператор
-                if (check(TokenType::PipeArrow))
+                if (nextIndent < lines[lineIndex + 1].size() &&
+                    lines[lineIndex + 1][nextIndent].type == TokenType::PipeArrow)
                 {
+                    nextLine();
+                    movedLine++;
+
+                    tokenIndex = getIndentLevel(lines[lineIndex]); // Перепрыгиваем через пайпы/отступы
+
+                    isPipe = true;
                     currentToken = current();
                     currentPrecedence = getPrecedence(currentToken);
                 }
                 else
                 {
-                    break; // Нет pipe — выходим из цикла
+                    break; // Нет pipe — выходим из цикла, не переходим на строку
                 }
             }
             else
@@ -321,21 +326,20 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         if (intValue.has_value()) // Если число целое
         {
             std::shared_ptr<SimpleTypeNode> type;
-            if (intValue.value() == 0 || intValue.value() == 1) // Если число больше i8
-            {
-                type = std::make_shared<SimpleTypeNode>("i1"); // Создаём тип bool
+            if (intValue.value() == 0 || intValue.value() == 1) {
+                type = std::make_shared<SimpleTypeNode>("i1");
             }
-            else if (intValue.value() < 255 || intValue.value() > -256) // Если число больше i8
-            {
-                type = std::make_shared<SimpleTypeNode>("i8"); // Создаём тип i8
+            else if (intValue.value() >= -128 && intValue.value() <= 127) {
+                type = std::make_shared<SimpleTypeNode>("i8");
             }
-            else if (intValue.value() > 65535 || intValue.value() < -65536) // Если число больше i32
-            {
-                type = std::make_shared<SimpleTypeNode>("i32"); // Создаём тип i32
+            else if (intValue.value() >= -32768 && intValue.value() <= 32767) {
+                type = std::make_shared<SimpleTypeNode>("i16");
             }
-            else if (intValue.value() > 2147483647 || intValue.value() < -2147483648) // Если число больше i32
-            {
-                type = std::make_shared<SimpleTypeNode>("i64"); // Создаём тип i64
+            else if (intValue.value() >= -2147483648 && intValue.value() <= 2147483647) {
+                type = std::make_shared<SimpleTypeNode>("i32");
+            }
+            else {
+                type = std::make_shared<SimpleTypeNode>("i64");
             }
             return std::make_shared<NumberNode>(intValue.value(), type); // Создаём узел числа
         }
@@ -395,6 +399,7 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         {
             std::shared_ptr<TypeNode> paramType = getFullType(); // Получаем полный тип параметра функции
             consume(TokenType::Colon, "Expected ':' after parameter type"); // Проверяем наличие двоеточия после типа параметра функции
+
             std::string paramName = current().value; // Сохраняем имя параметра функции
             consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора параметра функции
 
@@ -414,9 +419,9 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         {
             int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока if
             nextLine(); // Переходим к следующему токену
-            IC("s", current().value, peek().value, lineIndex, tokenIndex, expectedIndent);
+            
             auto body = parseBlock(expectedIndent);
-            IC("e", current().value, peek().value, lineIndex, tokenIndex);
+            
             lineIndex--; // Без этого он скипает 2 линии а не одну
             tokenIndex = getIndentLevel(lines[lineIndex]); // Перепрыгиваем через пайпы/отступы
             return std::make_shared<LambdaNode>(returnType, params, body);
@@ -483,7 +488,6 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         advance(); // Переходим к следующему токену
         auto expression = parseExpression(); // Разбираем выражение внутри скобок
 
-        //IC(current().value, peek().value, lineIndex, tokenIndex);
         consume(TokenType::RightParen, "Expected ')' after expression"); // Проверяем наличие правой скобки
         return expression; // Возвращаем разобранное выражение
     }
