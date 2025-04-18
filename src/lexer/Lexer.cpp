@@ -24,6 +24,20 @@ void Lexer::tokenize()
                     continue;
                 else
                     this->isInMultilineComment=false;
+            else if (isStringnotFinished)
+            {
+                if (y == '"')
+                {
+                    currentTokenValue += y;
+                    isStringnotFinished = false;
+                    addToken(TokenType::String, currentTokenValue); // Add the token to the current line
+                    resetValues();
+                    continue;
+                }
+                else
+                    currentTokenValue += y;
+                continue;
+            }
 
             TokenType type = IdentifyTokenType(y);
             TokenType keywordCheck;
@@ -186,15 +200,7 @@ void Lexer::tokenize()
                 isStringnotFinished = true;
                 continue;
             }
-            else if (type == TokenType::String && currentTokenType == TokenType::String)
-            {
-                currentTokenValue += y;
-                isStringnotFinished = false;
-                
-                addToken(currentTokenType, currentTokenValue); // Add the token to the current line
-                resetValues();
-                continue;
-            }
+
             //IC(currentTokenValue, TokenTypeToString(currentTokenType), y);
             if(currentTokenValue.length() > 0) 
             {            

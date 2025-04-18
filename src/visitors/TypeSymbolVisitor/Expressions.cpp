@@ -1,24 +1,70 @@
 #include "../headers/TypeSymbolVisitor.h"
 
 void TypeSymbolVisitor::visit(BinaryOpNode& node) {
-    // Рекурсивно анализируем левый и правый операнд
     node.left->accept(*this);
     node.right->accept(*this);
 
-    IC();
-
-    std::shared_ptr<TypeNode> leftType = checkForIdentifier(node.left);
-    std::shared_ptr<TypeNode> rightType = checkForIdentifier(node.right);
-
-    IC(leftType->toString(), rightType->toString());
-    // Пример для оператора "+"
-    if (node.op == "+") {
+    std::shared_ptr<TypeNode> leftType = node.left->inferredType;
+    std::shared_ptr<TypeNode> rightType = node.right->inferredType;
+    
+    // "+"
+    if (node.op == "+" || node.op == "add" || node.op == "fadd") {
         handlePlusOperator(node, leftType, rightType);
-        //numCast(node.left, node.right, node.op);
         node.inferredType = node.left->inferredType;
-        std::cout << "numCast: finished BinaryOpNode block" << std::endl;
         return;
     }
-    // ...обработка других операторов
+
+    // "-"
+    if (node.op == "-" || node.op == "sub" || node.op == "fsub") {
+        handleMinusOperator(node, leftType, rightType);
+        node.inferredType = node.left->inferredType;
+        return;
+    }
+
+    // "*"
+    if (node.op == "*" || node.op == "mul" || node.op == "fmul") {
+        handleMulOperator(node, leftType, rightType);
+        node.inferredType = node.left->inferredType;
+        return;
+    }
+
+    // "/"
+    if (node.op == "/" || node.op == "sdiv" || node.op == "fdiv") {
+        handleDivOperator(node, leftType, rightType);
+        node.inferredType = node.left->inferredType;
+        return;
+    }
+
+    // "%"
+    if (node.op == "%" || node.op == "srem" || node.op == "frem") {
+        handleModOperator(node, leftType, rightType);
+        node.inferredType = node.left->inferredType;
+        return;
+    }
+
+    auto getCmpOp = [](const std::string& op) -> std::string {
+        if (op == "==" || op == "eq") return "eq";
+        else if (op == "!=" || op == "ne") return "ne";
+        else if (op == "<") return "slt";
+        else if (op == ">") return "sgt";
+        else if (op == "<=") return "sle";
+        else if (op == ">=") return "sge";
+        return "";
+    };
+
+    // "==", "!=", "<", ">", "<=", ">="
+    if (getCmpOp(node.op) != "") {
+        handleCompareOperator(node, leftType, rightType);
+        node.inferredType = registry.findType("i1");
+        return;
+    }
+
+    // and, or 
+    if (node.op == "and" || node.op == "or") {
+        handleLogicalOperator(node, leftType, rightType);
+        node.inferredType = registry.findType("i1");
+        return;
+    }
+
     IC();
 }

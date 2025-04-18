@@ -48,7 +48,41 @@ private:
                                                                         BinaryOpNode& node, 
                                                                         std::shared_ptr<TypeNode> leftType, 
                                                                         std::shared_ptr<TypeNode> rightType);
-                                                                
+
+    void                                                            handleMinusOperator(
+                                                                            BinaryOpNode& node, 
+                                                                            std::shared_ptr<TypeNode> leftType, 
+                                                                            std::shared_ptr<TypeNode> rightType);
+
+    void                                                            handleMulOperator(
+                                                                            BinaryOpNode& node, 
+                                                                            std::shared_ptr<TypeNode> leftType, 
+                                                                            std::shared_ptr<TypeNode> rightType);
+                                                                            
+    void                                                            handleDivOperator(
+                                                                            BinaryOpNode& node, 
+                                                                            std::shared_ptr<TypeNode> leftType, 
+                                                                            std::shared_ptr<TypeNode> rightType);
+
+    void                                                            handleModOperator(
+                                                                            BinaryOpNode& node, 
+                                                                            std::shared_ptr<TypeNode> leftType, 
+                                                                            std::shared_ptr<TypeNode> rightType);
+    
+    void                                                            handleCompareOperator(
+                                                                            BinaryOpNode& node, 
+                                                                            std::shared_ptr<TypeNode> leftType, 
+                                                                            std::shared_ptr<TypeNode> rightType);
+
+    void                                                            handleLogicalOperator(
+                                                                            BinaryOpNode& node, 
+                                                                            std::shared_ptr<TypeNode> leftType, 
+                                                                            std::shared_ptr<TypeNode> rightType);
+
+    void                                                            handleUnaryOperator(
+                                                                            UnaryOpNode& node, 
+                                                                            std::shared_ptr<TypeNode> operandType);
+    
 public:
                                                                     TypeSymbolVisitor() 
                                                                     {

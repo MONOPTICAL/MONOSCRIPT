@@ -106,6 +106,19 @@ static std::string getTypeByRank(int rank) {
     }
 }
 
+static std::string getOperation(const std::string& op, const std::string& type) {
+    if (type == "float") {
+        if (op == "add") return "fadd";
+        if (op == "sub") return "fsub";
+        if (op == "mul") return "fmul";
+        if (op == "sdiv") return "fdiv";
+        if (op == "srem") return "frem";
+        if (op.rfind("icmp_", 0) == 0) return "fcmp_" + op.substr(5);
+    }
+
+    return op;
+}
+
 // Рекурсивно выставляет implicitCastTo для всех чисел, если их тип меньше чем targetType
 static void castAllNumbersToType(const std::shared_ptr<ASTNode>& node, const std::string& targetType) {
     if (!node) return;
@@ -120,18 +133,25 @@ static void castAllNumbersToType(const std::shared_ptr<ASTNode>& node, const std
         castAllNumbersToType(bin->left, targetType);
         castAllNumbersToType(bin->right, targetType);
         std::string implicitCast;
+
         if (bin->left->implicitCastTo) {
             implicitCast = bin->left->implicitCastTo->toString();
         } else if (bin->right->implicitCastTo) {
             implicitCast = bin->right->implicitCastTo->toString();
         } else {
-            return;
-
+            auto leftType = std::dynamic_pointer_cast<BinaryOpNode>(bin->left);
+            implicitCast = leftType ? leftType->inferredType->toString() : bin->left->inferredType->toString();
         }
         if (implicitCast == "float")
-            bin->op = "fadd";
+        {
+            bin->op = getOperation(bin->op, "float");
+            bin->inferredType = std::make_shared<SimpleTypeNode>("float");
+        }
         else
-            bin->op = "add";
+        {
+            bin->inferredType = std::make_shared<SimpleTypeNode>(implicitCast);
+        }
+
     }
 }
 
@@ -139,8 +159,8 @@ static bool checkIntLimits(const std::string& type, int value) {
     if (type == "i1") return value == 0 || value == 1;
     if (type == "i8") return value >= -128 && value <= 127;
     if (type == "i32") return value >= -2147483648 && value <= 2147483647;
-    if (type == "i64") return true; // для простоты, можно добавить реальные лимиты
-    return true; // float и др. не проверяем
+    if (type == "i64") return true; 
+    return true;
 }
 
 // Второй проход: кастим и валидируем (для не-auto)
