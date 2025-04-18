@@ -78,7 +78,6 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
                     }
                     genericType->typeParameters.push_back(returnType); // Добавляем тип возвращаемого значения в параметры функции
 
-                    IC(paramName, genericType->toString(), returnType->toString());
                     parameters.push_back({genericType, paramName}); // Добавляем параметр в вектор параметров функции
                 }
                 else
@@ -124,7 +123,6 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
 
 std::shared_ptr<ASTNode> Parser::parseIf()
 {
-    //IC(current().value, peek().value, lineIndex, tokenIndex);
     // Проверяем, что текущий токен - это ключевое слово if
     consume(TokenType::Keyword, "Expected 'if' keyword"); 
     // Мы не делаем проверку здесь на наличие круглой скобки, так как это может быть выражение без скобок
@@ -233,7 +231,6 @@ std::shared_ptr<BlockNode> Parser::parseBlock(int expectedIndent)
         if (actualIndent > expectedIndent)
             throwError("Unexpected indentation");
 
-        //IC(actualIndent, expectedIndent, current().value, peek().value, lineIndex, tokenIndex);
         // пропустить Pipe токены
         tokenIndex = actualIndent;
 
@@ -425,8 +422,10 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
 
 std::shared_ptr<ASTNode> Parser::parseUse()
 {
-    std::vector<std::string> path;
+    std::map<std::vector<std::string>, std::string> paths;
     std::string alias;
+
+    std::vector<std::string> path;
 
     consume(TokenType::Keyword, "Expected 'use' keyword"); // Проверяем наличие ключевого слова use
     nextLine();
@@ -438,19 +437,27 @@ std::shared_ptr<ASTNode> Parser::parseUse()
         do {
             path.push_back(current().value);
             consume(TokenType::Identifier, "Expected identifier in import path");
+            if (!current().value.empty() && !(check(TokenType::Arrow) || check(TokenType::Colon)))
+                throwError("Import path must be a single word without spaces");
         } while (match(TokenType::Arrow));
     
         if (match(TokenType::Colon)) {
             alias = current().value;
             consume(TokenType::Identifier, "Expected alias name after ':'");
+            if (!current().value.empty())
+                throwError("Alias must be a single word without spaces");
         }
     
+        paths.insert({path, alias}); // Добавляем путь в мапу
+        path.clear(); // Очищаем путь для следующего импорта
+        alias.clear(); // Очищаем алиас для следующего импорта
+
         // Только если не конец файла — переходи к следующей строке
         if (!isEndOfFile())
             nextLine();
     }
 
-    IC(path, alias);
+    IC(paths);
     lineIndex--; // Без этого он скипает 2 линии а не одну
-    return std::make_shared<ImportNode>(path, alias);
+    return std::make_shared<ImportNode>(paths);
 }
