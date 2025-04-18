@@ -6,7 +6,7 @@ void TypeSymbolVisitor::handlePlusOperator(BinaryOpNode &node, std::shared_ptr<T
     std::string right = rightType->toString();
 
     auto isIntType = [](const std::string& t) {
-        return t == "i32" || t == "i64" || t == "i8" || t == "i1" ;
+        return t == "i32" || t == "i64" || t == "i16" || t == "i8" || t == "i1";
     };
 
     IC(left, right);
@@ -57,7 +57,7 @@ void TypeSymbolVisitor::handleMinusOperator(BinaryOpNode &node, std::shared_ptr<
     std::string right = rightType->toString();
 
     auto isIntType = [](const std::string& t) {
-        return t == "i32" || t == "i64" || t == "i8" || t == "i1" ;
+        return t == "i32" || t == "i64" || t == "i16" || t == "i8" || t == "i1";
     };
 
     // string
@@ -95,7 +95,7 @@ void TypeSymbolVisitor::handleMulOperator(BinaryOpNode &node, std::shared_ptr<Ty
     std::string right = rightType->toString();
 
     auto isIntType = [](const std::string& t) {
-        return t == "i32" || t == "i64" || t == "i8" || t == "i1" ;
+        return t == "i32" || t == "i64" || t == "i16" || t == "i8" || t == "i1";
     };
 
     // string
@@ -133,7 +133,7 @@ void TypeSymbolVisitor::handleDivOperator(BinaryOpNode &node, std::shared_ptr<Ty
     std::string right = rightType->toString();
 
     auto isIntType = [](const std::string& t) {
-        return t == "i32" || t == "i64" || t == "i8" || t == "i1";
+        return t == "i32" || t == "i64" || t == "i16" || t == "i8" || t == "i1";
     };
 
     if (left == "string" || right == "string") {
@@ -269,4 +269,5 @@ void TypeSymbolVisitor::handleLogicalOperator(BinaryOpNode &node, std::shared_pt
 
     node = *std::make_shared<BinaryOpNode>(node.left, op, node.right);
     node.inferredType = registry.findType("i1");
+    node.implicitCastTo = registry.findType("i1");
 }

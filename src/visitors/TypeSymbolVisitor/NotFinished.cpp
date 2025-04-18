@@ -6,10 +6,6 @@ void TypeSymbolVisitor::visit(ReassignMemberNode& node) {
     // TODO: реализовать обработку ReassignMemberNode
 }
 
-void TypeSymbolVisitor::visit(VariableReassignNode& node) {
-    // TODO: реализовать обработку VariableReassignNode
-}
-
 void TypeSymbolVisitor::visit(IfNode& node) {
     // TODO: реализовать обработку IfNode
 }
@@ -24,10 +20,6 @@ void TypeSymbolVisitor::visit(WhileNode& node) {
 
 void TypeSymbolVisitor::visit(CallNode& node) {
     // TODO: реализовать обработку CallNode
-}
-
-void TypeSymbolVisitor::visit(UnaryOpNode& node) {
-    // TODO: реализовать обработку UnaryOpNode
 }
 
 void TypeSymbolVisitor::visit(BreakNode& node) {

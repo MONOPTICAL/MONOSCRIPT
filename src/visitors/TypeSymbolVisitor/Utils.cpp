@@ -89,9 +89,10 @@ void TypeSymbolVisitor::debugContexts()
 static int getTypeRank(const std::string& type) {
     if (type == "i1") return 1;
     if (type == "i8") return 2;
-    if (type == "i32") return 3;
-    if (type == "i64") return 4;
-    if (type == "float") return 5;
+    if (type == "i16") return 3;
+    if (type == "i32") return 4;
+    if (type == "i64") return 5;
+    if (type == "float") return 6;
     return 0;
 }
 
@@ -99,9 +100,10 @@ static std::string getTypeByRank(int rank) {
     switch (rank) {
         case 1: return "i1";
         case 2: return "i8";
-        case 3: return "i32";
-        case 4: return "i64";
-        case 5: return "float";
+        case 3: return "i16";
+        case 4: return "i32";
+        case 5: return "i64";
+        case 6: return "float";
         default: return "";
     }
 }
@@ -151,15 +153,24 @@ static void castAllNumbersToType(const std::shared_ptr<ASTNode>& node, const std
         {
             bin->inferredType = std::make_shared<SimpleTypeNode>(implicitCast);
         }
-
+    }   
+    if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
+        castAllNumbersToType(unary->operand, targetType);
+        if (unary->operand->implicitCastTo) {
+            unary->implicitCastTo = unary->operand->implicitCastTo;
+        } else {
+            auto leftType = std::dynamic_pointer_cast<BinaryOpNode>(unary->operand);
+            unary->implicitCastTo = leftType ? leftType->inferredType : unary->operand->inferredType;
+        }
     }
 }
 
 static bool checkIntLimits(const std::string& type, int value) {
     if (type == "i1") return value == 0 || value == 1;
     if (type == "i8") return value >= -128 && value <= 127;
+    if (type == "i16") return value >= -32768 && value <= 32767;
     if (type == "i32") return value >= -2147483648 && value <= 2147483647;
-    if (type == "i64") return true; 
+    if (type == "i64") return true;
     return true;
 }
 
@@ -181,6 +192,9 @@ static void castAndValidate(const std::shared_ptr<ASTNode>& node, const std::str
         castAndValidate(bin->left, targetType, visitor);
         castAndValidate(bin->right, targetType, visitor);
     }
+    if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
+        castAndValidate(unary->operand, targetType, visitor);
+    }
 }
 
 // Первый проход: ищем максимальный rank
@@ -201,16 +215,21 @@ static void findMaxRank(const std::shared_ptr<ASTNode>& node, int& maxRank) {
         findMaxRank(bin->left, maxRank);
         findMaxRank(bin->right, maxRank);
     }
+    if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
+        findMaxRank(unary->operand, maxRank);
+    }
 }
 
 
 void TypeSymbolVisitor::castNumbersInBinaryTree(std::shared_ptr<ASTNode> node, const std::string& expectedType) {
     if (!node) return;
 
+    int maxRank = 0;
+    std::string targetType = expectedType;
+
     if (expectedType == "auto") {
-        int maxRank = 0;
         findMaxRank(node, maxRank);
-        std::string targetType = getTypeByRank(maxRank);
+        targetType = getTypeByRank(maxRank);
         if (targetType.empty()) {
             LogError("Cannot deduce type for auto");
             return;
@@ -219,7 +238,15 @@ void TypeSymbolVisitor::castNumbersInBinaryTree(std::shared_ptr<ASTNode> node, c
             std::cout << "Target type: " << targetType << std::endl;
         castAllNumbersToType(node, targetType); // <--- вот это ключевой вызов!
     } else {
-        castAndValidate(node, expectedType, this);
+        // Мы не проверим i1 в другом месте
+        if (expectedType == "i1")
+        {
+            findMaxRank(node, maxRank);
+            targetType = getTypeByRank(maxRank);
+            castAllNumbersToType(node, targetType);
+            return;
+        }
+        castAndValidate(node, targetType, this);
     }
 }
 
@@ -245,9 +272,10 @@ void TypeSymbolVisitor::validateCollectionElements(
     auto numericRank = [](const std::string& type, int& maxRank) -> int {
         if (type == "i1") { if (maxRank < 1) maxRank = 1; return 1; }
         if (type == "i8") { if (maxRank < 2) maxRank = 2; return 2; }
-        if (type == "i32") { if (maxRank < 3) maxRank = 3; return 3; }
-        if (type == "i64") { if (maxRank < 4) maxRank = 4; return 4; }
-        if (type == "float") { if (maxRank < 5) maxRank = 5; return 5; }
+        if (type == "i16") { if (maxRank < 3) maxRank = 3; return 3; }
+        if (type == "i32") { if (maxRank < 4) maxRank = 4; return 4; }
+        if (type == "i64") { if (maxRank < 5) maxRank = 5; return 5; }
+        if (type == "float") { if (maxRank < 6) maxRank = 6; return 6; }
         return 0; // unknown type
     };
 
@@ -334,9 +362,10 @@ void TypeSymbolVisitor::applyImplicitCastToNumeric(
     switch (maxRank) {
         case 1: targetType = "i1"; break;
         case 2: targetType = "i8"; break;
-        case 3: targetType = "i32"; break;
-        case 4: targetType = "i64"; break;
-        case 5: targetType = "float"; break;
+        case 3: targetType = "i16"; break;
+        case 4: targetType = "i32"; break;
+        case 5: targetType = "i64"; break;
+        case 6: targetType = "float"; break;
         default: return;
     }
 
@@ -349,6 +378,7 @@ void TypeSymbolVisitor::applyImplicitCastToNumeric(
                     if (
                         simple->toString() == "i1" ||
                         simple->toString() == "i8" ||
+                        simple->toString() == "i16" ||
                         simple->toString() == "i32" ||
                         simple->toString() == "i64" ||
                         simple->toString() == "float"
@@ -375,8 +405,9 @@ void TypeSymbolVisitor::applyImplicitCastToNumeric(
     auto checkLimits = [](const std::string& generic, int value) -> bool {
         if (generic == "i1") return value == 0 || value == 1;
         if (generic == "i8") return value >= -128 && value <= 127;
-        if (generic == "i32") return value >= -32768 && value <= 32767;
-        if (generic == "i64") return value >= -2147483648LL && value <= 2147483647LL;
+        if (generic == "i16") return value >= -32768 && value <= 32767;
+        if (generic == "i32") return value >= -2147483648 && value <= 2147483647;
+        if (generic == "i64") return true;
         return true; // float и др. не проверяем, або нахуй надо
     };
 
