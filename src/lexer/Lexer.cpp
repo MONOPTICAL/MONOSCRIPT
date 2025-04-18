@@ -24,6 +24,20 @@ void Lexer::tokenize()
                     continue;
                 else
                     this->isInMultilineComment=false;
+            else if (isStringnotFinished)
+            {
+                if (y == '"')
+                {
+                    currentTokenValue += y;
+                    isStringnotFinished = false;
+                    addToken(TokenType::String, currentTokenValue); // Add the token to the current line
+                    resetValues();
+                    continue;
+                }
+                else
+                    currentTokenValue += y;
+                continue;
+            }
 
             TokenType type = IdentifyTokenType(y);
             TokenType keywordCheck;
@@ -45,6 +59,12 @@ void Lexer::tokenize()
             if(keywordCheck != TokenType::Identifier)
             {
                 std::optional<char> peekChar = peek(0);
+                if (currentTokenValue == "i1" && y == '6')
+                {
+                    currentTokenValue += y;
+                    currentIndex++;
+                    continue;
+                }
                 if(peekChar.has_value() && IdentifyTokenType(peekChar.value())!=TokenType::Identifier)
                 {
                     addToken(keywordCheck, currentTokenValue);
@@ -154,6 +174,12 @@ void Lexer::tokenize()
                     resetValues();
                     continue;
                 }
+                else if (currentTokenValue == "**")
+                {
+                    addToken(TokenType::Operator, "**"); // Add the token to the current line
+                    resetValues();
+                    continue;
+                }
                 else if (currentTokenValue == "->")
                 {
                     addToken(TokenType::Arrow, "->"); // Add the token to the current line
@@ -180,15 +206,7 @@ void Lexer::tokenize()
                 isStringnotFinished = true;
                 continue;
             }
-            else if (type == TokenType::String && currentTokenType == TokenType::String)
-            {
-                currentTokenValue += y;
-                isStringnotFinished = false;
-                
-                addToken(currentTokenType, currentTokenValue); // Add the token to the current line
-                resetValues();
-                continue;
-            }
+
             //IC(currentTokenValue, TokenTypeToString(currentTokenType), y);
             if(currentTokenValue.length() > 0) 
             {            
@@ -316,7 +334,7 @@ TokenType Lexer::IsKeyword(const std::string &value) const
     }; 
 
     std::vector<std::string> builtinTypes = {
-        "i1", "i8", "i32", "i64", "string", "void", "array", "map", "float", "struct"
+        "i1", "i8", "i16","i32", "i64", "string", "void", "array", "map", "float", "struct", "func"
     };
 
     std::string trimmedValue = ParsingFunctions::trim(value);

@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
 
 class ASTNodeVisitor {
     public:
@@ -123,6 +124,7 @@ class FunctionNode : public ASTNode {
         std::string associated;
         std::shared_ptr<TypeNode> returnType;
         std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters; // {type, name}
+        std::vector<std::pair<std::string, LambdaNode>> lambdas; // {type, name}
         std::shared_ptr<ASTNode> body; // BlockNode
         
         void accept(ASTNodeVisitor& visitor) override {
@@ -416,12 +418,11 @@ class AccessExpression : public ASTNode {
 class ImportNode : public ASTNode {
     public:
         ImportNode() = default;
-        ImportNode(const std::vector<std::string>& path, const std::string& alias = "")
-        : path(path), alias(alias) {}
+        ImportNode(const std::map<std::vector<std::string>, std::string>& paths)
+        : paths(paths){}
+        
         // Путь импорта: module -> struct -> function ...
-        std::vector<std::string> path;
-        // Алиас (опционально)
-        std::string alias;
+        std::map<std::vector<std::string>, std::string> paths;
     
 
         void accept(ASTNodeVisitor& visitor) override {

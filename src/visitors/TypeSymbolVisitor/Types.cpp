@@ -34,21 +34,12 @@ void TypeSymbolVisitor::visit(IdentifierNode& node)
         LogError("Variable not found: " + node.name);
     }
 
-    IC();
     node.inferredType = checkForIdentifier(it->second);
-    IC(
-        node.name,
-        node.inferredType->toString()
-    );
 }
 
 void TypeSymbolVisitor::visit(NumberNode& node)
 {
     node.inferredType = registry.findType(node.type->toString()); // Тут пока что i32 потом разделим на i8, i32, i64
-    IC(
-        node.value,
-        node.inferredType->toString()
-    );
 }
 
 void TypeSymbolVisitor::visit(FloatNumberNode& node)
