@@ -234,8 +234,6 @@ void TypeSymbolVisitor::castNumbersInBinaryTree(std::shared_ptr<ASTNode> node, c
             LogError("Cannot deduce type for auto");
             return;
         }
-        else
-            std::cout << "Target type: " << targetType << std::endl;
         castAllNumbersToType(node, targetType); // <--- вот это ключевой вызов!
     } else {
         // Мы не проверим i1 в другом месте

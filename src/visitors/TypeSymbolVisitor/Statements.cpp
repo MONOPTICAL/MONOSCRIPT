@@ -104,7 +104,7 @@ void TypeSymbolVisitor::visit(BlockNode &node)
 
 static std::string getType(std::shared_ptr<ASTNode> expression, std::string type) {
     if (auto num = std::dynamic_pointer_cast<NumberNode>(expression)) 
-        return type;
+        return num->inferredType->toString();
     else if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(expression)) 
         if (bin->op == "and" || bin->op == "or" || bin->op == "==" || bin->op == "!=" || bin->op.rfind("icmp_", 0) == 0 || bin->op.rfind("fcmp_", 0) == 0)
             return "i1";
@@ -169,18 +169,17 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
             }
         }
     }
-    
+
     if (varType.starts_with("array")
         || varType.starts_with("map")
     ) {
         validateCollectionElements(node.type, node.expression, isAuto);
-        IC("exit");
     }
     else
     {
         node.expression->accept(*this);
         auto expressionType = node.expression->inferredType->toString();
-
+        
         if (expressionType != "none" && expressionType != "string")
         {        
             castNumbersInBinaryTree(node.expression, isAuto ? "auto" : varType);
@@ -196,13 +195,16 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
             }
         }
 
+        if (expressionType == "string" && varType != "string" && varType != "auto")
+            LogError("Type mismatch: expected " + varType + ", got string"); 
+
         if (isAuto)
             if(node.expression->implicitCastTo)
                 node.type = std::make_shared<SimpleTypeNode>(getType(node.expression, node.expression->implicitCastTo->toString()));
             else
                 node.type = std::make_shared<SimpleTypeNode>(getType(node.expression, node.expression->inferredType->toString()));
         else if(varType == "i1")
-            if(getType(node.expression, "") != "i1")
+            if(getType(node.expression, varType) != "i1")
                 LogError("Type mismatch: expected i1, got " + expressionType);
     }
 
@@ -223,7 +225,6 @@ void TypeSymbolVisitor::visit(ReturnNode &node)
     // Проверяем тип возвращаемого значения
     if (node.expression) {
         node.expression->accept(*this);
-        IC(node.expression->inferredType->toString());
         std::string expectedType = contexts.back().returnType->toString();
         std::string actualType = node.expression->inferredType->toString();
         if (actualType != expectedType) {
@@ -244,13 +245,19 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
     std::shared_ptr<VariableAssignNode> varAssign = std::dynamic_pointer_cast<VariableAssignNode>(contexts.back().variables[node.name]);
     std::string varType = varAssign->inferredType->toString();
 
-    IC(varType);
     node.expression->accept(*this);
     auto expressionType = node.expression->inferredType->toString();
 
     if (expressionType != "none" && expressionType != "string") {
         castNumbersInBinaryTree(node.expression, varType);
+
+        if (node.expression->implicitCastTo)
+            expressionType = node.expression->implicitCastTo->toString();
+        else
+            expressionType = node.expression->inferredType->toString();
+
         expressionType = getType(node.expression, expressionType);
+
         if (varType != "i1") {
             if (auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.expression)) {
                 if ((binaryOp->op == "and" || binaryOp->op == "or" || binaryOp->op.rfind("icmp_", 0) == 0 || binaryOp->op.rfind("fcmp_", 0) == 0)) {
