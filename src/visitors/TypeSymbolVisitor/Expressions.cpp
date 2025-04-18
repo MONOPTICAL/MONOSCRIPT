@@ -56,6 +56,7 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
     if (getCmpOp(node.op) != "") {
         handleCompareOperator(node, leftType, rightType);
         node.inferredType = registry.findType("i1");
+        
         return;
     }
 
@@ -66,5 +67,25 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
         return;
     }
 
+    IC();
+}
+
+void TypeSymbolVisitor::visit(UnaryOpNode& node) {
+    node.operand->accept(*this);
+    std::shared_ptr<TypeNode> operandType = node.operand->inferredType;
+    node.inferredType = operandType;
+    /*
+    if (node.op == "-" || node.op == "sub") {
+        handleUnaryOperator(node, operandType);
+        node.inferredType = operandType;
+        return;
+    }
+
+    if (node.op == "!") {
+        handleLogicalOperator(node, operandType, nullptr);
+        node.inferredType = registry.findType("i1");
+        return;
+    }
+    */
     IC();
 }

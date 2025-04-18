@@ -102,6 +102,20 @@ void TypeSymbolVisitor::visit(BlockNode &node)
     }
 }
 
+static std::string getType(std::shared_ptr<ASTNode> expression, std::string type) {
+    if (auto num = std::dynamic_pointer_cast<NumberNode>(expression)) 
+        return type;
+    else if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(expression)) 
+        if (bin->op == "and" || bin->op == "or" || bin->op == "==" || bin->op == "!=" || bin->op.rfind("icmp_", 0) == 0 || bin->op.rfind("fcmp_", 0) == 0)
+            return "i1";
+        else
+            return type;
+    else if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(expression)) 
+        return "i1";
+    else
+        return type;
+};
+
 void TypeSymbolVisitor::visit(VariableAssignNode &node)
 {
     // Проверяем, существует ли переменная в реестре
@@ -166,27 +180,32 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
     {
         node.expression->accept(*this);
         auto expressionType = node.expression->inferredType->toString();
-        IC(expressionType);
 
         if (expressionType != "none" && expressionType != "string")
         {        
-            IC(expressionType, varType);
-            // Проверяем тип выражения
             castNumbersInBinaryTree(node.expression, isAuto ? "auto" : varType);
+            if (varType != "i1" && varType != "auto")
+            {
+                if (auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.expression))
+                {
+                    if ((binaryOp->op == "and" || binaryOp->op == "or" || binaryOp->op.rfind("icmp_", 0) == 0 || binaryOp->op.rfind("fcmp_", 0) == 0))
+                    {
+                        LogError("Type mismatch: expected i1, got " + expressionType);
+                    }
+                }
+            }
         }
 
         if (isAuto)
             if(node.expression->implicitCastTo)
-            {
-                node.type = node.expression->implicitCastTo;
-            }
+                node.type = std::make_shared<SimpleTypeNode>(getType(node.expression, node.expression->implicitCastTo->toString()));
             else
-            {
-                IC();
-                node.type = node.expression->inferredType;
-            }
+                node.type = std::make_shared<SimpleTypeNode>(getType(node.expression, node.expression->inferredType->toString()));
+        else if(varType == "i1")
+            if(getType(node.expression, "") != "i1")
+                LogError("Type mismatch: expected i1, got " + expressionType);
     }
-    
+
     // Добавляем переменную в реестр
     auto varNode = std::make_shared<VariableAssignNode>(node.name, node.isConst, node.type, node.expression);
     varNode->inferredType = node.type; // Устанавливаем тип переменной
@@ -214,4 +233,36 @@ void TypeSymbolVisitor::visit(ReturnNode &node)
     }
 
     contexts.back().returnedValue = true; // Устанавливаем, что функция вернула значение
+}
+
+void TypeSymbolVisitor::visit(VariableReassignNode& node) {
+    // Проверяем, существует ли переменная в реестре
+    if (contexts.back().variables.find(node.name) == contexts.back().variables.end()) {
+        LogError("Variable not found: " + node.name);
+    }
+
+    std::shared_ptr<VariableAssignNode> varAssign = std::dynamic_pointer_cast<VariableAssignNode>(contexts.back().variables[node.name]);
+    std::string varType = varAssign->inferredType->toString();
+
+    IC(varType);
+    node.expression->accept(*this);
+    auto expressionType = node.expression->inferredType->toString();
+
+    if (expressionType != "none" && expressionType != "string") {
+        castNumbersInBinaryTree(node.expression, varType);
+        expressionType = getType(node.expression, expressionType);
+        if (varType != "i1") {
+            if (auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.expression)) {
+                if ((binaryOp->op == "and" || binaryOp->op == "or" || binaryOp->op.rfind("icmp_", 0) == 0 || binaryOp->op.rfind("fcmp_", 0) == 0)) {
+                    LogError("Type mismatch: expected i1, got " + expressionType);
+                }
+            }
+        }
+    }
+
+    if (expressionType != varType) 
+            LogError("Type mismatch: expected " + varType + ", got " + expressionType);
+
+    // Добавляем переменную в реестр
+    varAssign->expression = node.expression;
 }

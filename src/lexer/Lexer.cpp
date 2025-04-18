@@ -59,6 +59,12 @@ void Lexer::tokenize()
             if(keywordCheck != TokenType::Identifier)
             {
                 std::optional<char> peekChar = peek(0);
+                if (currentTokenValue == "i1" && y == '6')
+                {
+                    currentTokenValue += y;
+                    currentIndex++;
+                    continue;
+                }
                 if(peekChar.has_value() && IdentifyTokenType(peekChar.value())!=TokenType::Identifier)
                 {
                     addToken(keywordCheck, currentTokenValue);
@@ -328,7 +334,7 @@ TokenType Lexer::IsKeyword(const std::string &value) const
     }; 
 
     std::vector<std::string> builtinTypes = {
-        "i1", "i8", "i32", "i64", "string", "void", "array", "map", "float", "struct", "func"
+        "i1", "i8", "i16","i32", "i64", "string", "void", "array", "map", "float", "struct", "func"
     };
 
     std::string trimmedValue = ParsingFunctions::trim(value);

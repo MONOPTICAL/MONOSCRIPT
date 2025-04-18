@@ -326,21 +326,20 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         if (intValue.has_value()) // Если число целое
         {
             std::shared_ptr<SimpleTypeNode> type;
-            if (intValue.value() == 0 || intValue.value() == 1) // Если число больше i8
-            {
-                type = std::make_shared<SimpleTypeNode>("i1"); // Создаём тип bool
+            if (intValue.value() == 0 || intValue.value() == 1) {
+                type = std::make_shared<SimpleTypeNode>("i1");
             }
-            else if (intValue.value() < 255 && intValue.value() > -256) // Если число больше i8
-            {
-                type = std::make_shared<SimpleTypeNode>("i8"); // Создаём тип i8
+            else if (intValue.value() >= -128 && intValue.value() <= 127) {
+                type = std::make_shared<SimpleTypeNode>("i8");
             }
-            else if (intValue.value() < 65535 && intValue.value() > -65536) // Если число больше i32
-            {
-                type = std::make_shared<SimpleTypeNode>("i32"); // Создаём тип i32
+            else if (intValue.value() >= -32768 && intValue.value() <= 32767) {
+                type = std::make_shared<SimpleTypeNode>("i16");
             }
-            else if (intValue.value() < 2147483647 && intValue.value() > -2147483648) // Если число больше i32
-            {
-                type = std::make_shared<SimpleTypeNode>("i64"); // Создаём тип i64
+            else if (intValue.value() >= -2147483648 && intValue.value() <= 2147483647) {
+                type = std::make_shared<SimpleTypeNode>("i32");
+            }
+            else {
+                type = std::make_shared<SimpleTypeNode>("i64");
             }
             return std::make_shared<NumberNode>(intValue.value(), type); // Создаём узел числа
         }
