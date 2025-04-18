@@ -7,38 +7,40 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
     std::shared_ptr<TypeNode> leftType = node.left->inferredType;
     std::shared_ptr<TypeNode> rightType = node.right->inferredType;
     
+    std::shared_ptr<BinaryOpNode> root = std::make_shared<BinaryOpNode>(node.left, node.op, node.right);
+   
     // "+"
     if (node.op == "+" || node.op == "add" || node.op == "fadd") {
-        handlePlusOperator(node, leftType, rightType);
-        node.inferredType = node.left->inferredType;
+        handlePlusOperator(root, leftType, rightType);
+        node = *root;
         return;
     }
 
     // "-"
     if (node.op == "-" || node.op == "sub" || node.op == "fsub") {
-        handleMinusOperator(node, leftType, rightType);
-        node.inferredType = node.left->inferredType;
+        handlePlusOperator(root, leftType, rightType);
+        node = *root;
         return;
     }
 
     // "*"
     if (node.op == "*" || node.op == "mul" || node.op == "fmul") {
-        handleMulOperator(node, leftType, rightType);
-        node.inferredType = node.left->inferredType;
+        handleMulOperator(root, leftType, rightType);
+        node = *root;
         return;
     }
 
     // "/"
     if (node.op == "/" || node.op == "sdiv" || node.op == "fdiv") {
-        handleDivOperator(node, leftType, rightType);
-        node.inferredType = node.left->inferredType;
+        handleDivOperator(root, leftType, rightType);
+        node = *root;
         return;
     }
 
     // "%"
     if (node.op == "%" || node.op == "srem" || node.op == "frem") {
-        handleModOperator(node, leftType, rightType);
-        node.inferredType = node.left->inferredType;
+        handleModOperator(root, leftType, rightType);
+        node = *root;
         return;
     }
 
@@ -54,38 +56,21 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
 
     // "==", "!=", "<", ">", "<=", ">="
     if (getCmpOp(node.op) != "") {
-        handleCompareOperator(node, leftType, rightType);
-        node.inferredType = registry.findType("i1");
-        
+        handleCompareOperator(root, leftType, rightType);
+        node = *root;
         return;
     }
 
     // and, or 
     if (node.op == "and" || node.op == "or") {
-        handleLogicalOperator(node, leftType, rightType);
-        node.inferredType = registry.findType("i1");
+        handleLogicalOperator(root, leftType, rightType);
+        node = *root;
         return;
     }
-
-    IC();
 }
 
 void TypeSymbolVisitor::visit(UnaryOpNode& node) {
     node.operand->accept(*this);
     std::shared_ptr<TypeNode> operandType = node.operand->inferredType;
     node.inferredType = operandType;
-    /*
-    if (node.op == "-" || node.op == "sub") {
-        handleUnaryOperator(node, operandType);
-        node.inferredType = operandType;
-        return;
-    }
-
-    if (node.op == "!") {
-        handleLogicalOperator(node, operandType, nullptr);
-        node.inferredType = registry.findType("i1");
-        return;
-    }
-    */
-    IC();
 }

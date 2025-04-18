@@ -39,7 +39,6 @@ void TypeSymbolVisitor::visit(IdentifierNode& node)
 
 void TypeSymbolVisitor::visit(NumberNode& node)
 {
-    IC();
     node.inferredType = registry.findType(node.type->toString()); // Тут пока что i32 потом разделим на i8, i32, i64
 }
 
