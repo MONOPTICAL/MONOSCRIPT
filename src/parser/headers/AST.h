@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
 
 class ASTNodeVisitor {
     public:
@@ -417,12 +418,11 @@ class AccessExpression : public ASTNode {
 class ImportNode : public ASTNode {
     public:
         ImportNode() = default;
-        ImportNode(const std::vector<std::string>& path, const std::string& alias = "")
-        : path(path), alias(alias) {}
+        ImportNode(const std::map<std::vector<std::string>, std::string>& paths)
+        : paths(paths){}
+        
         // Путь импорта: module -> struct -> function ...
-        std::vector<std::string> path;
-        // Алиас (опционально)
-        std::string alias;
+        std::map<std::vector<std::string>, std::string> paths;
     
 
         void accept(ASTNodeVisitor& visitor) override {

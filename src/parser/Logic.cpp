@@ -235,7 +235,6 @@ int Parser::getPrecedence(const Token &token) const
 
 std::shared_ptr<ASTNode> Parser::parseBinary(int precedence) 
 {
-    IC(precedence);
     auto left = parseUnary(); // 2
     int initialLine = lineIndex;  // Запоминаем начальную строку
     int movedLine = 0; // Флаг для проверки, был ли сделан переход на следующую строку
@@ -252,13 +251,12 @@ std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
             {
                 // Получаем уровень отступа следующей строки
                 int nextIndent = getIndentLevel(lines[lineIndex + 1]);
-                // Проверяем, что в следующей строке после отступов есть PipeArrow
+
                 if (nextIndent < lines[lineIndex + 1].size() &&
                     lines[lineIndex + 1][nextIndent].type == TokenType::PipeArrow)
                 {
                     nextLine();
                     movedLine++;
-                    IC("slide", lineIndex, precedence, movedLine);
 
                     tokenIndex = getIndentLevel(lines[lineIndex]); // Перепрыгиваем через пайпы/отступы
 
@@ -422,9 +420,9 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         {
             int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока if
             nextLine(); // Переходим к следующему токену
-            IC("s", current().value, peek().value, lineIndex, tokenIndex, expectedIndent);
+            
             auto body = parseBlock(expectedIndent);
-            IC("e", current().value, peek().value, lineIndex, tokenIndex);
+            
             lineIndex--; // Без этого он скипает 2 линии а не одну
             tokenIndex = getIndentLevel(lines[lineIndex]); // Перепрыгиваем через пайпы/отступы
             return std::make_shared<LambdaNode>(returnType, params, body);
@@ -491,7 +489,6 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         advance(); // Переходим к следующему токену
         auto expression = parseExpression(); // Разбираем выражение внутри скобок
 
-        //IC(current().value, peek().value, lineIndex, tokenIndex);
         consume(TokenType::RightParen, "Expected ')' after expression"); // Проверяем наличие правой скобки
         return expression; // Возвращаем разобранное выражение
     }
