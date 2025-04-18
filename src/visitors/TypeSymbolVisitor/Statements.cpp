@@ -155,9 +155,6 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
             }
         }
     }
-    // Проверяем выражение является ли оно дженериком
-
-    debugContexts();
     
     if (varType.starts_with("array")
         || varType.starts_with("map")
@@ -165,23 +162,31 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
         validateCollectionElements(node.type, node.expression, isAuto);
         IC("exit");
     }
-    
     else
     {
         node.expression->accept(*this);
         auto expressionType = node.expression->inferredType->toString();
-        if (expressionType != "none" || expressionType != "string")
+        IC(expressionType);
+
+        if (expressionType != "none" && expressionType != "string")
         {        
             IC(expressionType, varType);
             // Проверяем тип выражения
-            castNumbersInBinaryTree(node.expression, isAuto ? "auto" : expressionType);
-            if (isAuto)
-            {
-                
-            }
+            castNumbersInBinaryTree(node.expression, isAuto ? "auto" : varType);
         }
-        IC("exitted");
+
+        if (isAuto)
+            if(node.expression->implicitCastTo)
+            {
+                node.type = node.expression->implicitCastTo;
+            }
+            else
+            {
+                IC();
+                node.type = node.expression->inferredType;
+            }
     }
+    
     // Добавляем переменную в реестр
     auto varNode = std::make_shared<VariableAssignNode>(node.name, node.isConst, node.type, node.expression);
     varNode->inferredType = node.type; // Устанавливаем тип переменной

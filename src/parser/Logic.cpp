@@ -330,15 +330,15 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
             {
                 type = std::make_shared<SimpleTypeNode>("i1"); // Создаём тип bool
             }
-            else if (intValue.value() < 255 || intValue.value() > -256) // Если число больше i8
+            else if (intValue.value() < 255 && intValue.value() > -256) // Если число больше i8
             {
                 type = std::make_shared<SimpleTypeNode>("i8"); // Создаём тип i8
             }
-            else if (intValue.value() > 65535 || intValue.value() < -65536) // Если число больше i32
+            else if (intValue.value() < 65535 && intValue.value() > -65536) // Если число больше i32
             {
                 type = std::make_shared<SimpleTypeNode>("i32"); // Создаём тип i32
             }
-            else if (intValue.value() > 2147483647 || intValue.value() < -2147483648) // Если число больше i32
+            else if (intValue.value() < 2147483647 && intValue.value() > -2147483648) // Если число больше i32
             {
                 type = std::make_shared<SimpleTypeNode>("i64"); // Создаём тип i64
             }
