@@ -7,6 +7,7 @@ void TypeSymbolVisitor::visit(SimpleTypeNode &node)
     if (!type) {
         LogError("Unknown type: " + node.name);
     }
+
     node.inferredType = type;
 }
 
@@ -36,6 +37,11 @@ void TypeSymbolVisitor::visit(IdentifierNode& node)
 
     std::shared_ptr<ASTNode> varAssign = contexts.back().variables[node.name];
     auto result = checkForIdentifier(varAssign);
+
+    if(varAssign->implicitCastTo)
+    {
+        node.inferredType = varAssign->implicitCastTo;
+    }
     node.inferredType = result;
 }
 

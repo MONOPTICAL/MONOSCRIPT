@@ -72,5 +72,32 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
 void TypeSymbolVisitor::visit(UnaryOpNode& node) {
     node.operand->accept(*this);
     std::shared_ptr<TypeNode> operandType = node.operand->inferredType;
+
+    if (node.op == "?")
+    {
+        if (std::dynamic_pointer_cast<CallNode>(node.operand)) {}
+        else if (std::dynamic_pointer_cast<AccessExpression>(node.operand)) {}
+        else if (std::dynamic_pointer_cast<IdentifierNode>(node.operand)) {}
+        else if (std::dynamic_pointer_cast<LambdaNode>(node.operand)) {}
+        else
+        {
+            LogError("Unsupported operand type for '?'");
+            return;
+        }
+    }
+    else if (node.op == "!")
+    {
+        if (std::dynamic_pointer_cast<CallNode>(node.operand)) {}
+        else if (std::dynamic_pointer_cast<BinaryOpNode>(node.operand)) {}
+        else if (std::dynamic_pointer_cast<AccessExpression>(node.operand)) {}
+        else if (std::dynamic_pointer_cast<IdentifierNode>(node.operand)) {}
+        else if (std::dynamic_pointer_cast<LambdaNode>(node.operand)) {}
+        else
+        {
+            LogError("Unsupported operand type for '!'");
+            return;
+        }
+    }
+
     node.inferredType = operandType;
 }

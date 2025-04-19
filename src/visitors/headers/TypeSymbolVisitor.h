@@ -82,6 +82,10 @@ private:
                                                                             std::shared_ptr<TypeNode> leftType, 
                                                                             std::shared_ptr<TypeNode> rightType);
 
+    void                                                            castAndValidate(
+                                                                            const std::shared_ptr<ASTNode>& node, 
+                                                                            const std::string& targetType, 
+                                                                            TypeSymbolVisitor* visitor);
 public:
                                                                     TypeSymbolVisitor() 
                                                                     {
