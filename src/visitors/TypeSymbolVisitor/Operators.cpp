@@ -129,7 +129,7 @@ void TypeSymbolVisitor::handleDivOperator(std::shared_ptr<BinaryOpNode>& node, s
 {
     std::string left = leftType->toString();
     std::string right = rightType->toString();
-    IC();
+    
     auto isIntType = [](const std::string& t) {
         return t == "i32" || t == "i64" || t == "i16" || t == "i8" || t == "i1";
     };
