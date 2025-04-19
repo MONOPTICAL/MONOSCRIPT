@@ -2,6 +2,7 @@
 #include <string_view>
 void TypeSymbolVisitor::visit(ProgramNode &node)
 {
+    this->program = std::make_shared<ProgramNode>(node);
     for (const auto& statement : node.body) {
         statement->accept(*this);
     }
@@ -236,6 +237,11 @@ void TypeSymbolVisitor::visit(ReturnNode &node)
     contexts.back().returnedValue = true; // Устанавливаем, что функция вернула значение
 }
 
+static bool isCompareOperator(const std::string& op) {
+    return op.starts_with("icmp_") || op.starts_with("fcmp_") ||
+           op == "and" || op == "or";
+}
+
 void TypeSymbolVisitor::visit(VariableReassignNode& node) {
     // Проверяем, существует ли переменная в реестре
     if (contexts.back().variables.find(node.name) == contexts.back().variables.end()) {
@@ -246,11 +252,11 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
     std::shared_ptr<TypeNode> varType = varAssign->inferredType;
     std::string varTypeStr = varType->toString();
 
-    IC(varTypeStr);
     std::string expressionType;
     if (varTypeStr.starts_with("array")
         || varTypeStr.starts_with("map")
     ) {
+        node.expression->accept(*this);
         validateCollectionElements(varType, node.expression, false);
         auto Block = std::dynamic_pointer_cast<BlockNode>(node.expression);
         auto Generic = std::dynamic_pointer_cast<GenericTypeNode>(varType);
@@ -267,9 +273,19 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
         } 
         else {
             if (Block->statements[0]->inferredType->toString() != Generic->typeParameters[0]->toString()) {
-                LogError("Element type mismatch: expected " + Generic->typeParameters[0]->toString() + ", got " + Block->statements[0]->inferredType->toString());
+                if (Generic->typeParameters[0]->toString() == "i1")
+                    if (auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(Block->statements[0])) {
+                        if (isCompareOperator(binaryOp->op)) {
+                            expressionType = "array<i1>";
+                        } else {
+                            LogError("Type mismatch: expected i1, got " + Block->statements[0]->inferredType->toString());
+                        }
+                    }
+                else
+                    LogError("Element type mismatch: expected " + Generic->typeParameters[0]->toString() + ", got " + Block->statements[0]->inferredType->toString());
             }
-            expressionType = "array<" + Block->statements[0]->inferredType->toString() + ">";
+            else 
+                expressionType = "array<" + Block->statements[0]->inferredType->toString() + ">";
         } 
     }
     else

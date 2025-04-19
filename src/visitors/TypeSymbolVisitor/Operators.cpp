@@ -129,7 +129,7 @@ void TypeSymbolVisitor::handleDivOperator(std::shared_ptr<BinaryOpNode>& node, s
 {
     std::string left = leftType->toString();
     std::string right = rightType->toString();
-
+    IC();
     auto isIntType = [](const std::string& t) {
         return t == "i32" || t == "i64" || t == "i16" || t == "i8" || t == "i1";
     };
@@ -166,7 +166,7 @@ void TypeSymbolVisitor::handleModOperator(std::shared_ptr<BinaryOpNode>& node, s
     std::string right = rightType->toString();
 
     auto isIntType = [](const std::string& t) {
-        return t == "i32" || t == "i64" || t == "i8" || t == "i1";
+        return t == "i32" || t == "i64" || t == "i16" || t == "i8" || t == "i1";
     };
 
     if (left == "string" || right == "string") {
@@ -201,7 +201,7 @@ void TypeSymbolVisitor::handleCompareOperator(std::shared_ptr<BinaryOpNode>& nod
     std::string right = rightType->toString();
 
     auto isIntType = [](const std::string& t) {
-        return t == "i32" || t == "i64" || t == "i8" || t == "i1";
+        return t == "i32" || t == "i64" || t == "i16" || t == "i8" || t == "i1";
     };
 
     // IR-операции по node->op

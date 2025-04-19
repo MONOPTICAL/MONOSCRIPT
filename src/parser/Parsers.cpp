@@ -457,7 +457,6 @@ std::shared_ptr<ASTNode> Parser::parseUse()
             nextLine();
     }
 
-    IC(paths);
     lineIndex--; // Без этого он скипает 2 линии а не одну
     return std::make_shared<ImportNode>(paths);
 }
