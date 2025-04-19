@@ -36,7 +36,6 @@ void TypeSymbolVisitor::visit(IdentifierNode& node)
 
     std::shared_ptr<ASTNode> varAssign = contexts.back().variables[node.name];
     auto result = checkForIdentifier(varAssign);
-    IC(result->toString(), node.name);
     node.inferredType = result;
 }
 

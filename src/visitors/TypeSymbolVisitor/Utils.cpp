@@ -2,7 +2,9 @@
 #include "../../includes/ASTDebugger.hpp"
 void TypeSymbolVisitor::LogError(const std::string &message)
 {
+    std::cout << "--- ERROR ---\n" << std::endl;
     ASTDebugger::debug(this->program);
+    std::cout << "-------------\n";
     throw std::runtime_error("Semantic Error: " + message);
 }
 
