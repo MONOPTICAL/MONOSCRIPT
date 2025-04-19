@@ -3,3 +3,5 @@
 /build
 /.ccls-cache
 /.vscode
+ms
+*.ms

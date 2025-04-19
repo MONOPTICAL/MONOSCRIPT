@@ -24,9 +24,12 @@ private:
 
     Registry                                                        registry;
 
+    std::shared_ptr<ProgramNode>                                    program; // Только для отладки
+
     /*
     Проверяет, существует ли переменная в реестре(если переданный node является идентификатором)
     */
+   
     std::shared_ptr<TypeNode>                                       checkForIdentifier(std::shared_ptr<ASTNode>& node);
 
     void                                                            castNumbersInBinaryTree(
@@ -79,10 +82,6 @@ private:
                                                                             std::shared_ptr<TypeNode> leftType, 
                                                                             std::shared_ptr<TypeNode> rightType);
 
-    void                                                            handleUnaryOperator(
-                                                                            UnaryOpNode& node, 
-                                                                            std::shared_ptr<TypeNode> operandType);
-    
 public:
                                                                     TypeSymbolVisitor() 
                                                                     {
