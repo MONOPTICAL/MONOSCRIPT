@@ -224,9 +224,11 @@ void TypeSymbolVisitor::castAndValidate(const std::shared_ptr<ASTNode>& node, co
     if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
         castAndValidate(bin->left, targetType, visitor);
         castAndValidate(bin->right, targetType, visitor);
+        bin->inferredType = std::make_shared<SimpleTypeNode>(targetType);
     }
     if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
         castAndValidate(unary->operand, targetType, visitor);
+        unary->inferredType = std::make_shared<SimpleTypeNode>(targetType);
     }
 }
 
