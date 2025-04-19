@@ -227,7 +227,14 @@ void TypeSymbolVisitor::visit(ReturnNode &node)
     if (node.expression) {
         node.expression->accept(*this);
         std::string expectedType = contexts.back().returnType->toString();
-        std::string actualType = node.expression->inferredType->toString();
+        std::string actualType;
+        castAndValidate(node.expression, expectedType, this);
+        
+        if (node.expression->implicitCastTo)
+            actualType = node.expression->implicitCastTo->toString();
+        else
+            actualType = node.expression->inferredType->toString();
+
         if (actualType != expectedType) {
             if (!(actualType == "null" && expectedType == "void"))
                 LogError("Return type mismatch: expected " + contexts.back().returnType->toString() + ", got " + node.expression->inferredType->toString());
@@ -476,8 +483,11 @@ void TypeSymbolVisitor::visit(CallNode& node) {
     for (size_t i = 0; i < node.arguments.size(); ++i) {
         node.arguments[i]->accept(*this);
         if (!builtin)
-            castAndValidate(node.arguments[i], func->parameters[i].first->toString(), this);
-            
+            if (std::dynamic_pointer_cast<BinaryOpNode>(node.arguments[i]) || std::dynamic_pointer_cast<UnaryOpNode>(node.arguments[i]))
+                castNumbersInBinaryTree(node.arguments[i], func->parameters[i].first->toString());
+            else
+                castAndValidate(node.arguments[i], func->parameters[i].first->toString(), this);
+
         if (node.arguments[i]->implicitCastTo)
             argTypes.push_back(node.arguments[i]->implicitCastTo);
         else
