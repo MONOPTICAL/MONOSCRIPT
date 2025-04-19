@@ -1,10 +1,12 @@
 #include "lexer/headers/Lexer.h"
 #include "lexer/headers/Token.h"
 #include "parser/headers/Parser.h"
-#include "includes/ASTDebugger.hpp"
+#include "linker/headers/Linker.h"
 #include "visitors/headers/TypeSymbolVisitor.h"
+#include "includes/ASTDebugger.hpp"
 #include <fstream>
 #include <iostream>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -66,30 +68,71 @@ int main(int argc, char* argv[]) {
         if (showTokens) {
             std::cout << "\n--- Токены ---\n";
             lexer.printTokens();
-            std::cout << "--- Конец токенов ---\n";
+            std::cout << "--- Конец токенов ---\n\n";
         }
 
         Parser parser(tokens);
         auto program = parser.parse();
 
-        if (showAST && program) {
-            std::cout << "\n--- AST(1) ---\n";
-            ASTDebugger::debug(program);
-            std::cout << "--- Конец AST(1) ---\n";
-        } else if (!program) {
+        // Получаем путь текущего файла
+        Linker linker(std::filesystem::path(inputFile).parent_path().string());
+        
+        // Добавляем основной модуль
+        if (!linker.addModule(std::filesystem::path(inputFile).stem().string(), inputFile, program)) {
+            return 1;
+        }
+        
+        if (!linker.linkModules()) {
+            return 1;
+        }
+        
+        auto linkedModules = linker.getLinkedASTs();
+        
+        // Создаем объединенный AST из всех модулей
+        std::shared_ptr<ProgramNode> combinedAST = std::make_shared<ProgramNode>();
+
+        std::cout << "--- Модули ---" << std::endl;
+
+        // Выводим информацию о связанных модулях
+        for (const auto& [name, module] : linker.getModules()) {
+            std::cout << "Модуль: " << name << " (" << module.path << ")" << std::endl;
+            std::cout << "  Функции: " << module.functions.size() << std::endl;
+            std::cout << "  Глобальные переменные: " << module.globals.size() << std::endl;
+            std::cout << "  Импортировано: " << module.imports.size() << " символов" << std::endl;
+            
+            // Копируем все узлы из текущего модуля в объединенный AST
+            if (module.ast) {
+                for (const auto& node : module.ast->body) {
+                    // Пропускаем директивы импорта в объединенном AST, они уже обработаны
+                    if (!std::dynamic_pointer_cast<ImportNode>(node)) {
+                        combinedAST->body.push_back(node);
+                    }
+                }
+            }
+        }
+
+        std::cout << "--- Конец модулей ---\n";
+
+        if (showAST && combinedAST) {
+            std::cout << "\n--- Объединенный AST ---\n";
+            ASTDebugger::debug(combinedAST);
+            std::cout << "--- Конец объединенного AST ---\n";
+        }
+        else if (!combinedAST) {
             std::cerr << "Ошибка: не удалось разобрать исходный код.\n";
             return 1;
         }
 
+
         TypeSymbolVisitor typeSymbolVisitor;
 
-        program->accept(typeSymbolVisitor);
+        combinedAST->accept(typeSymbolVisitor);
 
-        if (showAST && program) {
+        if (showAST && combinedAST) {
             std::cout << "\n--- AST(2) ---\n";
-            ASTDebugger::debug(program);
+            ASTDebugger::debug(combinedAST);
             std::cout << "--- Конец AST(2) ---\n";
-        } else if (!program) {
+        } else if (!combinedAST) {
             std::cerr << "Ошибка: не удалось разобрать исходный код.\n";
             return 1;
         }

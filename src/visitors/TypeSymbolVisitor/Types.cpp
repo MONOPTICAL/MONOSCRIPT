@@ -34,7 +34,9 @@ void TypeSymbolVisitor::visit(IdentifierNode& node)
         LogError("Variable not found: " + node.name);
     }
 
-    node.inferredType = checkForIdentifier(it->second);
+    std::shared_ptr<ASTNode> varAssign = contexts.back().variables[node.name];
+    auto result = checkForIdentifier(varAssign);
+    node.inferredType = result;
 }
 
 void TypeSymbolVisitor::visit(NumberNode& node)

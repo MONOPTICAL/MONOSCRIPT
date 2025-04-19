@@ -1,7 +1,10 @@
 #include "../headers/TypeSymbolVisitor.h"
-
+#include "../../includes/ASTDebugger.hpp"
 void TypeSymbolVisitor::LogError(const std::string &message)
 {
+    std::cout << "--- ERROR ---\n" << std::endl;
+    ASTDebugger::debug(this->program);
+    std::cout << "-------------\n";
     throw std::runtime_error("Semantic Error: " + message);
 }
 
@@ -31,6 +34,18 @@ std::shared_ptr<TypeNode> TypeSymbolVisitor::checkForIdentifier(std::shared_ptr<
 
         return varAssign->expression->inferredType;
     }
+    else if (auto varAssignNode = std::dynamic_pointer_cast<VariableAssignNode>(node)) {
+        if (varAssignNode->expression == nullptr) {
+            if (!varAssignNode->inferredType)
+                LogError("Variable '" + varAssignNode->name + "' has no inferred type");
+            return varAssignNode->inferredType;
+        }
+
+        if (!varAssignNode->expression->inferredType)
+            LogError("Expression type is null for variable: " + varAssignNode->name);
+
+        return varAssignNode->expression->inferredType;
+    }
 
     if (!node->inferredType)
         LogError("Node type is null");
@@ -41,6 +56,7 @@ std::shared_ptr<TypeNode> TypeSymbolVisitor::checkForIdentifier(std::shared_ptr<
 void TypeSymbolVisitor::debugContexts()
 {
     for (const auto& context : contexts) {
+        std::cout << "---------------------\n";
         std::cout << "Context: " << context.currentFunctionName << "\n";
         std::cout << "Variables:\n";
         for (const auto& var : context.variables) {
@@ -131,6 +147,11 @@ static void castAllNumbersToType(const std::shared_ptr<ASTNode>& node, const std
         }
         return;
     }
+    if (auto ident = std::dynamic_pointer_cast<IdentifierNode>(node)) {
+        if (ident->inferredType->toString() != targetType)
+            if (getTypeRank(ident->inferredType->toString()) > 0)
+                ident->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
+    }
     if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
         castAllNumbersToType(bin->left, targetType);
         castAllNumbersToType(bin->right, targetType);
@@ -188,6 +209,14 @@ static void castAndValidate(const std::shared_ptr<ASTNode>& node, const std::str
         }
         return;
     }
+    if (auto ident = std::dynamic_pointer_cast<IdentifierNode>(node))
+    {
+        if (!ident->inferredType)
+            visitor->LogError("Expression type is null for variable: " + ident->name);
+        else if (ident->inferredType->toString() != targetType)
+            if (getTypeRank(ident->inferredType->toString()) > 0)
+                ident->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
+    }
     if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
         castAndValidate(bin->left, targetType, visitor);
         castAndValidate(bin->right, targetType, visitor);
@@ -210,6 +239,9 @@ static void findMaxRank(const std::shared_ptr<ASTNode>& node, int& maxRank) {
     if (auto floatNum = std::dynamic_pointer_cast<FloatNumberNode>(node)) {
         maxRank = std::max(maxRank, getTypeRank("float"));
         return;
+    }
+    if (auto ident = std::dynamic_pointer_cast<IdentifierNode>(node)) {
+        maxRank = std::max(maxRank, getTypeRank(ident->inferredType->toString()));
     }
     if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
         findMaxRank(bin->left, maxRank);
@@ -283,6 +315,19 @@ void TypeSymbolVisitor::validateCollectionElements(
             // Для вложенных коллекций рекурсивно
             if (auto subBlock = std::dynamic_pointer_cast<BlockNode>(statement)) {
                 validateCollectionElements(genericType->typeParameters[0], subBlock, isAuto);
+            } else if (auto binary = std::dynamic_pointer_cast<BinaryOpNode>(statement)) {
+                // TODO : Проверить на корректность в пиздец тяжёлых случаях
+                binary->left->accept(*this);
+                binary->right->accept(*this);
+                auto leftType = binary->left->inferredType;
+                auto rightType = binary->right->inferredType;
+                auto expectedElemType = genericType->typeParameters[0];
+                if (auto expectedGeneric = std::dynamic_pointer_cast<GenericTypeNode>(expectedElemType)) {
+                    // Вложенная коллекция
+                    validateCollectionElements(expectedElemType, statement, isAuto);
+                } else {
+                    castNumbersInBinaryTree(binary, "auto");
+                }
             } else {
                 statement->accept(*this);
                 auto elemType = statement->inferredType;
@@ -293,7 +338,6 @@ void TypeSymbolVisitor::validateCollectionElements(
                 } else if (elemType->toString() != expectedElemType->toString()) {
                     if ((numericRank(elemType->toString(), maxRank) > 0 && numericRank(expectedElemType->toString(), maxRank) > 0))
                         continue;
-
                     LogError("Element type mismatch: expected " + expectedElemType->toString() + ", got " + elemType->toString());
                 }
             }
@@ -425,7 +469,7 @@ void TypeSymbolVisitor::applyImplicitCastToNumeric(
                 }
                 if (elemType && elemType->toString() != targetType) {
                     numNode->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
-                }
+                } 
             }
         }
     } else if (genericType->baseName == "map") {
