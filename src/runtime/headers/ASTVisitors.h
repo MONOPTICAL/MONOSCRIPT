@@ -39,14 +39,14 @@ public:
     void                visit(NumberNode& node) override;
     void                visit(FloatNumberNode& node) override;
     void                visit(StringNode& node) override;
-    void                visit(BooleanNode& node) override;
     void                visit(NullNode& node) override;
     void                visit(NoneNode& node) override;
     void                visit(KeyValueNode& node) override;
     void                visit(BreakNode& node) override;
     void                visit(ContinueNode& node) override;
     void                visit(AccessExpression& node) override;
-    void                visit(ClassNode& node) override;
+    void                visit(ImportNode& node) override;
+    void                visit(LambdaNode& node) override;
 };
 
 #endif // AST_VISITORS_H

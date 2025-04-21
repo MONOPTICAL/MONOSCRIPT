@@ -17,7 +17,11 @@ class ASTDebugger
             }
             else if (auto func = std::dynamic_pointer_cast<FunctionNode>(node)) { 
                 printIndent(indent); std::cout << "[Function] " << func->name << "[" << func->associated << "]" << "(...) Return";
-                debug(func->returnType, 1);
+                if (func->inferredType) 
+                    std::cout << " (inferred type: " << func->inferredType->toString() << ")\n";
+                else 
+                    debug(func->returnType, 1);
+
                 for (const auto& param : func->parameters) {
                     printIndent(indent + 2); std::cout << "Param: " << param.second << " "; 
                     debug(param.first, 1);
@@ -172,7 +176,11 @@ class ASTDebugger
             }
             else if(auto typeShi = std::dynamic_pointer_cast<TypeNode>(node))
             {
-                printIndent(indent); std::cout << "Type: " << typeShi->toString() << "\n";
+                printIndent(indent);
+                if (typeShi->inferredType)
+                    std::cout << "Inferred Type: " << typeShi->toString() << "\n";
+                else 
+                    std::cout << "Type: " << typeShi->toString() << "\n";
             }
             else {
                 printIndent(indent); std::cout << "Unknown AST node\n";

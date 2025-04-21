@@ -227,7 +227,14 @@ void TypeSymbolVisitor::visit(ReturnNode &node)
     if (node.expression) {
         node.expression->accept(*this);
         std::string expectedType = contexts.back().returnType->toString();
-        std::string actualType = node.expression->inferredType->toString();
+        std::string actualType;
+        castAndValidate(node.expression, expectedType, this);
+        
+        if (node.expression->implicitCastTo)
+            actualType = node.expression->implicitCastTo->toString();
+        else
+            actualType = node.expression->inferredType->toString();
+
         if (actualType != expectedType) {
             if (!(actualType == "null" && expectedType == "void"))
                 LogError("Return type mismatch: expected " + contexts.back().returnType->toString() + ", got " + node.expression->inferredType->toString());
@@ -317,4 +324,203 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
 
     // Добавляем переменную в реестр
     varAssign->expression = node.expression;
+}
+
+void TypeSymbolVisitor::visit(IfNode& node) {
+    // Проверяем, существует ли функция в реестре
+    if (contexts.back().currentFunctionName.empty()) {
+        LogError("If statement outside of function");
+    }
+
+    node.condition->accept(*this);
+    std::string conditionType = node.condition->inferredType->toString();
+
+    if (conditionType != "i1") 
+        LogError("If condition must be of type i1, got " + conditionType);
+    else 
+    {
+        auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.condition);
+        if(binaryOp && binaryOp->op != "strcmp_eq") 
+                castNumbersInBinaryTree(node.condition, "auto");
+        else 
+                castNumbersInBinaryTree(node.condition, "auto");
+    }
+
+    // Создаем новый контекст для блока if
+    contexts.push_back(contexts.back());
+
+    contexts.back().currentFunctionName = "if";
+
+    // Проверяем блок if
+    node.thenBlock->accept(*this);
+
+    // Убираем контекст блока if
+    contexts.pop_back();
+
+    // Проверяем блок else
+    if (node.elseBlock) {
+        // Создаем новый контекст для блока else
+        contexts.push_back(contexts.back());
+
+        contexts.back().currentFunctionName = "else";
+
+        // Проверяем блок else
+        node.elseBlock->accept(*this);
+
+        // Убираем контекст блока else
+        contexts.pop_back();
+    }
+}
+
+void TypeSymbolVisitor::visit(ForNode& node) {
+    // Проверяем, существует ли функция в реестре
+    if (contexts.back().currentFunctionName.empty()) {
+        LogError("For statement outside of function");
+    }
+
+    // Проверяем тип переменной
+    node.iterable->accept(*this);
+    std::string iterableType = node.iterable->inferredType->toString();
+
+    if (iterableType == "none" || iterableType == "null" || iterableType == "void") {
+        LogError("Type cannot be " + iterableType);
+    }
+
+    node.varType = node.iterable->inferredType; // Устанавливаем тип итератора 
+
+    // Создаем новый контекст для блока for
+    contexts.push_back(contexts.back());
+
+    contexts.back().currentFunctionName = "for";
+
+    // Проверяем блок for
+    node.body->accept(*this);
+
+    // Убираем контекст блока for
+    contexts.pop_back();
+}
+
+void TypeSymbolVisitor::visit(WhileNode& node) {
+    // Проверяем, существует ли функция в реестре
+    if (contexts.back().currentFunctionName.empty()) {
+        LogError("If statement outside of function");
+    }
+
+    node.condition->accept(*this);
+    std::string conditionType = node.condition->inferredType->toString();
+
+    if (conditionType != "i1") 
+        LogError("If condition must be of type i1, got " + conditionType);
+    else 
+    {
+        auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.condition);
+        if(binaryOp && binaryOp->op != "strcmp_eq") 
+                castNumbersInBinaryTree(node.condition, "auto");
+        else 
+                castNumbersInBinaryTree(node.condition, "auto");
+    }
+
+    // Создаем новый контекст для блока while
+    contexts.push_back(contexts.back());
+
+    contexts.back().currentFunctionName = "while";
+
+    // Проверяем блок while
+    node.body->accept(*this);
+
+    // Убираем контекст блока while
+    contexts.pop_back();
+}
+
+void TypeSymbolVisitor::visit(BreakNode& node) {
+    // Проверяем, существует ли функция в реестре
+    if (contexts.back().currentFunctionName.empty()) {
+        LogError("Break statement outside of function");
+    }
+
+    // Проверяем, что break находится внутри цикла
+    if (contexts.back().currentFunctionName != "for" && contexts.back().currentFunctionName != "while") {
+        LogError("Break statement outside of loop");
+    }
+
+    node.inferredType = std::make_shared<SimpleTypeNode>("void");
+}
+
+void TypeSymbolVisitor::visit(ContinueNode& node) {
+    // Проверяем, существует ли функция в реестре
+    if (contexts.back().currentFunctionName.empty()) {
+        LogError("Continue statement outside of function");
+    }
+
+    // Проверяем, что continue находится внутри цикла
+    if (contexts.back().currentFunctionName != "for" && contexts.back().currentFunctionName != "while") {
+        LogError("Continue statement outside of loop");
+    }
+
+    node.inferredType = std::make_shared<SimpleTypeNode>("void");
+}
+
+void TypeSymbolVisitor::visit(CallNode& node) {
+
+    bool builtin = false;
+    std::shared_ptr<FunctionNode> builtInFunc = nullptr;
+
+    // Проверяем, существует ли функция в реестре
+    if (contexts.back().functions.find(node.callee) == contexts.back().functions.end()) {
+        if (registry.findFunction(node.callee) == nullptr) 
+            LogError("Function not found: " + node.callee);
+        else
+        {
+            contexts.back().functions[node.callee] = registry.findFunction(node.callee);
+            builtin = true;
+            builtInFunc = std::dynamic_pointer_cast<FunctionNode>(contexts.back().functions[node.callee]);
+        }
+    }
+
+    // Проверяем типы аргументов
+    std::shared_ptr<FunctionNode> func = std::dynamic_pointer_cast<FunctionNode>(contexts.back().functions[node.callee]);
+    std::vector<std::shared_ptr<TypeNode>> argTypes;
+    for (size_t i = 0; i < node.arguments.size(); ++i) {
+        node.arguments[i]->accept(*this);
+        if (!builtin)
+            if (std::dynamic_pointer_cast<BinaryOpNode>(node.arguments[i]) || std::dynamic_pointer_cast<UnaryOpNode>(node.arguments[i]))
+                castNumbersInBinaryTree(node.arguments[i], func->parameters[i].first->toString());
+            else
+                castAndValidate(node.arguments[i], func->parameters[i].first->toString(), this);
+
+        if (node.arguments[i]->implicitCastTo)
+            argTypes.push_back(node.arguments[i]->implicitCastTo);
+        else
+            argTypes.push_back(node.arguments[i]->inferredType);
+    }
+
+    if (!builtin) {
+
+        // Проверяем количество аргументов
+        if (argTypes.size() != func->parameters.size()) {
+            LogError("Function " + node.callee + " expects " + std::to_string(func->parameters.size()) + " arguments, got " + std::to_string(argTypes.size()));
+        }
+
+        // Проверяем типы аргументов
+        for (size_t i = 0; i < argTypes.size(); ++i) {
+            if (argTypes[i]->toString() != func->parameters[i].first->toString()) {
+                LogError("Type mismatch in function " + node.callee + ": expected " + func->parameters[i].first->toString() + ", got " + argTypes[i]->toString());
+            }
+        }
+    }
+    else {
+        bool isValid = false;
+        for (const auto& param : builtInFunc->parameters) {
+            if (param.first->toString() == argTypes[0]->toString()) {
+                isValid = true;
+                break;
+            }
+        }
+
+        if (!isValid) {
+            LogError("Type mismatch in function " + node.callee + ": expected " + builtInFunc->parameters[0].first->toString() + ", got " + argTypes[0]->toString());
+        }
+    }
+
+    node.inferredType = func->returnType; // Устанавливаем тип функции
 }

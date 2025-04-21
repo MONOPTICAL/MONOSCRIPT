@@ -279,7 +279,7 @@ TokenType Lexer::IdentifyTokenType(const char &value) const
         return TokenType::Number;
     else if (value == '"')
         return TokenType::String;
-    else if (value == '+' || value == '-' || value == '*' || value == '%' || value == '/' || value == '^' || value == '=' || value == '!' || value == '<' || value == '>')
+    else if (value == '+' || value == '-' || value == '*' || value == '%' || value == '/' || value == '^' || value == '=' || value == '!' || value == '<' || value == '>' || value == '?')
         return TokenType::Operator;
     else if (value == '(')
         return TokenType::LeftParen;
