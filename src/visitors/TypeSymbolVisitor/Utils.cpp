@@ -278,7 +278,6 @@ void TypeSymbolVisitor::castNumbersInBinaryTree(std::shared_ptr<ASTNode> node, c
             return;
         }
 
-        std::cout << "Deduced type: " << targetType << std::endl;
         castAllNumbersToType(node, targetType); 
     } else {
         // Мы не проверим i1 в другом месте
