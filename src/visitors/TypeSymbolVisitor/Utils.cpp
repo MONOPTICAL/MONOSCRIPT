@@ -13,7 +13,7 @@ std::shared_ptr<TypeNode> TypeSymbolVisitor::checkForIdentifier(std::shared_ptr<
     if (!node) {
         LogError("Node is null");
     }
-
+    
     if (auto idNode = std::dynamic_pointer_cast<IdentifierNode>(node)) {
         auto it = contexts.back().variables.find(idNode->name);
         if (it == contexts.back().variables.end()) 
@@ -32,12 +32,16 @@ std::shared_ptr<TypeNode> TypeSymbolVisitor::checkForIdentifier(std::shared_ptr<
         if (!varAssign->expression->inferredType)
             LogError("Expression type is null for variable: " + idNode->name);
 
+        if (varAssign->expression && varAssign->expression->implicitCastTo) 
+            std::cout << varAssign->implicitCastTo->toString() << std::endl;
         return varAssign->expression->inferredType;
     }
     else if (auto varAssignNode = std::dynamic_pointer_cast<VariableAssignNode>(node)) {
         if (varAssignNode->expression == nullptr) {
             if (!varAssignNode->inferredType)
                 LogError("Variable '" + varAssignNode->name + "' has no inferred type");
+            if (varAssignNode->expression && varAssignNode->expression->implicitCastTo)
+                std::cout << varAssignNode->implicitCastTo->toString() << std::endl;
             return varAssignNode->inferredType;
         }
 
@@ -196,7 +200,7 @@ static bool checkIntLimits(const std::string& type, int value) {
 }
 
 // Второй проход: кастим и валидируем (для не-auto)
-static void castAndValidate(const std::shared_ptr<ASTNode>& node, const std::string& targetType, TypeSymbolVisitor* visitor) {
+void TypeSymbolVisitor::castAndValidate(const std::shared_ptr<ASTNode>& node, const std::string& targetType, TypeSymbolVisitor* visitor) {
     if (!node) return;
     if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
         int value = num->value;
@@ -220,9 +224,11 @@ static void castAndValidate(const std::shared_ptr<ASTNode>& node, const std::str
     if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
         castAndValidate(bin->left, targetType, visitor);
         castAndValidate(bin->right, targetType, visitor);
+        bin->inferredType = std::make_shared<SimpleTypeNode>(targetType);
     }
     if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
         castAndValidate(unary->operand, targetType, visitor);
+        unary->inferredType = std::make_shared<SimpleTypeNode>(targetType);
     }
 }
 
@@ -250,6 +256,11 @@ static void findMaxRank(const std::shared_ptr<ASTNode>& node, int& maxRank) {
     if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
         findMaxRank(unary->operand, maxRank);
     }
+    if (auto call = std::dynamic_pointer_cast<CallNode>(node)) {
+        for (const auto& arg : call->arguments) {
+            findMaxRank(arg, maxRank);
+        }
+    }
 }
 
 
@@ -266,7 +277,8 @@ void TypeSymbolVisitor::castNumbersInBinaryTree(std::shared_ptr<ASTNode> node, c
             LogError("Cannot deduce type for auto");
             return;
         }
-        castAllNumbersToType(node, targetType); // <--- вот это ключевой вызов!
+
+        castAllNumbersToType(node, targetType); 
     } else {
         // Мы не проверим i1 в другом месте
         if (expectedType == "i1")

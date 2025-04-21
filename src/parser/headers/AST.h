@@ -230,6 +230,7 @@ class ForNode : public ASTNode {
         ForNode(const std::string& varName, std::shared_ptr<ASTNode> iterable, std::shared_ptr<BlockNode> body) 
             : varName(varName), iterable(iterable), body(body) {}
         std::string varName;
+        std::shared_ptr<TypeNode> varType; // TODO: <-- чек хуету
         std::shared_ptr<ASTNode> iterable;
         std::shared_ptr<BlockNode> body;
 

@@ -222,6 +222,14 @@ void TypeSymbolVisitor::handleCompareOperator(std::shared_ptr<BinaryOpNode>& nod
 
     // string
     if (left == "string" || right == "string") {
+        if (left != "string") {
+            node->left = std::make_shared<CallNode>("toString", std::vector{node->left});
+            node->left->accept(*this);
+        }
+        if (right != "string") {
+            node->right = std::make_shared<CallNode>("toString", std::vector{node->right});
+            node->right->accept(*this);
+        }
         node = std::make_shared<BinaryOpNode>(node->left, "strcmp_" + cmpOp, node->right);
         node->inferredType = registry.findType("i1");
         return;

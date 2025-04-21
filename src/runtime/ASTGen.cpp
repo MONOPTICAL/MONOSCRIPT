@@ -79,7 +79,7 @@ void ASTGen::visit(VariableAssignNode& node) {
     }
     
     // Получаем тип переменной
-    llvm::Type* varType = context.getLLVMType(node.type);
+    llvm::Type* varType = context.getLLVMType(node.inferredType);
 
     LogWarning("Тип переменной " + node.name + " : " + node.type->toString());
     if (!varType) {
@@ -208,14 +208,14 @@ void ASTGen::visit(CallNode& node) {
                 // --- Конец замены ---
 
                 formatStringValue = "[Неподдерживаемый тип: " + rso.str() + "]"; // Добавим тип в сообщение
-                valueToPrint = context.Builder.CreateGlobalStringPtr(formatStringValue, "unsupported_str");
+                valueToPrint = context.Builder.CreateGlobalString(formatStringValue, "unsupported_str");
                 formatStringValue = "%s";
             }
 
             formatStringValue += "\n";
 
             // 4. Создаем глобальную строку для формата
-            llvm::Constant* formatString = context.Builder.CreateGlobalStringPtr(formatStringValue, "fmt");
+            llvm::Constant* formatString = context.Builder.CreateGlobalString(formatStringValue, "fmt");
 
             // 5. Генерируем вызов printf
             std::vector<llvm::Value*> printfArgs = {formatString, valueToPrint};
@@ -290,12 +290,7 @@ void ASTGen::visit(FloatNumberNode& node) {
 
 void ASTGen::visit(StringNode& node) {
     LogWarning("visit для StringNode: \"" + node.value + "\"");
-    result = context.Builder.CreateGlobalStringPtr(node.value, "str");
-}
-
-void ASTGen::visit(BooleanNode& node) {
-    LogWarning("visit для BooleanNode: " + std::string(node.value ? "true" : "false"));
-    result = llvm::ConstantInt::get(context.TheContext, llvm::APInt(1, node.value ? 1 : 0));
+    result = context.Builder.CreateGlobalString(node.value, "str");
 }
 
 void ASTGen::visit(NullNode& node) {
@@ -328,7 +323,14 @@ void ASTGen::visit(AccessExpression& node) {
     result = nullptr;
 }
 
-void ASTGen::visit(ClassNode& node) {
-    LogWarning("visit не реализован для ClassNode: " + node.name);
+void ASTGen::visit(ImportNode &node)
+{
+    LogWarning("visit не реализован для ImportNode");
+    result = nullptr;
+}
+
+void ASTGen::visit(LambdaNode &node)
+{
+    LogWarning("visit не реализован для LambdaNode");
     result = nullptr;
 }
