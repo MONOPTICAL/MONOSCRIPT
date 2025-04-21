@@ -4,6 +4,21 @@
 #include "linker/headers/Linker.h"
 #include "visitors/headers/TypeSymbolVisitor.h"
 #include "includes/ASTDebugger.hpp"
+#include "runtime/headers/CodeGenContext.h" 
+#include "runtime/headers/ASTVisitors.h"
+#include <llvm/IR/Module.h>         // Для llvm::Module
+#include <llvm/Support/raw_ostream.h> // Для llvm::outs()
+#include <llvm/IRReader/IRReader.h> // Для parseIR
+#include <llvm/Support/MemoryBuffer.h> // Для MemoryBuffer
+#include <llvm/Support/SourceMgr.h> // Для SMDiagnostic
+// For Execution
+// ----------------------------------------------
+#include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/ExecutionEngine/Orc/LLJIT.h>
+#include <llvm/ExecutionEngine/GenericValue.h>
+#include <llvm/Support/TargetSelect.h>
+// ----------------------------------------------
+#include <llvm/Support/Error.h> // Для ExitOnError
 #include <fstream>
 #include <iostream>
 #include <filesystem>
@@ -18,6 +33,66 @@ void printHelp(const char* programName) {
               << "  --ast            Показать AST\n"
               << "\nЕсли ФАЙЛ не указан, ввод читается со стандартного ввода.\n"
               << std::endl;
+}
+
+int executeModule(llvm::Module* module) {
+    llvm::InitializeNativeTarget();
+    llvm::InitializeNativeTargetAsmPrinter();
+    llvm::InitializeNativeTargetAsmParser();
+
+    llvm::ExitOnError ExitOnErr;
+    ExitOnErr.setBanner("Error JIT: ");
+
+    // JIT
+    auto JIT = ExitOnErr(llvm::orc::LLJITBuilder().create());
+
+    auto& jitDylib = JIT->getMainJITDylib();
+    jitDylib.addGenerator(
+        cantFail(llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
+            JIT->getDataLayout().getGlobalPrefix()))
+    );
+
+    // --- Клонирование модуля ---
+    auto Ctx = std::make_unique<llvm::LLVMContext>();
+    std::unique_ptr<llvm::Module> ClonedModule;
+
+    { // Ограничиваем область видимости буфера и потока
+        llvm::SmallString<0> IRBuffer;
+        llvm::raw_svector_ostream OS(IRBuffer);
+        module->print(OS, nullptr); // Сериализуем оригинальный модуль в буфер
+
+        llvm::SMDiagnostic Err;
+        ClonedModule = llvm::parseIR(
+            *llvm::MemoryBuffer::getMemBuffer(IRBuffer.str()), // Создаем MemoryBuffer из строки
+            Err,
+            *Ctx // Используем новый контекст для клонированного модуля
+        );
+
+        if (!ClonedModule) {
+            std::cerr << "Ошибка при клонировании модуля для JIT: ";
+            Err.print("executeModule", llvm::errs());
+            return 1;
+        }
+    }
+    // --- Конец клонирования ---
+
+
+    // ThreadSafeModule и добавляем в JIT
+    llvm::orc::ThreadSafeModule TSM(std::move(ClonedModule), std::move(Ctx));
+    ExitOnErr(JIT->addIRModule(std::move(TSM)));
+
+    // main
+    auto MainSymbol = ExitOnErr(JIT->lookup("main"));
+
+    // int(*)()
+    auto MainFn = MainSymbol.toPtr<int(*)()>();
+
+    // Вызываем функцию
+    std::cout << "Выполнение функции main()...\n";
+    int Result = MainFn();
+    std::cout << "Функция main() завершена.\n";
+
+    return Result;
 }
 
 int main(int argc, char* argv[]) {

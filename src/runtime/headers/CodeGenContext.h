@@ -30,12 +30,12 @@ public:
 
     llvm::Constant*                     getNoneValue() 
     {
-        return llvm::ConstantPointerNull::get(llvm::Type::getInt8Ty(TheContext)->getPointerTo());
+        return llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(TheContext), 0));
     }
 
     llvm::Constant*                     getNullValue() 
     {
-        return llvm::ConstantPointerNull::get(llvm::Type::getInt8Ty(TheContext)->getPointerTo());
+        return llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(TheContext), 0));
     }
 
     CodeGenContext(const std::string& moduleName = "ms_module") : Builder(TheContext) {
