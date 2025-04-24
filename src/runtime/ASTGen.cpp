@@ -49,6 +49,67 @@ void ASTGen::visit(ProgramNode& node) {
 
 void ASTGen::visit(FunctionNode& node) {
     LogWarning("visit не полностью реализован для FunctionNode: " + node.name);
+
+    // Сохраняем текущую точку вставки
+    llvm::BasicBlock* currentBlock = nullptr;
+    llvm::Function* currentFunction = nullptr;
+    if (context.Builder.GetInsertBlock()) {
+        currentBlock = context.Builder.GetInsertBlock();
+        currentFunction = currentBlock->getParent();
+    }
+
+    // Создаем минимальную заглушку функции
+    std::vector<llvm::Type*> paramTypes;
+    for (auto& param : node.parameters) {
+        paramTypes.push_back(context.getLLVMType(param.first));
+    }
+    
+    llvm::Type* returnLLVMType = llvm::Type::getVoidTy(context.TheContext);
+    if (node.returnType) {
+        returnLLVMType = context.getLLVMType(node.returnType);
+    }
+    
+    llvm::FunctionType* funcType = llvm::FunctionType::get(returnLLVMType, paramTypes, false);
+    llvm::Function* func = llvm::Function::Create(
+        funcType, llvm::Function::ExternalLinkage, node.name, context.TheModule.get());
+    
+    // Создаем блок входа в функцию
+    llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(
+        context.TheContext, "entry", func);
+    context.Builder.SetInsertPoint(entryBlock);
+    
+    // Сохраняем старую таблицу символов и создаем новую
+    auto oldNamedValues = context.NamedValues;
+    context.NamedValues.clear();
+    
+    // Обрабатываем параметры функции
+    unsigned idx = 0;
+    for (auto &arg : func->args()) {
+        arg.setName(node.parameters[idx++].second);
+    }
+    
+    // Генерируем тело функции, если оно есть
+    if (node.body) {
+        node.body->accept(*this);
+    }
+    
+    // Добавляем return, если его нет
+    if (!entryBlock->getTerminator()) {
+        if (returnLLVMType->isVoidTy()) {
+            context.Builder.CreateRetVoid();
+        } else {
+            context.Builder.CreateRet(llvm::Constant::getNullValue(returnLLVMType));
+        }
+    }
+
+    if (currentBlock) {
+        context.Builder.SetInsertPoint(currentBlock);
+    }
+    
+    // Восстанавливаем старую таблицу символов
+    context.NamedValues = oldNamedValues;
+    
+    result = func;
 }
 
 void ASTGen::visit(StructNode& node) {
