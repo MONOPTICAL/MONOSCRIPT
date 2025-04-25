@@ -1,145 +1,38 @@
 #include "headers/BuiltIn.h"
-
-void registerBuiltInFunctions(Registry& registry) 
+#include "../includes/toml.hpp" // путь к toml11
+#include <iostream>
+void registerBuiltInFunctions(Registry& registry, const std::string& tomlPath) 
 {
-    /*
-        Встроенные функции:
+    const auto data = toml::parse(tomlPath);
+    if (!data.contains("function")) return;
 
-        echo(string|i32|i64|float|bool|null|none ...) -> void
-            - Выводит значения на экран.
+    const auto& functions = toml::find(data, "function").as_array();
+    for (const auto& func : functions) {
+        const auto& name = toml::find<std::string>(func, "name");
+        const auto& retStr = toml::find<std::string>(func, "ret");
+        const auto& argsArr = toml::find<std::vector<std::string>>(func, "args");
 
-        len(string|array|map) -> i32
-            - Возвращает длину строки, массива или карты.
+        // Создаём список аргументов с именами arg1, arg2, ...
+        std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> args;
+        for (size_t i = 0; i < argsArr.size(); ++i) {
+            args.emplace_back(
+                std::make_shared<SimpleTypeNode>(argsArr[i]),
+                "arg" + std::to_string(i + 1)
+            );
+        }
 
-        exit(i32 code) -> void
-            - Завершает выполнение программы с указанным кодом.
-
-        assert(bool condition) -> void
-            - Прерывает выполнение программы, если условие ложно.
-    */
-
-    registry.addBuiltinFunction(
-        "echo",                                                                             // Имя функции
-        std::make_shared<FunctionNode>(
-            "echo",                                                                         // Имя функции
-            "",                                                                             // Ассоциированное имя
-            std::make_shared<SimpleTypeNode>("void"),                                       // Тип возвращаемого значения
-            std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>>
-            {
-                std::make_pair(std::make_shared<SimpleTypeNode>("string"), "arg1"),         
-                std::make_pair(std::make_shared<SimpleTypeNode>("i32"), "arg2"),
-                std::make_pair(std::make_shared<SimpleTypeNode>("i64"), "arg3"),
-                std::make_pair(std::make_shared<SimpleTypeNode>("float"), "arg4"),
-                std::make_pair(std::make_shared<SimpleTypeNode>("bool"), "arg5"),
-                std::make_pair(std::make_shared<SimpleTypeNode>("null"), "arg6"),
-                std::make_pair(std::make_shared<SimpleTypeNode>("none"), "arg7")
-            },                                                                              // Все возможные аргументы                                  
-            nullptr                                                                         // Тело функции
-        )
-    );
-
-    registry.addBuiltinFunction(
-        "len",                                                                              // Имя функции
-        std::make_shared<FunctionNode>(
-            "len",                                                                          // Имя функции                                        
-            "",                                                                             // Ассоциированное имя                                  
-            std::make_shared<SimpleTypeNode>("i32"),                                        // Тип возвращаемого значения
-            std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>>
-            {
-                std::make_pair(std::make_shared<SimpleTypeNode>("string"), "arg1"),
-                std::make_pair(std::make_shared<SimpleTypeNode>("array"), "arg2"),              // Даже если там параметры, то все равно baseType является SimpleTypeNode.array
-                std::make_pair(std::make_shared<SimpleTypeNode>("map"), "arg3")                 // Даже если там параметры, то все равно baseType является SimpleTypeNode.map
-            
-            },                                                                              // Все возможные аргументы      
-            nullptr                                                                         // Тело функции 
-        )
-    );
-
-    registry.addBuiltinFunction(
-        "exit",                                                                             // Имя функции
-        std::make_shared<FunctionNode>(
-            "exit", 
-            "", 
-            std::make_shared<SimpleTypeNode>("void"),                                       // Тип возвращаемого значения
-            std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>>
-            {
-                std::make_pair(std::make_shared<SimpleTypeNode>("i32"), "arg1")             // Код завершения
-
-            },                                                                              // Все возможные аргументы
-
-            nullptr                                                                         // Тело функции
-        )
-    );
-    
-    registry.addBuiltinFunction(
-        "assert",                                                                           // Имя функции
-        std::make_shared<FunctionNode>(
-            "assert", 
-            "", 
-            std::make_shared<SimpleTypeNode>("void"),                                       // Тип возвращаемого значения
-            std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>>
-            {
-                std::make_pair(std::make_shared<SimpleTypeNode>("bool"), "arg1")       // Условие
-            },                                                                              // Все возможные аргументы
-
-            nullptr                                                                         // Тело функции
-        )
-    );
-
-    // Cast функции
-    registry.addBuiltinFunction(
-        "toString",                                                                         // Имя функции
-        std::make_shared<FunctionNode>(
-            "toString", 
-            "", 
-            std::make_shared<SimpleTypeNode>("string"),                                      // Тип возвращаемого значения
-            std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>>
-            {
-                std::make_pair(std::make_shared<SimpleTypeNode>("i32"), "arg1"),
-                std::make_pair(std::make_shared<SimpleTypeNode>("i64"), "arg2"),
-                std::make_pair(std::make_shared<SimpleTypeNode>("float"), "arg3"),
-                std::make_pair(std::make_shared<SimpleTypeNode>("bool"), "arg4"),
-                std::make_pair(std::make_shared<SimpleTypeNode>("null"), "arg5"),
-                std::make_pair(std::make_shared<SimpleTypeNode>("none"), "arg6")
-            },                                                                              // Все возможные аргументы
-
-            nullptr                                                                         // Тело функции
-        )
-    );
-
-    registry.addBuiltinFunction(
-        "toInt",                                                                           // Имя функции
-        std::make_shared<FunctionNode>(
-            "toInt", 
-            "", 
-            std::make_shared<SimpleTypeNode>("i32"),                                        // Тип возвращаемого значения
-            std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>>
-            {
-                std::make_pair(std::make_shared<SimpleTypeNode>("string"), "arg1"),
-                std::make_pair(std::make_shared<SimpleTypeNode>("float"), "arg2")
-            },                                                                              // Все возможные аргументы
-
-            nullptr                                                                         // Тело функции
-        )
-    );
-
-    registry.addBuiltinFunction(
-        "toFloat",                                                                          // Имя функции
-        std::make_shared<FunctionNode>(
-            "toFloat", 
-            "", 
-            std::make_shared<SimpleTypeNode>("float"),                                       // Тип возвращаемого значения
-            std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>>
-            {
-                std::make_pair(std::make_shared<SimpleTypeNode>("string"), "arg1"),
-                std::make_pair(std::make_shared<SimpleTypeNode>("i32"), "arg2"),
-                std::make_pair(std::make_shared<SimpleTypeNode>("i64"), "arg3")
-            },                                                                              // Все возможные аргументы
-
-            nullptr                                                                         // Тело функции
-        )
-    );
-
+        registry.addBuiltinFunction(
+            name,
+            std::make_shared<FunctionNode>(
+                name,
+                "",
+                std::make_shared<SimpleTypeNode>(retStr),
+                args,
+                nullptr
+            )
+        );
+        std::cout << "Добавлена встроенная функция: " << name << std::endl;
+    }
 }
 
 void registerBuiltInTypes(Registry& registry) 

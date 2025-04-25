@@ -461,20 +461,12 @@ void TypeSymbolVisitor::visit(ContinueNode& node) {
 }
 
 void TypeSymbolVisitor::visit(CallNode& node) {
-
-    bool builtin = false;
-    std::shared_ptr<FunctionNode> builtInFunc = nullptr;
-
     // Проверяем, существует ли функция в реестре
     if (contexts.back().functions.find(node.callee) == contexts.back().functions.end()) {
         if (registry.findFunction(node.callee) == nullptr) 
             LogError("Function not found: " + node.callee);
         else
-        {
             contexts.back().functions[node.callee] = registry.findFunction(node.callee);
-            builtin = true;
-            builtInFunc = std::dynamic_pointer_cast<FunctionNode>(contexts.back().functions[node.callee]);
-        }
     }
 
     // Проверяем типы аргументов
@@ -482,11 +474,6 @@ void TypeSymbolVisitor::visit(CallNode& node) {
     std::vector<std::shared_ptr<TypeNode>> argTypes;
     for (size_t i = 0; i < node.arguments.size(); ++i) {
         node.arguments[i]->accept(*this);
-        if (!builtin)
-            if (std::dynamic_pointer_cast<BinaryOpNode>(node.arguments[i]) || std::dynamic_pointer_cast<UnaryOpNode>(node.arguments[i]))
-                castNumbersInBinaryTree(node.arguments[i], func->parameters[i].first->toString());
-            else
-                castAndValidate(node.arguments[i], func->parameters[i].first->toString(), this);
 
         if (node.arguments[i]->implicitCastTo)
             argTypes.push_back(node.arguments[i]->implicitCastTo);
@@ -494,31 +481,18 @@ void TypeSymbolVisitor::visit(CallNode& node) {
             argTypes.push_back(node.arguments[i]->inferredType);
     }
 
-    if (!builtin) {
-
-        // Проверяем количество аргументов
-        if (argTypes.size() != func->parameters.size()) {
-            LogError("Function " + node.callee + " expects " + std::to_string(func->parameters.size()) + " arguments, got " + std::to_string(argTypes.size()));
-        }
-
-        // Проверяем типы аргументов
-        for (size_t i = 0; i < argTypes.size(); ++i) {
-            if (argTypes[i]->toString() != func->parameters[i].first->toString()) {
-                LogError("Type mismatch in function " + node.callee + ": expected " + func->parameters[i].first->toString() + ", got " + argTypes[i]->toString());
-            }
-        }
+    // Проверяем количество аргументов
+    if (argTypes.size() != func->parameters.size()) {
+        LogError("Function " + node.callee + " expects " + std::to_string(func->parameters.size()) + " arguments, got " + std::to_string(argTypes.size()));
     }
-    else {
-        bool isValid = false;
-        for (const auto& param : builtInFunc->parameters) {
-            if (param.first->toString() == argTypes[0]->toString()) {
-                isValid = true;
-                break;
-            }
-        }
 
-        if (!isValid) {
-            LogError("Type mismatch in function " + node.callee + ": expected " + builtInFunc->parameters[0].first->toString() + ", got " + argTypes[0]->toString());
+    // Проверяем типы аргументов
+    for (size_t i = 0; i < argTypes.size(); ++i) {
+        std::string argType = argTypes[i]->toString();
+        std::string paramType = func->parameters[i].first->toString();
+
+        if (argType != paramType) {
+            LogError("Type mismatch in function " + node.callee + ": expected " + func->parameters[i].first->toString() + ", got " + argTypes[i]->toString());
         }
     }
 

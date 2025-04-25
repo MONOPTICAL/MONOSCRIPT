@@ -102,7 +102,7 @@ public:
                                                                         registerBuiltInTypes(registry);
 
                                                                         // Инициализация встроенных функций
-                                                                        registerBuiltInFunctions(registry);
+                                                                        registerBuiltInFunctions(registry, STDLIB_TOML_PATH);
                                                                     };
 
     void                                                            debugContexts();
