@@ -24,7 +24,7 @@ public:
 
     llvm::Function*                     getOrDeclareFunction(const std::string& name, llvm::FunctionType* type);
 
-    llvm::Type*                         getLLVMType(std::shared_ptr<TypeNode> typeNode);
+    static llvm::Type*                  getLLVMType(std::shared_ptr<TypeNode> typeNode, llvm::LLVMContext& ctx);
 
     std::shared_ptr<TypeNode>           getTypeByASTNode(std::shared_ptr<ASTNode> node);
 

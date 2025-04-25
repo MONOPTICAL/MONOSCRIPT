@@ -13,7 +13,7 @@ namespace Declarations
             codeGen.LogWarning("Не удалось сгенерировать код для выражения " + node.name);
             return nullptr;
         }
-        
+
         // Проверяем совместимость типов и выполняем преобразование при необходимости
         if (value->getType() != varType) {
             codeGen.LogWarning("Тип значения не совпадает с типом переменной " + node.name);
@@ -71,7 +71,7 @@ namespace Declarations
             codeGen.LogWarning("Переменная " + node.name + " является массивом но динамический инициализированый");
             auto TypeNode = std::make_shared<GenericTypeNode>("array");
             TypeNode->typeParameters.push_back(context.getTypeByASTNode(blockExpr->statements[0]));
-            varType = context.getLLVMType(TypeNode);
+            varType = context.getLLVMType(TypeNode, context.TheContext);
             if (!varType) {
                 codeGen.LogWarning("Не удалось получить тип для массива " + node.name);
                 return nullptr;
@@ -193,7 +193,7 @@ namespace Declarations
         {
             // Если тип указатель, то получаем тип элемента и меняем тип переменной
             auto typeOfTheValue = context.getTypeByASTNode(node.expression);
-            varType = context.getLLVMType(typeOfTheValue);
+            varType = context.getLLVMType(typeOfTheValue, context.TheContext);
         }
         
 

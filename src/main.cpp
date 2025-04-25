@@ -24,6 +24,7 @@
 #include <filesystem>
 #include <string>
 #include <vector>
+#include <dlfcn.h> // Для dlopen
 
 void printHelp(const char* programName) {
     std::cout << "Использование: " << programName << " [ОПЦИИ] [ФАЙЛ]\n\n"
@@ -42,6 +43,12 @@ int executeModule(llvm::Module* module) {
 
     llvm::ExitOnError ExitOnErr;
     ExitOnErr.setBanner("Error JIT: ");
+
+    void* handle = dlopen(STDLIB_SO_PATH, RTLD_NOW | RTLD_GLOBAL);
+    if (!handle) {
+        std::cerr << "Ошибка загрузки libm_std.so: " << dlerror() << std::endl;
+        return 1;
+    }
 
     // JIT
     auto JIT = ExitOnErr(llvm::orc::LLJITBuilder().create());

@@ -16,6 +16,23 @@ message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 # Врубаем определения LLVM чтобы билдил нормально
 add_definitions(${LLVM_DEFINITIONS})
 
+  # СТАНДАРНАЯ БИБЛИОТЕКА
+  # ----------------------
+  file(GLOB D_SOURCES "${CMAKE_SOURCE_DIR}/mono/*.d") # Получаем все .d файлы в папке std
+  set(D_LIB ${CMAKE_BINARY_DIR}/libm_std.so) # Путь к .so библиотеке
+
+  # Создаём .so библиотеку из .d файлов
+  add_custom_command(
+      OUTPUT ${D_LIB}
+      COMMAND dmd -shared -fPIC -of=${D_LIB} ${D_SOURCES}
+      DEPENDS ${D_SOURCES}
+      COMMENT "Building D shared library: ${D_LIB}"
+  )
+  add_custom_target(build_dlib ALL DEPENDS ${D_LIB}) # Создаём цель для сборки библиотеки
+  add_definitions(-DSTDLIB_SO_PATH="${D_LIB}") # Путь к .so библиотеке
+  add_definitions(-DSTDLIB_TOML_PATH="${CMAKE_SOURCE_DIR}/mono/mono.toml") # Путь к toml файлу
+  # ----------------------
+
 # Добавить пути к заголовочным файлам LLVM
 include_directories(${LLVM_INCLUDE_DIRS})
 
@@ -73,5 +90,8 @@ add_executable(ms # Create an executable target named ms
     src/runtime/codegen/Arrays.cpp
     src/runtime/codegen/Statements.cpp
 )
+
+# Добавляем библиотеку D
+add_dependencies(ms build_dlib) 
 
 target_link_libraries(ms PRIVATE ${llvm_libs})
