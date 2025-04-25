@@ -4,7 +4,7 @@
 #include "../../parser/headers/AST.h"
 #include "Register.h"
 
-void registerBuiltInFunctions(Registry& registry);
+void registerBuiltInFunctions(Registry& registry, const std::string& tomlPath);
 void registerBuiltInTypes(Registry& registry);
 
 

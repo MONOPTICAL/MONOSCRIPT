@@ -1,0 +1,19 @@
+[[function]]
+name = "sum"
+ret = "i32"
+args = []
+
+[[function]]
+name = "concat"
+ret = "string"
+args = ["string", "string"]
+
+[[function]]
+name = "echo"
+ret = "void"
+args = ["string"]
+
+[[function]]
+name = "test"
+ret = "void"
+args = ["i1"]
