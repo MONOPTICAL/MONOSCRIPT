@@ -9,20 +9,20 @@ llvm::Function* CodeGenContext::getOrDeclareFunction(const std::string& name, ll
     return func;
 }
 
-llvm::Type* CodeGenContext::getLLVMType(std::shared_ptr<TypeNode> typeNode) {
+llvm::Type* CodeGenContext::getLLVMType(std::shared_ptr<TypeNode> typeNode, llvm::LLVMContext& ctx) {
     // TODO: Реализовать маппинг всех типов
 
     if (auto simpleType = std::dynamic_pointer_cast<SimpleTypeNode>(typeNode)) {
-        if (simpleType->name == "i1") return llvm::Type::getInt1Ty(TheContext);
-        if (simpleType->name == "i8") return llvm::Type::getInt8Ty(TheContext);
-        if (simpleType->name == "i16") return llvm::Type::getInt16Ty(TheContext);
-        if (simpleType->name == "i32") return llvm::Type::getInt32Ty(TheContext);
-        if (simpleType->name == "i64") return llvm::Type::getInt64Ty(TheContext);
-        if (simpleType->name == "float") return llvm::Type::getFloatTy(TheContext);
-        if (simpleType->name == "string") return llvm::PointerType::get(llvm::Type::getInt8Ty(TheContext), 0); // Строки как char*
-        if (simpleType->name == "void") return llvm::Type::getVoidTy(TheContext);
-        if (simpleType->name == "null") return llvm::PointerType::get(llvm::Type::getInt8Ty(TheContext), 0); // null как указатель на i8
-        if (simpleType->name == "auto") return llvm::PointerType::get(llvm::Type::getInt8Ty(TheContext), 0); // auto как указатель на i8
+        if (simpleType->name == "i1") return llvm::Type::getInt1Ty(ctx);
+        if (simpleType->name == "i8") return llvm::Type::getInt8Ty(ctx);
+        if (simpleType->name == "i16") return llvm::Type::getInt16Ty(ctx);
+        if (simpleType->name == "i32") return llvm::Type::getInt32Ty(ctx);
+        if (simpleType->name == "i64") return llvm::Type::getInt64Ty(ctx);
+        if (simpleType->name == "float") return llvm::Type::getFloatTy(ctx);
+        if (simpleType->name == "string") return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0); // Строки как char*
+        if (simpleType->name == "void") return llvm::Type::getVoidTy(ctx);
+        if (simpleType->name == "null") return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0); // null как указатель на i8
+        if (simpleType->name == "auto") return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0); // auto как указатель на i8
     }
     else if (auto genericType = std::dynamic_pointer_cast<GenericTypeNode>(typeNode)) {
         // Обработка параметризованных типов (generic)
@@ -30,20 +30,20 @@ llvm::Type* CodeGenContext::getLLVMType(std::shared_ptr<TypeNode> typeNode) {
         if (genericType->baseName == "array") {
             // array<i32>
             if (genericType->typeParameters.size() == 1) {
-                llvm::Type* elementType = getLLVMType(genericType->typeParameters[0]);
+                llvm::Type* elementType = getLLVMType(genericType->typeParameters[0], ctx);
                 return llvm::ArrayType::get(elementType, 0); // 0 - размер массива, меняется в процессе синтеза IR
             }
         }
         else if (genericType->baseName == "map") {
             // map<string, i32>
             if (genericType->typeParameters.size() == 2) {
-                llvm::Type* keyType = getLLVMType(genericType->typeParameters[0]);
-                llvm::Type* valueType = getLLVMType(genericType->typeParameters[1]);
+                llvm::Type* keyType = getLLVMType(genericType->typeParameters[0], ctx);
+                llvm::Type* valueType = getLLVMType(genericType->typeParameters[1], ctx);
             }
         }
     }
     // TODO: Добавить обработку ошибок для неизвестных типов(например, если это класс который ранее был объявлен)
-    return llvm::PointerType::getUnqual(TheContext);
+    return llvm::PointerType::getUnqual(ctx);
 }
 
 std::shared_ptr<TypeNode> CodeGenContext::getTypeByASTNode(std::shared_ptr<ASTNode> node) {

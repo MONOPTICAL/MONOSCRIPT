@@ -9,7 +9,7 @@
 #include <string>
 #include <string_view>
 #include <vector>                   // <<< Добавлено для std::vector
-
+#include "headers/TOMLstd.h" // <<< Добавлено для TOML
 
 // Конструктор
 ASTGen::ASTGen(CodeGenContext& context) : context(context), result(nullptr) {}
@@ -49,6 +49,67 @@ void ASTGen::visit(ProgramNode& node) {
 
 void ASTGen::visit(FunctionNode& node) {
     LogWarning("visit не полностью реализован для FunctionNode: " + node.name);
+
+    // Сохраняем текущую точку вставки
+    llvm::BasicBlock* currentBlock = nullptr;
+    llvm::Function* currentFunction = nullptr;
+    if (context.Builder.GetInsertBlock()) {
+        currentBlock = context.Builder.GetInsertBlock();
+        currentFunction = currentBlock->getParent();
+    }
+
+    // Создаем минимальную заглушку функции
+    std::vector<llvm::Type*> paramTypes;
+    for (auto& param : node.parameters) {
+        paramTypes.push_back(context.getLLVMType(param.first, context.TheContext));
+    }
+    
+    llvm::Type* returnLLVMType = llvm::Type::getVoidTy(context.TheContext);
+    if (node.returnType) {
+        returnLLVMType = context.getLLVMType(node.returnType, context.TheContext);
+    }
+    
+    llvm::FunctionType* funcType = llvm::FunctionType::get(returnLLVMType, paramTypes, false);
+    llvm::Function* func = llvm::Function::Create(
+        funcType, llvm::Function::ExternalLinkage, node.name, context.TheModule.get());
+    
+    // Создаем блок входа в функцию
+    llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(
+        context.TheContext, "entry", func);
+    context.Builder.SetInsertPoint(entryBlock);
+    
+    // Сохраняем старую таблицу символов и создаем новую
+    auto oldNamedValues = context.NamedValues;
+    context.NamedValues.clear();
+    
+    // Обрабатываем параметры функции
+    unsigned idx = 0;
+    for (auto &arg : func->args()) {
+        arg.setName(node.parameters[idx++].second);
+    }
+    
+    // Генерируем тело функции, если оно есть
+    if (node.body) {
+        node.body->accept(*this);
+    }
+    
+    // Добавляем return, если его нет
+    if (!entryBlock->getTerminator()) {
+        if (returnLLVMType->isVoidTy()) {
+            context.Builder.CreateRetVoid();
+        } else {
+            context.Builder.CreateRet(llvm::Constant::getNullValue(returnLLVMType));
+        }
+    }
+
+    if (currentBlock) {
+        context.Builder.SetInsertPoint(currentBlock);
+    }
+    
+    // Восстанавливаем старую таблицу символов
+    context.NamedValues = oldNamedValues;
+    
+    result = func;
 }
 
 void ASTGen::visit(StructNode& node) {
@@ -79,7 +140,13 @@ void ASTGen::visit(VariableAssignNode& node) {
     }
     
     // Получаем тип переменной
-    llvm::Type* varType = context.getLLVMType(node.inferredType);
+    llvm::Type* varType;
+
+    if (node.inferredType) 
+        varType = context.getLLVMType(node.inferredType, context.TheContext);
+    else 
+        varType = context.getLLVMType(node.type, context.TheContext);
+    
 
     LogWarning("Тип переменной " + node.name + " : " + node.type->toString());
     if (!varType) {
@@ -137,123 +204,65 @@ void ASTGen::visit(ReturnNode& node) {
 }
 
 void ASTGen::visit(CallNode& node) {
-    // --- Специальная обработка для встроенной функции echo ---
-    if (node.callee == "echo") {
-        LogWarning("visit для CallNode (echo)");
-
-        // 1. Получаем или объявляем функцию printf
-        llvm::FunctionType* printfType = llvm::FunctionType::get(
-            llvm::Type::getInt32Ty(context.TheContext),
-            {llvm::PointerType::get(llvm::Type::getInt8Ty(context.TheContext), 0)}, // Теперь должно работать с правильными include
-            true
-        );
-        llvm::FunctionCallee printfFunc = context.TheModule->getOrInsertFunction("printf", printfType);
-
-        // 2. Обрабатываем каждый аргумент для echo
-        for (const auto& argNode : node.arguments) {
-            if (!argNode) continue;
-
-            argNode->accept(*this);
-            llvm::Value* argValue = getResult();
-
-            if (!argValue) {
-                LogWarning("Не удалось сгенерировать значение для аргумента echo");
-                continue;
-            }
-
-            llvm::Type* argType = argValue->getType();
-            std::string formatStringValue;
-            llvm::Value* valueToPrint = argValue;
-
-            // 3. Определяем форматную строку и подготавливаем значение
-            if (argType->isIntegerTy(32)) {
-                formatStringValue = "%d";
-            } else if (argType->isIntegerTy(64)) {
-                formatStringValue = "%lld";
-            } else if (argType->isFloatTy()) {
-                formatStringValue = "%f";
-                valueToPrint = context.Builder.CreateFPExt(argValue, llvm::Type::getDoubleTy(context.TheContext), "fpext");
-            } else if (argType->isDoubleTy()) {
-                 formatStringValue = "%f";
-            } else if (argType->isIntegerTy(1)) {
-                formatStringValue = "%d";
-                valueToPrint = context.Builder.CreateZExt(argValue, llvm::Type::getInt32Ty(context.TheContext), "zext");
-            } else if (argType->isPointerTy()) {
-                // В LLVM 17+ мы не можем узнать тип элемента указателя!
-                // Поэтому: если это строка (i8*), мы знаем это только по логике генерации!
-                // Попробуем определить по имени переменной или другим признакам, иначе печатаем адрес
-            
-                // Если вы точно знаете, что это строка (например, результат visit(StringNode)), используйте %s:
-                if (llvm::isa<llvm::ConstantExpr>(argValue) || llvm::isa<llvm::Constant>(argValue)) {
-                    formatStringValue = "%s";
-                } else {
-                    // Для всех остальных указателей — только адрес
-                    formatStringValue = "%p";
-                    valueToPrint = context.Builder.CreateBitCast(
-                        argValue,
-                        llvm::PointerType::get(llvm::Type::getInt8Ty(context.TheContext), 0),
-                        "ptr_cast"
-                    );
-                }
-            } else {
-                // --- Замена context.typeToString ---
-                std::string typeStr;
-                llvm::raw_string_ostream rso(typeStr);
-                if (argType) {
-                    argType->print(rso);
-                } else {
-                    rso << "<null type>";
-                }
-                LogWarning("Неподдерживаемый тип для echo: " + rso.str()); // Используем rso.str()
-                // --- Конец замены ---
-
-                formatStringValue = "[Неподдерживаемый тип: " + rso.str() + "]"; // Добавим тип в сообщение
-                valueToPrint = context.Builder.CreateGlobalString(formatStringValue, "unsupported_str");
-                formatStringValue = "%s";
-            }
-
-            formatStringValue += "\n";
-
-            // 4. Создаем глобальную строку для формата
-            llvm::Constant* formatString = context.Builder.CreateGlobalString(formatStringValue, "fmt");
-
-            // 5. Генерируем вызов printf
-            std::vector<llvm::Value*> printfArgs = {formatString, valueToPrint};
-            context.Builder.CreateCall(printfFunc, printfArgs, "printfCall");
-        }
+    llvm::Function* calleeFunc = declareFunctionFromTOML(node.callee, context.TheModule.get(), context.TheContext, STDLIB_TOML_PATH);
+    if (!calleeFunc) {
+        LogWarning("Неизвестная функция: " + node.callee);
         result = nullptr;
+        return;
     }
-    else {
-        LogWarning("visit не реализован для CallNode: " + node.callee);
-        llvm::Function* calleeFunc = context.TheModule->getFunction(node.callee);
-        if (!calleeFunc) {
-            LogWarning("Неизвестная функция: " + node.callee); // Используем LogWarning или LogError
+
+    if (calleeFunc->arg_size() != node.arguments.size()) {
+        LogWarning("Неверное количество аргументов для функции " + node.callee);
+        result = nullptr;
+        return;
+    }
+
+    std::vector<llvm::Value*> argsV;
+    for (unsigned i = 0, e = node.arguments.size(); i != e; ++i) {
+        if (!node.arguments[i]) {
+            LogWarning("Пустой узел аргумента для функции " + node.callee);
+            result = nullptr;
+            return;
+        }
+        node.arguments[i]->accept(*this);
+        llvm::Value* argVal = getResult();
+        if (!argVal) {
+            LogWarning("Не удалось сгенерировать аргумент " + std::to_string(i) + " для функции " + node.callee);
             result = nullptr;
             return;
         }
 
-        if (calleeFunc->arg_size() != node.arguments.size()) {
-            LogWarning("Неверное количество аргументов для функции " + node.callee); // Используем LogWarning или LogError
-            result = nullptr;
-            return;
+        // Приведение типа, если требуется
+        if (node.arguments[i]->implicitCastTo) {
+            llvm::Type* targetType = context.getLLVMType(node.arguments[i]->implicitCastTo, context.TheContext);
+            if (targetType && argVal->getType() != targetType) {
+                if (argVal->getType()->isIntegerTy() && targetType->isFloatingPointTy()) {
+                    argVal = context.Builder.CreateSIToFP(argVal, targetType, "cast_int2fp");
+                } else if (argVal->getType()->isFloatingPointTy() && targetType->isIntegerTy()) {
+                    argVal = context.Builder.CreateFPToSI(argVal, targetType, "cast_fp2int");
+                } else if (argVal->getType()->isIntegerTy() && targetType->isIntegerTy()) {
+                    argVal = context.Builder.CreateIntCast(argVal, targetType, true, "cast_int2int");
+                } else if (argVal->getType()->isPointerTy() && targetType->isPointerTy()) {
+                    argVal = context.Builder.CreateBitCast(argVal, targetType, "cast_ptr2ptr");
+                }
+            }
         }
 
-        std::vector<llvm::Value*> argsV;
-        for (unsigned i = 0, e = node.arguments.size(); i != e; ++i) {
-            if (!node.arguments[i]) {
-                LogWarning("Пустой узел аргумента для функции " + node.callee); // Используем LogWarning или LogError
-                 result = nullptr;
-                 return;
+        llvm::Type* expectedType = calleeFunc->getFunctionType()->getParamType(i);
+        llvm::Type* argType = argVal->getType();
+        if (expectedType->isPointerTy() && argVal->getType()->isPointerTy()) {
+            if (llvm::isa<llvm::AllocaInst>(argVal)) {
+                argVal = context.Builder.CreateLoad(expectedType, argVal, "arg_load");
             }
-            node.arguments[i]->accept(*this);
-            llvm::Value* argVal = getResult();
-            if (!argVal) {
-                LogWarning("Не удалось сгенерировать аргумент " + std::to_string(i) + " для функции " + node.callee); // Используем LogWarning или LogError
-                result = nullptr;
-                return;
-            }
-            argsV.push_back(argVal);
         }
+
+        argsV.push_back(argVal);
+    }
+
+    llvm::Type* retType = calleeFunc->getReturnType();
+    if (retType->isVoidTy()) {
+        result = context.Builder.CreateCall(calleeFunc, argsV);
+    } else {
         result = context.Builder.CreateCall(calleeFunc, argsV, "calltmp");
     }
 }
@@ -280,7 +289,37 @@ void ASTGen::visit(IdentifierNode& node) {
 
 void ASTGen::visit(NumberNode& node) {
     LogWarning("visit для NumberNode: " + std::to_string(node.value));
-    result = llvm::ConstantInt::get(context.TheContext, llvm::APInt(32, node.value, true));
+
+    llvm::Type* targetLLVMType = nullptr;
+
+    if (node.implicitCastTo)
+    {
+        targetLLVMType = context.getLLVMType(node.implicitCastTo, context.TheContext); 
+        if (!targetLLVMType) {
+             LogWarning("Не удалось получить целевой тип LLVM из implicitCastTo. Используется i32 по умолчанию.");
+             targetLLVMType = llvm::Type::getInt32Ty(context.TheContext);
+        }
+    }
+    else
+    {
+        targetLLVMType = context.getLLVMType(node.inferredType, context.TheContext);
+        LogWarning("Нет типа для неявного приведения. Используется i32 по умолчанию.");
+    }
+
+    if (targetLLVMType && targetLLVMType->isIntegerTy()) 
+        result = llvm::ConstantInt::get(targetLLVMType, node.value, true);
+    else if (targetLLVMType && targetLLVMType->isFloatingPointTy()) 
+    {
+        LogWarning("Неявное приведение NumberNode к типу с плавающей точкой. Создается ConstantFP.");
+        double floatValue = static_cast<double>(node.value);
+        result = llvm::ConstantFP::get(llvm::Type::getFloatTy(context.TheContext), llvm::APFloat(static_cast<float>(floatValue)));
+    }
+    else {
+        // Обработка других типов или если targetLLVMType все еще nullptr
+        LogWarning("Неподдерживаемый или неизвестный целевой тип для NumberNode. Используется i32 по умолчанию.");
+        targetLLVMType = llvm::Type::getInt32Ty(context.TheContext);
+        result = llvm::ConstantInt::get(targetLLVMType, node.value, true);
+    }
 }
 
 void ASTGen::visit(FloatNumberNode& node) {

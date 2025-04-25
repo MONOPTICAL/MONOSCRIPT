@@ -24,6 +24,7 @@
 #include <filesystem>
 #include <string>
 #include <vector>
+#include <dlfcn.h> // Для dlopen
 
 void printHelp(const char* programName) {
     std::cout << "Использование: " << programName << " [ОПЦИИ] [ФАЙЛ]\n\n"
@@ -42,6 +43,12 @@ int executeModule(llvm::Module* module) {
 
     llvm::ExitOnError ExitOnErr;
     ExitOnErr.setBanner("Error JIT: ");
+
+    void* handle = dlopen(STDLIB_SO_PATH, RTLD_NOW | RTLD_GLOBAL);
+    if (!handle) {
+        std::cerr << "Ошибка загрузки libm_std.so: " << dlerror() << std::endl;
+        return 1;
+    }
 
     // JIT
     auto JIT = ExitOnErr(llvm::orc::LLJITBuilder().create());
@@ -150,7 +157,8 @@ int main(int argc, char* argv[]) {
         auto program = parser.parse();
 
         // Получаем путь текущего файла
-        Linker linker(std::filesystem::path(inputFile).parent_path().string());
+        std::string currentFilePath = std::filesystem::current_path().string();
+        Linker linker(currentFilePath);
         
         // Добавляем основной модуль
         if (!linker.addModule(std::filesystem::path(inputFile).stem().string(), inputFile, program)) {
@@ -211,6 +219,30 @@ int main(int argc, char* argv[]) {
             std::cerr << "Ошибка: не удалось разобрать исходный код.\n";
             return 1;
         }
+
+        CodeGenContext context(currentFilePath);
+        ASTGen codeGen(context);
+        combinedAST->accept(codeGen);
+
+        std::cout << "\n--- LLVM IR ---" << std::endl;
+        context.TheModule->print(llvm::outs(), nullptr);
+        std::cout << "--- Конец LLVM IR ---\n" << std::endl;
+
+        
+        std::cout << "\n--- Запуск программы ---" << std::endl;
+        try {
+    
+            if (context.TheModule != nullptr) { 
+                    int result = executeModule(context.TheModule.get());
+                    std::cout << "Программа выполнена. Результат: " << result << std::endl;
+            } else {
+                    std::cerr << "Ошибка: Не удалось получить модуль LLVM для выполнения." << std::endl;
+            }
+    
+        } catch (const std::exception& e) {
+            std::cerr << "Ошибка при выполнении: " << e.what() << std::endl;
+        }
+        std::cout << "--- Конец запуска ---\n" << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "Ошибка: " << e.what() << std::endl;
         return 1;
