@@ -181,7 +181,17 @@ void ASTGen::visit(ReassignMemberNode& node) {
 
 void ASTGen::visit(VariableReassignNode& node) {
     LogWarning("visit не реализован для VariableReassignNode: " + node.name);
-    result = nullptr;
+    
+    // Получаем тип переменной
+    llvm::Type* varType = context.NamedValues[node.name]->getType();
+    if (!varType) {
+        LogWarning("Не удалось получить тип для переменной " + node.name);
+        result = nullptr;
+        return;
+    }
+
+    // Генерируем код для присваивания
+    result = Declarations::handleSimpleReassignment(context, node, varType);
 }
 
 void ASTGen::visit(IfNode& node) {
