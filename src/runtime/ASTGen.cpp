@@ -235,26 +235,50 @@ void ASTGen::visit(CallNode& node) {
         // Приведение типа, если требуется
         if (node.arguments[i]->implicitCastTo) {
             llvm::Type* targetType = context.getLLVMType(node.arguments[i]->implicitCastTo, context.TheContext);
-            if (targetType && argVal->getType() != targetType) {
-                if (argVal->getType()->isIntegerTy() && targetType->isFloatingPointTy()) {
+            llvm::Type* argType = argVal->getType();
+            if (targetType && argType != targetType) {
+                if (argType->isIntegerTy() && targetType->isFloatingPointTy()) {
                     argVal = context.Builder.CreateSIToFP(argVal, targetType, "cast_int2fp");
-                } else if (argVal->getType()->isFloatingPointTy() && targetType->isIntegerTy()) {
+                } else if (argType->isFloatingPointTy() && targetType->isIntegerTy()) {
                     argVal = context.Builder.CreateFPToSI(argVal, targetType, "cast_fp2int");
-                } else if (argVal->getType()->isIntegerTy() && targetType->isIntegerTy()) {
+                } else if (argType->isIntegerTy() && targetType->isIntegerTy()) {
+                    LogWarning("!!!Неявное приведение целого числа к целому числу!!!");
                     argVal = context.Builder.CreateIntCast(argVal, targetType, true, "cast_int2int");
-                } else if (argVal->getType()->isPointerTy() && targetType->isPointerTy()) {
+                } else if (argType->isPointerTy() && targetType->isPointerTy()) {
+                    LogWarning("!!!Неявное приведение указателя к указателю!!!");
                     argVal = context.Builder.CreateBitCast(argVal, targetType, "cast_ptr2ptr");
-                }
+                } 
             }
         }
 
         llvm::Type* expectedType = calleeFunc->getFunctionType()->getParamType(i);
         llvm::Type* argType = argVal->getType();
-        if (expectedType->isPointerTy() && argVal->getType()->isPointerTy()) {
-            if (llvm::isa<llvm::AllocaInst>(argVal)) {
-                argVal = context.Builder.CreateLoad(expectedType, argVal, "arg_load");
+        if (argVal->getType()->isPointerTy()) {
+            llvm::Type* loadedType = nullptr;
+            if (llvm::AllocaInst* allocaInst = llvm::dyn_cast<llvm::AllocaInst>(argVal)) {
+                loadedType = allocaInst->getAllocatedType();
+            } else {
+                loadedType = expectedType;
+            }
+            argVal = context.Builder.CreateLoad(loadedType, argVal, "arg_load");
+            argType = argVal->getType();
+        }
+
+        if (argType != expectedType) {
+            if (argType->isIntegerTy(1) && expectedType->isIntegerTy()) {
+                argVal = context.Builder.CreateZExt(argVal, expectedType, "zext_i1_to_i32");
+            } else if (argType->isIntegerTy() && expectedType->isIntegerTy(1)) {
+                argVal = context.Builder.CreateTrunc(argVal, expectedType, "trunc_to_i1");
+            } else if (argType->isIntegerTy() && expectedType->isIntegerTy()) {
+                argVal = context.Builder.CreateIntCast(argVal, expectedType, true, "cast_int2int");
+            } else if (argType->isFloatingPointTy() && expectedType->isFloatingPointTy()) {
+                argVal = context.Builder.CreateFPCast(argVal, expectedType, "cast_fp2fp");
+            } else {
+                LogWarning("!!!Неизвестное неявное приведение аргумента " + std::to_string(i) + " для функции " + node.callee + "!!!");
             }
         }
+
+        
 
         argsV.push_back(argVal);
     }

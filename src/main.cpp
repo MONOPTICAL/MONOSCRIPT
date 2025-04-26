@@ -24,6 +24,7 @@
 #include <filesystem>
 #include <string>
 #include <vector>
+#include <chrono>
 #include <dlfcn.h> // Для dlopen
 
 void printHelp(const char* programName) {
@@ -143,6 +144,7 @@ int main(int argc, char* argv[]) {
     }
 
     try {
+        auto t_start = std::chrono::high_resolution_clock::now();
         Lexer lexer(sourceCode);
         lexer.tokenize();
         const auto tokens = lexer.getTokens();
@@ -152,7 +154,7 @@ int main(int argc, char* argv[]) {
             lexer.printTokens();
             std::cout << "--- Конец токенов ---\n\n";
         }
-
+        
         Parser parser(tokens);
         auto program = parser.parse();
 
@@ -206,6 +208,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
+        auto t_analysis = std::chrono::high_resolution_clock::now();
 
         TypeSymbolVisitor typeSymbolVisitor;
 
@@ -223,6 +226,8 @@ int main(int argc, char* argv[]) {
         CodeGenContext context(currentFilePath);
         ASTGen codeGen(context);
         combinedAST->accept(codeGen);
+        
+        auto t_codegen = std::chrono::high_resolution_clock::now();
 
         std::cout << "\n--- LLVM IR ---" << std::endl;
         context.TheModule->print(llvm::outs(), nullptr);
@@ -231,10 +236,23 @@ int main(int argc, char* argv[]) {
         
         std::cout << "\n--- Запуск программы ---" << std::endl;
         try {
-    
+            auto t_jit_start = std::chrono::high_resolution_clock::now();
             if (context.TheModule != nullptr) { 
                     int result = executeModule(context.TheModule.get());
+                    auto t_jit_end = std::chrono::high_resolution_clock::now();
                     std::cout << "Программа выполнена. Результат: " << result << std::endl;
+
+                    auto ms_analysis = std::chrono::duration_cast<std::chrono::milliseconds>(t_analysis - t_start).count();
+                    auto ms_codegen  = std::chrono::duration_cast<std::chrono::milliseconds>(t_codegen - t_analysis).count();
+                    auto ms_jit      = std::chrono::duration_cast<std::chrono::milliseconds>(t_jit_end - t_jit_start).count();
+                    auto ms_total    = std::chrono::duration_cast<std::chrono::milliseconds>(t_jit_end - t_start).count();
+
+                    std::cout << "\n--- Тайминги ---" << std::endl;
+                    std::cout << "Анализ и парсинг: " << ms_analysis << " мс" << std::endl;
+                    std::cout << "Генерация IR:      " << ms_codegen  << " мс" << std::endl;
+                    std::cout << "JIT + исполнение:  " << ms_jit      << " мс" << std::endl;
+                    std::cout << "Всего:             " << ms_total    << " мс" << std::endl;
+                    std::cout << "--- Конец таймингов ---\n" << std::endl;
             } else {
                     std::cerr << "Ошибка: Не удалось получить модуль LLVM для выполнения." << std::endl;
             }
