@@ -1,7 +1,7 @@
 [[function]]
 name = "sum"
 ret = "i32"
-args = []
+args = ["i32","i32"]
 
 [[function]]
 name = "concat"
