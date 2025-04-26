@@ -485,15 +485,20 @@ void TypeSymbolVisitor::visit(CallNode& node) {
     if (argTypes.size() != func->parameters.size()) {
         LogError("Function " + node.callee + " expects " + std::to_string(func->parameters.size()) + " arguments, got " + std::to_string(argTypes.size()));
     }
+    auto isNumeric = [](const std::shared_ptr<TypeNode>& type) {
+        return type->toString() == "i1" || type->toString() == "i8" || type->toString() == "i16" || type->toString() == "i32" || type->toString() == "i64";
+    };
 
     // Проверяем типы аргументов
     for (size_t i = 0; i < argTypes.size(); ++i) {
         std::string argType = argTypes[i]->toString();
         std::string paramType = func->parameters[i].first->toString();
 
-        if (argType != paramType) {
-            LogError("Type mismatch in function " + node.callee + ": expected " + func->parameters[i].first->toString() + ", got " + argTypes[i]->toString());
-        }
+        if (argType != paramType)
+            if (isNumeric(argTypes[i]) && isNumeric(func->parameters[i].first))
+                node.arguments[i]->implicitCastTo = func->parameters[i].first;
+            else
+                LogError("Function " + node.callee + " expects argument of type " + paramType + ", got " + argType);
     }
 
     node.inferredType = func->returnType; // Устанавливаем тип функции
