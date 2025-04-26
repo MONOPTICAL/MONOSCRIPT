@@ -223,3 +223,64 @@ namespace Declarations
         return globalVar;
     }
 }
+
+llvm::Value *Declarations::handleSimpleReassignment(CodeGenContext &context, VariableReassignNode &node, llvm::Type *varType)
+{
+    ASTGen codeGen(context);
+    // Генерируем код для выражения
+    node.expression->accept(codeGen);
+    llvm::Value* value = codeGen.getResult();
+    llvm::Type* valueType = value->getType();
+    if (!value) {
+        codeGen.LogWarning("Не удалось сгенерировать код для выражения " + node.name);
+        return nullptr;
+    }
+
+    if(node.expression->implicitCastTo)
+    {
+        if (valueType != varType) {
+            if (valueType->isIntegerTy() && varType->isFloatingPointTy()) {
+                value = context.Builder.CreateSIToFP(value, varType, "cast_int2fp");
+            } else if (valueType->isFloatingPointTy() && varType->isIntegerTy()) {
+                value = context.Builder.CreateFPToSI(value, varType, "cast_fp2int");
+            } else if (valueType->isIntegerTy() && varType->isIntegerTy()) {
+                value = context.Builder.CreateIntCast(value, varType, true, "cast_int2int");
+            } else if (valueType->isPointerTy() && varType->isPointerTy()) {
+                value = context.Builder.CreateBitCast(value, varType, "cast_ptr2ptr");
+            } 
+        }
+    }
+    
+    if (value->getType()->isPointerTy())
+    {
+        llvm::Type* loadedType = nullptr;
+        if (llvm::AllocaInst* allocaInst = llvm::dyn_cast<llvm::AllocaInst>(value)) {
+            loadedType = allocaInst->getAllocatedType();
+        } else if (llvm::GlobalVariable* globalVar = llvm::dyn_cast<llvm::GlobalVariable>(value)) {
+            loadedType = globalVar->getValueType();
+        } else {
+            loadedType = varType;
+        }
+        value = context.Builder.CreateLoad(loadedType, value, "val_load");
+        valueType = value->getType();
+    }
+
+    // Проверяем совместимость типов и выполняем преобразование при необходимости
+    if (varType != valueType) {
+        codeGen.LogWarning("Тип значения не совпадает с типом переменной " + node.name);
+        if (valueType->isIntegerTy(1) && varType->isIntegerTy()) {
+            value = context.Builder.CreateZExt(value, varType, "zext_i1_to_i32");
+        } else if (valueType->isIntegerTy() && varType->isIntegerTy(1)) {
+            value = context.Builder.CreateTrunc(value, varType, "trunc_to_i1");
+        } else if (valueType->isIntegerTy() && varType->isIntegerTy()) {
+            value = context.Builder.CreateIntCast(value, varType, true, "cast_int2int");
+        } else if (valueType->isFloatingPointTy() && varType->isFloatingPointTy()) {
+            value = context.Builder.CreateFPCast(value, varType, "cast_fp2fp");
+        } else {
+            codeGen.LogWarning("!!!Неизвестное неявное приведение для переменной " + node.name + "!!!");
+        }
+    }
+    // Записываем значение в переменную
+    context.Builder.CreateStore(value, context.NamedValues[node.name]);
+    return context.NamedValues[node.name];
+}

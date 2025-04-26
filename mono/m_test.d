@@ -2,7 +2,7 @@ module mono.m_test;
 
 extern(C) int sum(const int a, const int b) nothrow @nogc
 {
-    return a+b;
+    return a + b;
 }
 
 extern(C) void echo(const char* str) nothrow
