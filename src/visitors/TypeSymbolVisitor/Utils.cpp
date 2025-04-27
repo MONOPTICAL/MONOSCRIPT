@@ -106,6 +106,20 @@ void TypeSymbolVisitor::debugContexts()
     std::cout << "---------------------\n";
 }
 
+bool TypeSymbolVisitor::checkLabels(const std::string &label)
+{
+    static const std::vector<std::string> skipNames = {"if", "else", "for", "while"};
+    for (auto it = contexts.rbegin(); it != contexts.rend(); ++it) {
+        const auto& context = *it;
+        if (!context.currentFunctionName.empty() &&
+            std::find(skipNames.begin(), skipNames.end(), context.currentFunctionName) == skipNames.end())
+        {
+            return std::find(context.labels.begin(), context.labels.end(), label) != context.labels.end();
+        }
+    }
+    return false;
+}
+
 static int getTypeRank(const std::string& type) {
     if (type == "i1") return 1;
     if (type == "i8") return 2;
@@ -233,21 +247,30 @@ void TypeSymbolVisitor::castAndValidate(const std::shared_ptr<ASTNode>& node, co
 }
 
 // Первый проход: ищем максимальный rank
-static void findMaxRank(const std::shared_ptr<ASTNode>& node, int& maxRank) {
+void TypeSymbolVisitor::findMaxRank(const std::shared_ptr<ASTNode>& node, int& maxRank) {
     if (!node) return;
     if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
-        if (num->inferredType)
+        if (num->implicitCastTo)
+            maxRank = std::max(maxRank, getTypeRank(num->implicitCastTo->toString()));
+        else if (num->inferredType)
             maxRank = std::max(maxRank, getTypeRank(num->inferredType->toString()));
         else if (num->type)
             maxRank = std::max(maxRank, getTypeRank(num->type->toString()));
         return;
     }
     if (auto floatNum = std::dynamic_pointer_cast<FloatNumberNode>(node)) {
-        maxRank = std::max(maxRank, getTypeRank("float"));
+        if (floatNum->implicitCastTo)
+            maxRank = std::max(maxRank, getTypeRank(floatNum->implicitCastTo->toString()));
+        else if (floatNum->inferredType)
+            maxRank = std::max(maxRank, getTypeRank(floatNum->inferredType->toString()));
         return;
     }
     if (auto ident = std::dynamic_pointer_cast<IdentifierNode>(node)) {
-        maxRank = std::max(maxRank, getTypeRank(ident->inferredType->toString()));
+        if (ident->implicitCastTo)
+            maxRank = std::max(maxRank, getTypeRank(ident->implicitCastTo->toString()));
+        else if (ident->inferredType)
+            maxRank = std::max(maxRank, getTypeRank(ident->inferredType->toString()));
+        return;
     }
     if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
         findMaxRank(bin->left, maxRank);
@@ -257,8 +280,27 @@ static void findMaxRank(const std::shared_ptr<ASTNode>& node, int& maxRank) {
         findMaxRank(unary->operand, maxRank);
     }
     if (auto call = std::dynamic_pointer_cast<CallNode>(node)) {
-        for (const auto& arg : call->arguments) {
-            findMaxRank(arg, maxRank);
+        if (!checkLabels("@strict"))
+        {
+            for (const auto& arg : call->arguments) 
+                findMaxRank(arg, maxRank);
+        }
+        else
+        {            
+            if (contexts.back().functions.find(call->callee) == contexts.back().functions.end()) {
+                if (registry.findFunction(call->callee) == nullptr) 
+                    LogError("Function not found: " + call->callee);
+                else
+                {
+                    auto func = std::dynamic_pointer_cast<FunctionNode>(registry.findFunction(call->callee));
+                    maxRank = std::max(maxRank, getTypeRank(func->returnType->toString()));
+                }
+            }
+            else
+            {
+                auto func = std::dynamic_pointer_cast<FunctionNode>(contexts.back().functions[call->callee]);
+                maxRank = std::max(maxRank, getTypeRank(func->returnType->toString()));
+            }
         }
     }
 }

@@ -91,6 +91,16 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
         }
 
         consume(TokenType::RightParen, "Expected ')' after function parameters"); // Проверяем наличие правой скобки после параметров функции
+        
+        std::vector<std::string> labels; // Вектор меток функции
+        while (check(TokenType::Label))
+        {
+            std::string label = current().value;
+            consume(TokenType::Label, "Expected label"); // Проверяем наличие метки функции
+
+            labels.push_back(label);
+        }
+        
         int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока if
         nextLine(); // Переходим к следующему токену
 
@@ -111,13 +121,38 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
 
         lineIndex--; // Без этого он скипает 2 линии а не одну
 
-        return std::make_shared<FunctionNode>(functionName, association, returnType, parameters, body); // Создаём узел функции
+        return std::make_shared<FunctionNode>(functionName, association, returnType, parameters, labels, body); // Создаём узел функции
     }
     else
     {
         throwError("Expected '(' after function name");
     }
 
+    return nullptr; // Если ничего не найдено, возвращаем nullptr
+}
+
+std::shared_ptr<ASTNode> Parser::parseCast(std::shared_ptr<ASTNode> expression)
+{
+    IC();
+    consume(TokenType::Arrow, "Expected '->' after expression"); // Проверяем наличие стрелки после выражения
+    if(check(TokenType::Type))
+    {
+        std::string typeName = current().value; // Сохраняем имя типа
+        if(typeName != "array" && typeName != "func" && typeName != "string" && typeName != "struct" && typeName != "map" && typeName != "void")
+        {
+            advance(); // Переходим к следующему токену
+        }
+        else
+        {
+            throwError("Expected primitive type after '->'");
+        }
+        expression->implicitCastTo = std::make_shared<SimpleTypeNode>(typeName); // Создаём указатель на тип
+        return expression; // Возвращаем выражение
+    }
+    else
+    {
+        throwError("Expected primitive type after '->'");
+    }
     return nullptr; // Если ничего не найдено, возвращаем nullptr
 }
 

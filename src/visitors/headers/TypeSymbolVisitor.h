@@ -7,6 +7,7 @@
 #include "BuiltIn.h"
 
 struct Context {
+    std::vector<std::string> labels;
     std::unordered_map<std::string, std::shared_ptr<ASTNode>> variables;
     std::unordered_map<std::string, std::shared_ptr<ASTNode>> functions;
     std::string currentFunctionName;
@@ -86,6 +87,13 @@ private:
                                                                             const std::shared_ptr<ASTNode>& node, 
                                                                             const std::string& targetType, 
                                                                             TypeSymbolVisitor* visitor);
+
+    bool                                                            checkLabels(
+                                                                            const std::string& label);
+
+    void                                                            findMaxRank(
+                                                                            const std::shared_ptr<ASTNode>& node, 
+                                                                            int& maxRank);
 public:
                                                                     TypeSymbolVisitor() 
                                                                     {

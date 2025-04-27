@@ -341,11 +341,15 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
             else {
                 type = std::make_shared<SimpleTypeNode>("i64");
             }
-            return std::make_shared<NumberNode>(intValue.value(), type); // Создаём узел числа
+            auto ASTnode = std::make_shared<NumberNode>(intValue.value(), type); // Создаём узел числа
+            if(check(TokenType::Arrow)) return parseCast(ASTnode); // Если есть каст, то кастим
+            return ASTnode; // Возвращаем узел числа
         }
         else
         {
-            return std::make_shared<FloatNumberNode>(floatValue.value()); // Создаём узел числа с плавающей точкой
+            auto ASTnode = std::make_shared<FloatNumberNode>(floatValue.value()); // Создаём узел числа с плавающей точкой
+            if(check(TokenType::Arrow)) return parseCast(ASTnode); // Если есть каст, то кастим
+            return ASTnode; // Возвращаем узел числа с плавающей точкой
         }
     }
     else if (currentToken.type == TokenType::String) // Если токен - строка
@@ -370,10 +374,10 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
             }
 
             consume(TokenType::RightParen, "Expected ')' after function arguments"); // Проверяем наличие правой скобки
-            return std::make_shared<CallNode>(currentToken.value, arguments); // Создаём узел вызова функции
+            auto ASTnode = std::make_shared<CallNode>(currentToken.value, arguments); // Создаём узел вызова функции
+            if(check(TokenType::Arrow)) return parseCast(ASTnode); // Если есть каст, то кастим
+            return ASTnode; // Возвращаем узел вызова функции
         }
-
-        return std::make_shared<IdentifierNode>(currentToken.value); // Создаём узел идентификатора
     }
     else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::LeftBracket)
     {
@@ -522,7 +526,9 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
     else if (currentToken.type == TokenType::Identifier && (peek().value != "." || peek().value != "["))
     {
         advance();
-        return std::make_shared<IdentifierNode>(currentToken.value);
+        auto ASTnode = std::make_shared<IdentifierNode>(currentToken.value);
+        if(check(TokenType::Arrow)) return parseCast(ASTnode); // Если есть каст, то кастим
+        else return ASTnode; // Возвращаем узел идентификатора
     }
     throw std::runtime_error("Parser Error: Unknown primary expression at line " + std::to_string(currentToken.line) +
         ", column " + std::to_string(currentToken.column) +

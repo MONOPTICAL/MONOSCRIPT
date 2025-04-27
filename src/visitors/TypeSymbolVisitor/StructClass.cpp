@@ -8,6 +8,7 @@ void TypeSymbolVisitor::visit(StructNode& node) {
 
     // Создаем новый контекст для структуры
     Context structContext = {
+        .labels = {},
         .variables = {},
         .functions = {},
         .currentFunctionName = node.name,
