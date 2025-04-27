@@ -2,7 +2,6 @@
 
 /*
 Ну а это уже самый главный парсер, который парсит распредиляет линии по разным handler'ам
-
 */
 
 /// @brief Парсит программу
@@ -39,7 +38,7 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         // [Type]functionName([Type]: variableName ...)
         // [array<i32>]bubbleSort(array<i32>: arr)
         // ↑ if we have left bracket, we have function declaration
-    if (currentToken.type == TokenType::LeftBracket && getLastTokenInCurrentLine().type == TokenType::RightParen)
+    if (currentToken.type == TokenType::LeftBracket && (getLastTokenInCurrentLine().type == TokenType::RightParen || getLastTokenInCurrentLine().type == TokenType::Label))
     {
         return parseFunction();
         

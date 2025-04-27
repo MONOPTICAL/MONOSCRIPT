@@ -18,7 +18,7 @@ public:
     std::unordered_map<std::string, std::shared_ptr<TypeNode>> builtinTypes;
 
     // Базовые функции
-    std::unordered_map<std::string, std::shared_ptr<FunctionNode>> builtinFunctions;
+    std::unordered_map<std::string, std::vector<std::shared_ptr<FunctionNode>>> builtinFunctions;
 
     // Пользовательские структуры
     std::unordered_map<std::string, std::shared_ptr<StructNode>> userStructs;
@@ -35,6 +35,7 @@ public:
     // Поиск
     std::shared_ptr<TypeNode> findType(const std::string& name) const;
     std::shared_ptr<FunctionNode> findFunction(const std::string& name) const;
+    std::shared_ptr<FunctionNode> findFunction(const std::string& name, const std::vector<std::shared_ptr<TypeNode>>& args) const;
     std::shared_ptr<StructNode> findStruct(const std::string& name) const;
     std::shared_ptr<ClassNode> findClass(const std::string& name) const;
 };

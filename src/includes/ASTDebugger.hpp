@@ -22,6 +22,12 @@ class ASTDebugger
                 else 
                     debug(func->returnType, 1);
 
+                if (func->labels.size() > 0) {
+                    printIndent(indent + 2); std::cout << "[Labels]: ";
+                    for (const auto& label : func->labels) std::cout << label << " ";
+                    std::cout << "\n";
+                }
+
                 for (const auto& param : func->parameters) {
                     printIndent(indent + 2); std::cout << "Param: " << param.second << " "; 
                     debug(param.first, 1);

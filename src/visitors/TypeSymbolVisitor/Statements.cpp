@@ -53,9 +53,12 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
         // Добавляем параметр в реестр
         args[param.second] = param.first;
     }
+    std::vector<std::string> labels = contexts.back().labels;
+    labels.insert(labels.end(), node.labels.begin(), node.labels.end()); // Добавляем метки функции в текущий контекст
 
     // Если не вывилась ошибка, добавляем функцию в реестр
     Context currentFunction = {
+        .labels = labels, // Добавляем метки функции
         .variables = contexts.back().variables, // Добавляем переменные текущего контекста
         .functions = contexts.back().functions, // Добавляем функции текущего контекста
         .currentFunctionName = node.name,       // Имя функции 
@@ -128,9 +131,13 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
     node.type->accept(*this);
     std::string varType = node.type->toString();
     bool isAuto = false;
+    bool isStrict = checkLabels("@strict");
 
     if (varType == "auto")
-        isAuto = true;
+        if(!isStrict)
+            isAuto = true;
+        else
+            LogError("auto is not allowed in strict mode");
 
     if (
         varType == "none"
@@ -181,7 +188,9 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
         node.expression->accept(*this);
         auto expressionType = node.expression->inferredType->toString();
         
-        if (expressionType != "none" && expressionType != "string")
+        if (isStrict)
+        {} 
+        else if (expressionType != "none" && expressionType != "string")
         {        
             castNumbersInBinaryTree(node.expression, isAuto ? "auto" : varType);
             if (varType != "i1" && varType != "auto")
@@ -460,17 +469,8 @@ void TypeSymbolVisitor::visit(ContinueNode& node) {
     node.inferredType = std::make_shared<SimpleTypeNode>("void");
 }
 
-void TypeSymbolVisitor::visit(CallNode& node) {
-    // Проверяем, существует ли функция в реестре
-    if (contexts.back().functions.find(node.callee) == contexts.back().functions.end()) {
-        if (registry.findFunction(node.callee) == nullptr) 
-            LogError("Function not found: " + node.callee);
-        else
-            contexts.back().functions[node.callee] = registry.findFunction(node.callee);
-    }
-
-    // Проверяем типы аргументов
-    std::shared_ptr<FunctionNode> func = std::dynamic_pointer_cast<FunctionNode>(contexts.back().functions[node.callee]);
+void TypeSymbolVisitor::visit(CallNode& node) { 
+    // Длеаем список типов аргументов
     std::vector<std::shared_ptr<TypeNode>> argTypes;
     for (size_t i = 0; i < node.arguments.size(); ++i) {
         node.arguments[i]->accept(*this);
@@ -481,10 +481,29 @@ void TypeSymbolVisitor::visit(CallNode& node) {
             argTypes.push_back(node.arguments[i]->inferredType);
     }
 
+    // Проверяем, существует ли функция в реестре
+    if (contexts.back().functions.find(node.callee) == contexts.back().functions.end()) {
+        // Точное совпадение типов аргументов
+        if (registry.findFunction(node.callee, argTypes) != nullptr) 
+            contexts.back().functions[node.callee] = registry.findFunction(node.callee, argTypes);
+
+        // Поиск функции с совпадением по имени
+        else if (registry.findFunction(node.callee) != nullptr) 
+            contexts.back().functions[node.callee] = registry.findFunction(node.callee);
+
+        // Функция нихуя не найдена
+        else
+            LogError("Function not found: " + node.callee);
+    }
+
+    // Проверяем типы аргументов
+    std::shared_ptr<FunctionNode> func = std::dynamic_pointer_cast<FunctionNode>(contexts.back().functions[node.callee]);
+
     // Проверяем количество аргументов
     if (argTypes.size() != func->parameters.size()) {
         LogError("Function " + node.callee + " expects " + std::to_string(func->parameters.size()) + " arguments, got " + std::to_string(argTypes.size()));
     }
+
     auto isNumeric = [](const std::shared_ptr<TypeNode>& type) {
         return type->toString() == "i1" || type->toString() == "i8" || type->toString() == "i16" || type->toString() == "i32" || type->toString() == "i64";
     };
