@@ -3,16 +3,18 @@
 // Заглушки для visit-методов
 
 void TypeSymbolVisitor::visit(ReassignMemberNode& node) {
+    // x.y = 1
     // TODO: реализовать обработку ReassignMemberNode
 }
 
 void TypeSymbolVisitor::visit(AccessExpression& node) {
     // TODO: реализовать обработку AccessExpression
+    // x[1], x.y 
 }
 
 void TypeSymbolVisitor::visit(ImportNode &node)
 {
-    // TODO: реализовать обработку ImportNode
+    // Не надо его реализовывать, он обрабатывается в другом месте(при загрузке модулей в AST)
 }
 
 void TypeSymbolVisitor::visit(LambdaNode &node)

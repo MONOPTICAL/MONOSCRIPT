@@ -28,6 +28,7 @@ void registerBuiltInFunctions(Registry& registry, const std::string& tomlPath)
                 "",
                 std::make_shared<SimpleTypeNode>(retStr),
                 args,
+                std::vector<std::string>(),
                 nullptr
             )
         );

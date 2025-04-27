@@ -181,7 +181,17 @@ void ASTGen::visit(ReassignMemberNode& node) {
 
 void ASTGen::visit(VariableReassignNode& node) {
     LogWarning("visit не реализован для VariableReassignNode: " + node.name);
-    result = nullptr;
+    
+    // Получаем тип переменной
+    llvm::Type* varType = context.NamedValues[node.name]->getType();
+    if (!varType) {
+        LogWarning("Не удалось получить тип для переменной " + node.name);
+        result = nullptr;
+        return;
+    }
+
+    // Генерируем код для присваивания
+    result = Declarations::handleSimpleReassignment(context, node, varType);
 }
 
 void ASTGen::visit(IfNode& node) {
@@ -254,14 +264,27 @@ void ASTGen::visit(CallNode& node) {
         llvm::Type* expectedType = calleeFunc->getFunctionType()->getParamType(i);
         llvm::Type* argType = argVal->getType();
         if (argVal->getType()->isPointerTy()) {
-            llvm::Type* loadedType = nullptr;
             if (llvm::AllocaInst* allocaInst = llvm::dyn_cast<llvm::AllocaInst>(argVal)) {
-                loadedType = allocaInst->getAllocatedType();
-            } else {
-                loadedType = expectedType;
+                llvm::Type* loadedType = allocaInst->getAllocatedType();
+                argVal = context.Builder.CreateLoad(loadedType, argVal, "arg_load");
+                argType = argVal->getType();
+            } else if (llvm::GlobalVariable* globalVar = llvm::dyn_cast<llvm::GlobalVariable>(argVal)) {
+                llvm::Type* valueType = globalVar->getValueType();
+                if (valueType->isArrayTy() && valueType->getArrayElementType()->isIntegerTy(8)) {
+                    // Cтрока ебанная
+                    argVal = context.Builder.CreateInBoundsGEP(
+                        valueType,
+                        globalVar,
+                        {llvm::ConstantInt::get(context.TheContext, llvm::APInt(32, 0)),
+                         llvm::ConstantInt::get(context.TheContext, llvm::APInt(32, 0))}
+                    );
+                    argType = argVal->getType();
+                } else {
+                    // Обычная глобальная переменная
+                    argVal = context.Builder.CreateLoad(valueType, argVal, "arg_load");
+                    argType = argVal->getType();
+                }
             }
-            argVal = context.Builder.CreateLoad(loadedType, argVal, "arg_load");
-            argType = argVal->getType();
         }
 
         if (argType != expectedType) {

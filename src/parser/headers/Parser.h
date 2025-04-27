@@ -45,6 +45,8 @@ private:
 
     std::shared_ptr<ASTNode> parseUse();
 
+    std::shared_ptr<ASTNode> parseCast(std::shared_ptr<ASTNode> expression);
+
 /*
 все возможные случаи это
 _______________________________________

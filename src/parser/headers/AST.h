@@ -118,13 +118,15 @@ class ProgramNode : public ASTNode {
 class FunctionNode : public ASTNode {
     public:
         FunctionNode() = default;
-        FunctionNode(const std::string& name, const std::string& associated, std::shared_ptr<TypeNode> returnType, const std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters, std::shared_ptr<ASTNode> body) 
-            : name(name), associated(associated), returnType(returnType), parameters(parameters), body(body) {}
+        FunctionNode(const std::string& name, const std::string& associated, std::shared_ptr<TypeNode> returnType, const std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters, const std::vector<std::string> labels, std::shared_ptr<ASTNode> body) 
+            : name(name), associated(associated), returnType(returnType), parameters(parameters), labels(labels), body(body) {}
         std::string name;
         std::string associated;
         std::shared_ptr<TypeNode> returnType;
         std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters; // {type, name}
         std::vector<std::pair<std::string, LambdaNode>> lambdas; // {type, name}
+
+        std::vector<std::string> labels; // @strict, @pure, @entry, @public, @private, @test
         std::shared_ptr<ASTNode> body; // BlockNode
         
         void accept(ASTNodeVisitor& visitor) override {
