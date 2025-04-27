@@ -23,6 +23,7 @@ enum class TokenType {
     Dot,                    // . - точка . для доступа к полям объекта
     PipeArrow,              // |> - оператор для передачи результата функции в другую функцию и импорта модулей
     Arrow,                  // -> - стрелка для указания на указатель
+    Label
 };
 
 struct Token {
@@ -55,6 +56,7 @@ inline std::string TokenTypeToString(TokenType type)
     case TokenType::RightBrace: return "RightBrace";
     case TokenType::PipeArrow: return "PipeArrow";
     case TokenType::Arrow: return "Arrow";
+    case TokenType::Label: return "Label";
     default: return "Unknown";
     }
 }

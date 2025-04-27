@@ -337,11 +337,25 @@ TokenType Lexer::IsKeyword(const std::string &value) const
         "i1", "i8", "i16","i32", "i64", "string", "void", "array", "map", "float", "struct", "func"
     };
 
+    std::vector<std::string> labels = {
+        "@strict",
+        "@pure",
+        "@entry",
+        "@public",
+        "@private",
+        "@test"
+    };
+
     std::string trimmedValue = ParsingFunctions::trim(value);
 
     if (std::find(keywords.begin(), keywords.end(), trimmedValue) != keywords.end())
     {
         return TokenType::Keyword;
+    }
+
+    if (std::find(labels.begin(), labels.end(), trimmedValue) != labels.end())
+    {
+        return TokenType::Label;
     }
 
     if (std::find(builtinTypes.begin(), builtinTypes.end(), trimmedValue) != builtinTypes.end())

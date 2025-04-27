@@ -4,9 +4,24 @@ ret = "i32"
 args = ["i32","i32"]
 
 [[function]]
-name = "concat"
+name = "scat"
 ret = "string"
 args = ["string", "string"]
+
+[[function]]
+name = "toString_int"
+ret = "string"
+args = ["i32"]
+
+[[function]]
+name = "toString_bool"
+ret = "string"
+args = ["i1"]
+
+[[function]]
+name = "toString_float"
+ret = "string"
+args = ["float"]
 
 [[function]]
 name = "echo"

@@ -37,7 +37,7 @@ void printHelp(const char* programName) {
               << std::endl;
 }
 
-int executeModule(llvm::Module* module) {
+int executeModule(llvm::Module* module, std::string mainFunction="main") {
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
     llvm::InitializeNativeTargetAsmParser();
@@ -90,7 +90,7 @@ int executeModule(llvm::Module* module) {
     ExitOnErr(JIT->addIRModule(std::move(TSM)));
 
     // main
-    auto MainSymbol = ExitOnErr(JIT->lookup("main"));
+    auto MainSymbol = ExitOnErr(JIT->lookup(mainFunction));
 
     // int(*)()
     auto MainFn = MainSymbol.toPtr<int(*)()>();
@@ -225,6 +225,7 @@ int main(int argc, char* argv[]) {
 
         CodeGenContext context(currentFilePath);
         ASTGen codeGen(context);
+        
         combinedAST->accept(codeGen);
         
         auto t_codegen = std::chrono::high_resolution_clock::now();
@@ -235,10 +236,22 @@ int main(int argc, char* argv[]) {
 
         
         std::cout << "\n--- Запуск программы ---" << std::endl;
+        
         try {
             auto t_jit_start = std::chrono::high_resolution_clock::now();
             if (context.TheModule != nullptr) { 
-                    int result = executeModule(context.TheModule.get());
+                    std::string entryFunctionName = "main";
+                    for (const auto& node : combinedAST->body) {
+                        if (auto func = std::dynamic_pointer_cast<FunctionNode>(node)) {
+                            for (const auto& label : func->labels) {
+                                if (label == "@entry") {
+                                    entryFunctionName = func->name;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    int result = executeModule(context.TheModule.get(), entryFunctionName);
                     auto t_jit_end = std::chrono::high_resolution_clock::now();
                     std::cout << "Программа выполнена. Результат: " << result << std::endl;
 
