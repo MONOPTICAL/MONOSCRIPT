@@ -5,19 +5,6 @@
 Так сделано потому что язык очень гибкий и многофункциональный и написать всё в одном месте не удобно
 */
 
-
-
-/// @brief Конструктор класса Parser
-/// @details Инициализирует вектор токенов, индекс строки и индекс токена
-/// @param tokens Вектор токенов, который будет парситься 
-Parser::Parser(const std::vector<std::vector<Token>>& tokens)
-{
-    this->lines = tokens;
-    this->lineIndex = 0;
-    this->tokenIndex = 0;
-    this->currentNode = nullptr;
-}
-
 /// @brief Возвращает текущий токен
 /// @details Возвращает текущий токен, если индекс токена меньше размера токенов
 /// @return Текущий токен, если индекс токена меньше размера токенов, иначе возвращает токен с типом None и пустым значением
@@ -192,6 +179,8 @@ std::shared_ptr<TypeNode> Parser::getFullType()
         advance(); // Пропускаем <
         
         auto genericType = std::make_shared<GenericTypeNode>(baseName);
+        genericType->line = lineIndex;
+        genericType->column = tokenIndex;
         
         // Парсим параметры типа
         do {
@@ -213,7 +202,9 @@ std::shared_ptr<TypeNode> Parser::getFullType()
         return genericType;
     } else {
         // Простой тип
-        return std::make_shared<SimpleTypeNode>(baseName);
+        auto node = std::make_shared<SimpleTypeNode>(baseName);
+        node->line = lineIndex; node->column = tokenIndex;
+        return node;
     }
 }
 
@@ -280,6 +271,7 @@ std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
         auto right = parseBinary(currentPrecedence);
 
         left = std::make_shared<BinaryOpNode>(left, currentToken.value, right); // Создаём новый узел бинарной операции
+        left->line = lineIndex; left->column = tokenIndex; // Устанавливаем строку и колонку для узла
     }
 
     return left; // Возвращаем разобранное выражение
@@ -292,7 +284,9 @@ std::shared_ptr<ASTNode> Parser::parseUnary()
     {
         advance(); // Переходим к следующему токену
         auto right = parseUnary(); // Рекурсивно разбираем правую часть выражения
-        return std::make_shared<UnaryOpNode>(currentToken.value, right); // Создаём новый узел унарной операции
+        auto node = std::make_shared<UnaryOpNode>(currentToken.value, right); // Создаём новый узел унарной операции
+        node->line = lineIndex; node->column = tokenIndex; // Устанавливаем строку и колонку для узла
+        return node; // Возвращаем узел унарной операции
     }
     return parsePrimary(); // Если нет унарной операции, разбираем первичное выражение
 }
@@ -341,13 +335,20 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
             else {
                 type = std::make_shared<SimpleTypeNode>("i64");
             }
+            type->line = lineIndex; type->column = tokenIndex;
+
             auto ASTnode = std::make_shared<NumberNode>(intValue.value(), type); // Создаём узел числа
+
+            ASTnode->line = lineIndex; ASTnode->column = tokenIndex; // Устанавливаем строку и колонку для узла
             if(check(TokenType::Arrow)) return parseCast(ASTnode); // Если есть каст, то кастим
             return ASTnode; // Возвращаем узел числа
         }
         else
         {
             auto ASTnode = std::make_shared<FloatNumberNode>(floatValue.value()); // Создаём узел числа с плавающей точкой
+            
+            ASTnode->line = lineIndex; ASTnode->column = tokenIndex; // Устанавливаем строку и колонку для узла
+
             if(check(TokenType::Arrow)) return parseCast(ASTnode); // Если есть каст, то кастим
             return ASTnode; // Возвращаем узел числа с плавающей точкой
         }
@@ -355,7 +356,11 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
     else if (currentToken.type == TokenType::String) // Если токен - строка
     {
         advance(); // Переходим к следующему токену
-        return std::make_shared<StringNode>(currentToken.value.substr(1, currentToken.value.length()-2)); // Создаём узел строки обризаяя кавычки
+        
+        auto stringNode = std::make_shared<StringNode>(currentToken.value.substr(1, currentToken.value.length()-2)); // Создаём узел строки обризаяя кавычки
+        stringNode->line = lineIndex; stringNode->column = tokenIndex; // Устанавливаем строку и колонку для узла
+        
+        return stringNode; // Возвращаем узел строки
     }
     else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::LeftParen) // Если токен - идентификатор
     {
@@ -374,8 +379,12 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
             }
 
             consume(TokenType::RightParen, "Expected ')' after function arguments"); // Проверяем наличие правой скобки
+            
             auto ASTnode = std::make_shared<CallNode>(currentToken.value, arguments); // Создаём узел вызова функции
+            ASTnode->line = lineIndex; ASTnode->column = tokenIndex; // Устанавливаем строку и колонку для узла
+            
             if(check(TokenType::Arrow)) return parseCast(ASTnode); // Если есть каст, то кастим
+            
             return ASTnode; // Возвращаем узел вызова функции
         }
     }
@@ -417,7 +426,9 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         {
             advance(); // Переходим к следующему токену
             auto body = parseExpression();
-            return std::make_shared<LambdaNode>(returnType, params, body);
+            auto lambda = std::make_shared<LambdaNode>(returnType, params, body);
+            lambda->line = lineIndex; lambda->column = tokenIndex; // Устанавливаем строку и колонку для узла
+            return lambda; // Возвращаем узел лямбда-функции
         }
         else if(check(TokenType::Colon))
         {
@@ -428,7 +439,9 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
             
             lineIndex--; // Без этого он скипает 2 линии а не одну
             tokenIndex = getIndentLevel(lines[lineIndex]); // Перепрыгиваем через пайпы/отступы
-            return std::make_shared<LambdaNode>(returnType, params, body);
+            auto lamda = std::make_shared<LambdaNode>(returnType, params, body);
+            lamda->line = lineIndex; lamda->column = tokenIndex; // Устанавливаем строку и колонку для узла
+            return lamda; // Возвращаем узел лямбда-функции
         }
         else
         {
@@ -445,7 +458,12 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
     else if (currentToken.type == TokenType::LeftBracket)
     {
         std::shared_ptr<BlockNode> body = std::make_shared<BlockNode>();
-        if(peek().type == TokenType::RightBracket)  return std::make_shared<NoneNode>(); // если нихуя нету в скобках скипай
+        body->line = lineIndex; body->column = tokenIndex; // Устанавливаем строку и колонку для узла
+        if(peek().type == TokenType::RightBracket) {
+            auto none = std::make_shared<NoneNode>(); 
+            none->line = lineIndex; none->column = tokenIndex; // Устанавливаем строку и колонку для узла
+            return none; // Возвращаем узел none
+        }// если нихуя нету в скобках скипай
 
         do 
         {
@@ -464,10 +482,12 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         if(peek().type == TokenType::RightBrace)  return std::make_shared<NoneNode>(); 
 
         std::shared_ptr<BlockNode> body = std::make_shared<BlockNode>();
+        body->line = lineIndex; body->column = tokenIndex; // Устанавливаем строку и колонку для узла
         
         do 
         {
             std::shared_ptr<KeyValueNode> key_value = std::make_shared<KeyValueNode>();
+            key_value->line = lineIndex; key_value->column = tokenIndex; // Устанавливаем строку и колонку для узла
 
             advance();
 
@@ -501,23 +521,33 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         {
             advance(); // Переходим к следующему токену
             auto type = std::make_shared<SimpleTypeNode>("i1"); // Создаём тип bool
+            
+            type->line = lineIndex; type->column = tokenIndex; // Устанавливаем строку и колонку для узла
+            
             auto numberNode = std::make_shared<NumberNode>(currentToken.value == "true", type); // Создаём узел булевого значения
+            
+            numberNode->line = lineIndex; numberNode->column = tokenIndex; // Устанавливаем строку и колонку для узла
             return numberNode; // Создаём узел булевого значения
         }
         else if (currentToken.value == "null") // Если токен - null
         {
             advance(); // Переходим к следующему токену
-            return std::make_shared<NullNode>(); // Создаём узел null
+            auto nullNode = std::make_shared<NullNode>(); // Создаём узел null
+            nullNode->line = lineIndex; nullNode->column = tokenIndex; // Устанавливаем строку и колонку для узла
+            return nullNode; // Возвращаем узел null
         }
         else if (currentToken.value == "none")
         {
             advance(); // Переходим к следующему токену
-            return std::make_shared<NoneNode>(); // Создаём узел none
+            auto noneNode = std::make_shared<NoneNode>(); // Создаём узел none
+            noneNode->line = lineIndex; noneNode->column = tokenIndex; // Устанавливаем строку и колонку для узла
+            return noneNode; // Возвращаем узел none
         }
         else if (currentToken.value == "defined")
         {
             advance();
             auto call = std::make_shared<CallNode>();
+            call->line = lineIndex; call->column = tokenIndex; // Устанавливаем строку и колонку для узла
             call->callee = "defined";
             call->arguments.push_back(parseExpression());
             return call;
@@ -527,6 +557,7 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
     {
         advance();
         auto ASTnode = std::make_shared<IdentifierNode>(currentToken.value);
+        ASTnode->line = lineIndex; ASTnode->column = tokenIndex; // Устанавливаем строку и колонку для узла
         if(check(TokenType::Arrow)) return parseCast(ASTnode); // Если есть каст, то кастим
         else return ASTnode; // Возвращаем узел идентификатора
     }
@@ -576,6 +607,7 @@ void Parser::parseArrayNotation(std::shared_ptr<AccessExpression> next)
 std::shared_ptr<ASTNode> Parser::parseMemberExpression()
 {
     std::shared_ptr<AccessExpression> root = std::make_shared<AccessExpression>();
+    root->line = lineIndex; root->column = tokenIndex; // Устанавливаем строку и колонку для узла
     auto currentNode = root;
     
     if (!(check(TokenType::Identifier) || check(TokenType::Type)))
@@ -590,6 +622,7 @@ std::shared_ptr<ASTNode> Parser::parseMemberExpression()
            (check(TokenType::LeftParen) && currentNode->memberName.size() > 0))
     {
         auto next = std::make_shared<AccessExpression>();
+        next->line = lineIndex; next->column = tokenIndex; // Устанавливаем строку и колонку для узла
         next->memberName = currentNode->memberName;
         
         if (check(TokenType::Dot))
@@ -612,7 +645,9 @@ std::shared_ptr<ASTNode> Parser::parseMemberExpression()
     
     if (root->nextAccess == nullptr && !root->expression)
     {
-        return std::make_shared<IdentifierNode>(root->memberName);
+        auto IdentifierASTNode = std::make_shared<IdentifierNode>(root->memberName);
+        IdentifierASTNode->line = lineIndex; IdentifierASTNode->column = tokenIndex; // Устанавливаем строку и колонку для узла
+        return IdentifierASTNode; // Возвращаем узел идентификатора
     }
     
     return root;

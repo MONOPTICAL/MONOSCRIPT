@@ -107,8 +107,12 @@ class GenericTypeNode : public TypeNode {
 class ProgramNode : public ASTNode {
     public:
         ProgramNode() = default;
-        ProgramNode(const std::vector<std::shared_ptr<ASTNode>>& body) : body(body) {}
+        ProgramNode(
+            const std::vector<std::shared_ptr<ASTNode>>& body,
+            std::string moduleName) 
+            : body(body), moduleName(moduleName) {}
         std::vector<std::shared_ptr<ASTNode>> body;
+        std::string moduleName;
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);

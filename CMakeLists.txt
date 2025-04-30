@@ -89,6 +89,10 @@ add_executable(ms # Create an executable target named ms
     src/runtime/codegen/Declarations.cpp
     src/runtime/codegen/Arrays.cpp
     src/runtime/codegen/Statements.cpp
+    src/CLI/cli.cpp
+    src/CLI/ast_tools.cpp
+    src/CLI/runner.cpp
+    src/CLI/symantic.cpp
 )
 
 # Добавляем библиотеку D

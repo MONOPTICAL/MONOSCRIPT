@@ -17,6 +17,8 @@ bool Linker::addModule(const std::string& name, const std::string& path, std::sh
     module.name = name;
     module.path = path;
     module.ast = ast;
+
+    std::cout << "Adding module: " << path << std::endl;
     
     modules[name] = module;
     return true;
@@ -187,7 +189,8 @@ bool Linker::loadModule(const std::string& moduleName) {
         const auto tokens = lexer.getTokens();
         
         // Парсинг в AST
-        Parser parser(tokens);
+        std::cout << "!!!!!!!!!!!!!!!!!1Parsing module: " << moduleName << std::endl;
+        Parser parser(tokens, moduleName);
         auto moduleAST = parser.parse();
         
         if (!moduleAST) {
