@@ -10,6 +10,7 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
     [array<i32>]bubbleSort(array<i32>: arr)
     [Type]functionName([Type]: variableName ...)
     */
+    int line = lineIndex; int token = tokenIndex; // Запоминаем строку и токен
     consume(TokenType::LeftBracket, "Expected '[' before function declaration"); // Проверяем наличие левой скобки
 
     std::string association = "";
@@ -72,6 +73,7 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
                     auto returnType = getFullType(); // Получаем полный тип возвращаемого значения функции
 
                     std::shared_ptr<GenericTypeNode> genericType = std::make_shared<GenericTypeNode>("func"); // Создаём указатель на тип функции
+                    genericType->line = lineIndex; genericType->column = tokenIndex; // Устанавливаем строку и колонку для узла
                     for (const auto& param : params) // Для каждого параметра функции
                     {
                         genericType->typeParameters.push_back(param.first); // Добавляем тип параметра в параметры функции
@@ -109,6 +111,7 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
         if (getIndentLevel(lines[lineIndex]) == expectedIndent-1)
         {
             body = std::make_shared<BlockNode>(); // Создаём тело функции
+            body->line = lineIndex; body->column = tokenIndex; // Устанавливаем строку и колонку для узла
         }
         else if (getIndentLevel(lines[lineIndex]) == expectedIndent)
         {
@@ -121,7 +124,9 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
 
         lineIndex--; // Без этого он скипает 2 линии а не одну
 
-        return std::make_shared<FunctionNode>(functionName, association, returnType, parameters, labels, body); // Создаём узел функции
+        auto func = std::make_shared<FunctionNode>(functionName, association, returnType, parameters, labels, body); // Создаём узел функции
+        func->line = line; func->column = token; // Устанавливаем строку и колонку для узла
+        return func; // Возвращаем узел функции
     }
     else
     {
@@ -147,6 +152,7 @@ std::shared_ptr<ASTNode> Parser::parseCast(std::shared_ptr<ASTNode> expression)
             throwError("Expected primitive type after '->'");
         }
         expression->implicitCastTo = std::make_shared<SimpleTypeNode>(typeName); // Создаём указатель на тип
+        expression->implicitCastTo->line = lineIndex; expression->implicitCastTo->column = tokenIndex; // Устанавливаем строку и колонку для узла
         return expression; // Возвращаем выражение
     }
     else
@@ -158,6 +164,8 @@ std::shared_ptr<ASTNode> Parser::parseCast(std::shared_ptr<ASTNode> expression)
 
 std::shared_ptr<ASTNode> Parser::parseIf()
 {
+    int line = lineIndex; int token = tokenIndex; // Запоминаем строку и токен
+
     // Проверяем, что текущий токен - это ключевое слово if
     consume(TokenType::Keyword, "Expected 'if' keyword"); 
     // Мы не делаем проверку здесь на наличие круглой скобки, так как это может быть выражение без скобок
@@ -189,10 +197,14 @@ std::shared_ptr<ASTNode> Parser::parseIf()
             elseBlock = parseBlock(expectedIndent);
         }
     }
-
+    else
+    
     lineIndex--; // Без этого он скипает 2 линии а не одну
 
-    return std::make_shared<IfNode>(condition, thenBlock, elseBlock);
+    auto ifNode = std::make_shared<IfNode>(condition, thenBlock, elseBlock);
+    ifNode->line = line; ifNode->column = token; // Устанавливаем строку и колонку для узла
+    
+    return ifNode; // Возвращаем узел if
 }
 
 std::shared_ptr<ASTNode> Parser::parseFor()
@@ -202,6 +214,8 @@ std::shared_ptr<ASTNode> Parser::parseFor()
     for [iteration variable] in [variable]
     for i in arr
     */
+    int line = lineIndex; int token = tokenIndex; // Запоминаем строку и токен
+
     consume(TokenType::Keyword, "Expected 'for' keyword"); // Проверяем наличие ключевого слова for
 
     std::string iterationVariable = current().value; // Сохраняем имя переменной итерации
@@ -225,7 +239,10 @@ std::shared_ptr<ASTNode> Parser::parseFor()
 
     lineIndex--; // Без этого он скипает 2 линии а не одну
 
-    return std::make_shared<ForNode>(iterationVariable, iterable, body); // Создаём узел цикла for
+    auto forNode = std::make_shared<ForNode>(iterationVariable, iterable, body); // Создаём узел цикла for
+    forNode->line = line; forNode->column = token; // Устанавливаем строку и колонку для узла
+    
+    return forNode; // Возвращаем узел цикла for
 }
 
 std::shared_ptr<ASTNode> Parser::parseWhile()
@@ -235,6 +252,8 @@ std::shared_ptr<ASTNode> Parser::parseWhile()
     while (expression)
     |   {body}
     */
+    int line = lineIndex; int token = tokenIndex; // Запоминаем строку и токен
+
     consume(TokenType::Keyword, "Expected 'while' keyword"); // Проверяем наличие ключевого слова while
     auto condition = parseExpression();
 
@@ -246,7 +265,9 @@ std::shared_ptr<ASTNode> Parser::parseWhile()
     lineIndex--; // Без этого он скипает 2 линии а не одну
 
 
-    return std::make_shared<WhileNode>(condition, body);
+    auto whileNode = std::make_shared<WhileNode>(condition, body);
+    whileNode->line = line; whileNode->column = token; // Устанавливаем строку и колонку для узла
+    return whileNode; // Возвращаем узел цикла while
 }
 
 std::shared_ptr<BlockNode> Parser::parseBlock(int expectedIndent)
@@ -257,8 +278,9 @@ std::shared_ptr<BlockNode> Parser::parseBlock(int expectedIndent)
     |   *code*
     |
     */
-   auto block = std::make_shared<BlockNode>();
-   while (!isEndOfFile()) {
+    auto block = std::make_shared<BlockNode>();
+    block->line = lineIndex; block->column = tokenIndex; // Устанавливаем строку и колонку для узла
+    while (!isEndOfFile()) {
         int actualIndent = getIndentLevel(lines[lineIndex]);
 
         if (actualIndent < expectedIndent) break;
@@ -272,7 +294,7 @@ std::shared_ptr<BlockNode> Parser::parseBlock(int expectedIndent)
         auto stmt = parseStatement();  // не должен заниматься отступами
         if (stmt) block->statements.push_back(stmt);
         nextLine();
-   }
+    }
 
    return block;
 }
@@ -293,6 +315,8 @@ std::shared_ptr<ASTNode> Parser::parseReturn()
     return [expression]
     return 0
     */
+    int line = lineIndex; int token = tokenIndex; // Запоминаем строку и токен
+
     consume(TokenType::Keyword, "Expected 'return' keyword"); // Проверяем наличие ключевого слова return
     std::shared_ptr<ASTNode> expression;
     if(current().column != -1)
@@ -300,7 +324,9 @@ std::shared_ptr<ASTNode> Parser::parseReturn()
     else
         expression = std::make_shared<NullNode>();
 
-    return std::make_shared<ReturnNode>(expression); // Создаём узел возврата
+    auto returnNode = std::make_shared<ReturnNode>(expression); // Создаём узел возврата
+    returnNode->line = line; returnNode->column = token; // Устанавливаем строку и колонку для узла
+    return returnNode; // Возвращаем узел возврата
 }
 
 std::shared_ptr<ASTNode> Parser::parseExpression()
@@ -335,7 +361,9 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
 
     if(current().type == TokenType::Type && (current().value != "array" && current().value != "map"))                       // Проверяем наличие типа
     {
-        type = std::make_shared<SimpleTypeNode>(current().value);                                 // Сохраняем тип переменной
+        type = std::make_shared<SimpleTypeNode>(current().value); // Сохраняем тип переменной   
+        type->line = lineIndex; type->column = tokenIndex; // Устанавливаем строку и колонку для узла
+        
         consume(TokenType::Type, "Expected type");              // Проверяем наличие типа
         variableName = current().value;                         // Сохраняем имя переменной
         consume(TokenType::Identifier, "Expected identifier");  // Проверяем наличие идентификатора
@@ -347,7 +375,9 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
     }
     else if(current().type == TokenType::Identifier && peek().value == "^=") // Проверяем наличие идентификатора
     {
-        type = std::make_shared<SimpleTypeNode>("auto");
+        type = std::make_shared<SimpleTypeNode>("auto"); // Сохраняем тип переменной
+        type->line = lineIndex; type->column = tokenIndex; // Устанавливаем строку и колонку для узла
+
         variableName = current().value;                         // Сохраняем имя переменной
         consume(TokenType::Identifier, "Expected identifier");  // Проверяем наличие идентификатора
         if(!check(TokenType::Operator) || current().value != "^=") // Проверяем наличие оператора присваивания
@@ -362,7 +392,9 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
         consume(TokenType::Identifier, "Expected identifier");  // Проверяем наличие идентификатора
         consume(TokenType::Operator, "Expected = operator");
         auto expression = parseExpression();
-        return std::make_shared<VariableReassignNode>(variableName, expression);
+        auto varReassign = std::make_shared<VariableReassignNode>(variableName, expression);
+        varReassign->line = lineIndex; varReassign->column = tokenIndex; // Устанавливаем строку и колонку для узла
+        return varReassign; // Возвращаем узел присваивания переменной
     }
     else
     {   // Тут обрабатываются случаи с динамической инициализацией переменной и с кастомным типом(например, array<i32>)
@@ -385,7 +417,11 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
         if(!check(TokenType::Operator) || current().value != "=") // Проверяем наличие оператора присваивания
         {
             std::shared_ptr<NoneNode> none = std::make_shared<NoneNode>();
-            return std::make_shared<VariableAssignNode>(variableName, isConst, type, none);
+            none->line = lineIndex; none->column = tokenIndex; // Устанавливаем строку и колонку для узла
+
+            auto varAssign = std::make_shared<VariableAssignNode>(variableName, isConst, type, none);
+            varAssign->line = lineIndex; varAssign->column = tokenIndex; // Устанавливаем строку и колонку для узла
+            return varAssign; // Возвращаем узел присваивания переменной
         }
     }
     // Здесь мы уже у оператора присваивания, который идёт после имени переменной
@@ -398,7 +434,9 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
         throwError("Expected expression after assignment operator");
     }
 
-    return std::make_shared<VariableAssignNode>(variableName, isConst, type ,expression); // Создаём узел присваивания переменной
+    auto varAssign = std::make_shared<VariableAssignNode>(variableName, isConst, type ,expression); // Создаём узел присваивания переменной
+    varAssign->line = lineIndex; varAssign->column = tokenIndex; // Устанавливаем строку и колонку для узла
+    return varAssign; // Возвращаем узел присваивания переменной
 }
 
 std::shared_ptr<ASTNode> Parser::parseCall()
@@ -409,6 +447,7 @@ std::shared_ptr<ASTNode> Parser::parseCall()
     bubbleSort(arr, 0, 10)
     */
     std::shared_ptr<CallNode> callNode = std::make_shared<CallNode>();
+    callNode->line = lineIndex; callNode->column = tokenIndex; // Устанавливаем строку и колонку для узла
     callNode->callee = current().value;
     consume(TokenType::Identifier, "Expected function name"); // Проверяем наличие идентификатора функции
     consume(TokenType::LeftParen, "Expected '(' after function name");
@@ -438,7 +477,7 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
 |   | i32 age = 42
 |   | bool isActive = true
     */
-   
+    int line = lineIndex; int token = tokenIndex; // Запоминаем строку и токен
     consume(TokenType::LeftBracket, "Expected '[' before struct declaration"); // Проверяем наличие левой скобки
     consume(TokenType::Type, "Expected 'struct' keyword"); // Проверяем наличие ключевого слова struct
     consume(TokenType::RightBracket, "Expected ']' before struct declaration"); // Проверяем наличие левой скобки
@@ -452,14 +491,16 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
     
     lineIndex--; // Без этого он скипает 2 линии а не одну    
     
-    return std::make_shared<StructNode>(name, body); // Создаём узел структуры
+    auto structNode = std::make_shared<StructNode>(name, body); // Создаём узел структуры
+    structNode->line = line; structNode->column = token; // Устанавливаем строку и колонку для узла
+    return structNode; // Возвращаем узел структуры
 }
 
 std::shared_ptr<ASTNode> Parser::parseUse()
 {
     std::map<std::vector<std::string>, std::string> paths;
     std::string alias;
-
+    int line = lineIndex; int token = tokenIndex; // Запоминаем строку и токен
     std::vector<std::string> path;
 
     consume(TokenType::Keyword, "Expected 'use' keyword"); // Проверяем наличие ключевого слова use
@@ -493,5 +534,7 @@ std::shared_ptr<ASTNode> Parser::parseUse()
     }
 
     lineIndex--; // Без этого он скипает 2 линии а не одну
-    return std::make_shared<ImportNode>(paths);
+    auto importNode = std::make_shared<ImportNode>(paths);
+    importNode->line = line; importNode->column = token; // Устанавливаем строку и колонку для узла
+    return importNode; // Возвращаем узел импорта
 }
