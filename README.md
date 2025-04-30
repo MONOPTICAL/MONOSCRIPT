@@ -257,7 +257,7 @@ final, in, and, or, is, public, private, define
 
 ### 🔢 Встроенные типы
 ```
-i1, i8, i32, i64, string, void, array, map, float, struct, class
+i1, i8, i32, i64, string, void, array, map, float, struct
 ```
 
 ## 🛠 Пример полной программы
