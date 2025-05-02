@@ -3,6 +3,7 @@
 #include "../parser/headers/Parser.h"
 #include "../linker/headers/Linker.h"
 #include "../includes/ASTDebugger.hpp"
+#include "../errors/headers/ErrorEngine.h"
 #include <iostream>
 #include <filesystem>
 
@@ -58,6 +59,10 @@ std::shared_ptr<ProgramNode> parseAndLinkModules(
             for (const auto& node : module.ast->body) {
                 // Пропускаем директивы импорта в объединенном AST, они уже обработаны
                 if (!std::dynamic_pointer_cast<ImportNode>(node)) {
+                    // Добавляем метку модуля в объединенный AST
+                    auto newModuleMark = std::make_shared<ModuleMark>(module.path);
+                    combinedAST->body.push_back(newModuleMark);
+                    
                     combinedAST->body.push_back(node);
                 }
             }
@@ -72,5 +77,27 @@ std::shared_ptr<ProgramNode> parseAndLinkModules(
         std::cout << "--- Конец объединенного AST ---\n";
     }
     
+    // Инициализация ErrorEngine
+    std::vector<std::string>* sourceFromTokens = new std::vector<std::string>();
+    for (const auto& tokenList : tokens) {
+        std::string sourceLine;
+        for (const auto& token : tokenList) {
+            sourceLine += token.value + " ";
+        }
+        sourceFromTokens->push_back(sourceLine);
+    }
+
+    // Выводим для дебага
+    std::cout << "\n--- Исходный код из токенов ---\n";
+    int lineNumber = 0;
+    for (const auto& line : *sourceFromTokens) {
+        std::cout << "#" << lineNumber << " " <<  line << "\n";
+        lineNumber++;
+    }
+    std::cout << "--- Конец исходного кода из токенов ---\n";
+
+
+    ErrorEngine::getInstance().initialize(*sourceFromTokens);
+
     return combinedAST;
 }

@@ -314,6 +314,12 @@ void ASTGen::visit(CallNode& node) {
     }
 }
 
+void ASTGen::visit(ModuleMark &node)
+{
+    LogWarning("visit для ModuleMark: " + node.moduleName);
+    this->currentModuleName = node.moduleName;
+}
+
 void ASTGen::visit(BinaryOpNode& node) {
     LogWarning("visit не реализован для BinaryOpNode: " + node.op);
     result = nullptr;

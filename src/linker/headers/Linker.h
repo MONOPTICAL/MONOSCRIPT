@@ -60,7 +60,7 @@ struct ModuleContext {
     std::string                                                                                         name;
     std::string                                                                                         path;
     std::shared_ptr<ProgramNode>                                                                        ast;
-    
+
     // Символы, определённые в этом модуле
     std::unordered_map<std::string, FunctionInfo>                                                       functions;
     std::unordered_map<std::string, VariableInfo>                                                       globals;
@@ -93,9 +93,15 @@ public:
     const std::unordered_map<std::string, ModuleContext>&                                               getModules() const { 
                                                                                                             return modules; 
                                                                                                         }
+
+    const std::vector<std::vector<Token>>&                                                              getTokens() const { 
+                                                                                                            return Tokens; 
+                                                                                                        }
+    
 private:
     std::string                                                                                         stdLibPath;
     std::unordered_map<std::string, ModuleContext>                                                      modules;
+    std::vector<std::vector<Token>>                                                                     Tokens;
     
     // Первый проход: сбор информации о модулях
     void                                                                                                collectModuleInfo(ModuleContext& module);

@@ -36,6 +36,7 @@ class ASTNodeVisitor {
         virtual void visit(class AccessExpression& node) = 0;
         virtual void visit(class ImportNode& node) = 0;
         virtual void visit(class LambdaNode& node) = 0;
+        virtual void visit(class ModuleMark& node) = 0;
 };
 
 class TypeNode;
@@ -57,6 +58,17 @@ class ASTNode : public std::enable_shared_from_this<ASTNode> {
 
         std::shared_ptr<ASTNode> shared_from_this() {
             return std::enable_shared_from_this<ASTNode>::shared_from_this();
+        }
+};
+
+class ModuleMark : public ASTNode {
+    public:
+        ModuleMark() = default;
+        ModuleMark(const std::string& moduleName) : moduleName(moduleName) {}
+        std::string moduleName;
+
+        void accept(ASTNodeVisitor& visitor) override {
+            visitor.visit(*this);
         }
 };
 

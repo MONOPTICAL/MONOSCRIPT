@@ -187,6 +187,10 @@ bool Linker::loadModule(const std::string& moduleName) {
         Lexer lexer(moduleContent);
         lexer.tokenize();
         const auto tokens = lexer.getTokens();
+
+        for (const auto& tokenVec : tokens) {
+            this->Tokens.push_back(tokenVec);
+        }
         
         // Парсинг в AST
         std::cout << "!!!!!!!!!!!!!!!!!1Parsing module: " << moduleName << std::endl;

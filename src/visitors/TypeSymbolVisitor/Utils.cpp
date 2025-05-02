@@ -1,11 +1,22 @@
 #include "../headers/TypeSymbolVisitor.h"
 #include "../../includes/ASTDebugger.hpp"
-void TypeSymbolVisitor::LogError(const std::string &message)
+void TypeSymbolVisitor::LogError(const std::string &message, std::shared_ptr<ASTNode> node)
 {
-    std::cout << "--- ERROR ---\n" << std::endl;
-    ASTDebugger::debug(this->program);
-    std::cout << "-------------\n";
-    throw std::runtime_error("Semantic Error: " + message);
+    if (node) {
+        int column;
+
+        if (!node->column) column = 0;
+        else column = node->column;
+        
+        ErrorEngine::getInstance().report(
+            node->line, 
+            column, 
+            this->currentModuleName, 
+            message
+        );
+    }
+    else
+        throw std::runtime_error("[" + this->currentModuleName + "]Semantic Error: " + message);
 }
 
 std::shared_ptr<TypeNode> TypeSymbolVisitor::checkForIdentifier(std::shared_ptr<ASTNode>& node)
