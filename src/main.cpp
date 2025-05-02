@@ -2,6 +2,7 @@
 #include "CLI/headers/ast_tools.h"
 #include "CLI/headers/runner.h"
 #include "CLI/headers/symantic.h"
+#include "errors/headers/ErrorEngine.h"
 #include <iostream>
 #include <chrono>
 #include <filesystem>
@@ -33,7 +34,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Анализ кода завершен. Для выполнения используйте флаг --run." << std::endl;
         
     } catch (const std::exception& e) {
-        std::cerr << "Ошибка: " << e.what() << std::endl;
+        std::cerr << e.what() << std::endl;
         return 1;
     }
     

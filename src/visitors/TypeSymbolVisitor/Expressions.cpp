@@ -101,3 +101,18 @@ void TypeSymbolVisitor::visit(UnaryOpNode& node) {
 
     node.inferredType = operandType;
 }
+
+void TypeSymbolVisitor::visit(LambdaNode &node)
+{
+    std::unordered_map<std::string, std::shared_ptr<ASTNode>> args = {};
+
+    Context currentFunction = {
+        .labels = {},
+        .variables = {},
+        .functions = {}, 
+        .currentFunctionName = "lambda", // TODO: Проверить не мешает ли это
+        .returnType = node.returnType, // Тип возвращаемого значения
+        .returnedValue = false // Возвращаемое значение
+    };
+
+}

@@ -27,18 +27,13 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
             LogError("Function " + node.name + " cannot be defined in a non-global context");
     }
 
+    std::vector<std::string> labels = contexts.back().labels;
+    labels.insert(labels.end(), node.labels.begin(), node.labels.end()); // Добавляем метки функции в текущий контекст
 
     /*
-    Пока что не проверяем, что функция является методом класса
-    Так как не реализован класс
-    if (node.associated != "") {
-        // Проверяем, существует ли класс в реестре
-        auto it = contexts.back().variables.find(node.associated);
-        if (it == contexts.back().variables.end()) {
-            LogError("Class not found: " + node.associated);
-        }
-    }
+    Пока что не проверяем, что функция является методом структуры
     */
+   
     std::unordered_map<std::string, std::shared_ptr<TypeNode>> args = {};
 
     // Проходим по параметрам функции
@@ -46,21 +41,47 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
         param.first->accept(*this); // Проверяем тип параметра
         // Тут типы параметров не проверяются, так как они могут быть разными и это нормально
 
-        if (contexts.back().variables.find(param.second) != contexts.back().variables.end()) {
-            LogError("Parameter already defined: " + param.second);
+        /* TODO: Проверь перекрытие имён
+        if(std::find(labels.begin(), labels.end(), "@pure") == labels.end()) { // Если функция не является чистой
+            if (contexts.back().variables.find(param.second) != contexts.back().variables.end()) {
+                LogError("Parameter already defined: " + param.second);
+            }
+        }
+        */
+
+        if (std::find(node.labels.begin(), node.labels.end(), param.second) != node.labels.end()) {
+            LogError("Parameter cannot have the same name as a label: " + param.second);
         }
 
         // Добавляем параметр в реестр
         args[param.second] = param.first;
     }
-    std::vector<std::string> labels = contexts.back().labels;
-    labels.insert(labels.end(), node.labels.begin(), node.labels.end()); // Добавляем метки функции в текущий контекст
 
+    // Если функция не является чистой, то хуярим ей все предыдущие переменные
+    std::unordered_map<std::string, std::shared_ptr<ASTNode>> variables = {};
+    std::unordered_map<std::string, std::shared_ptr<ASTNode>> functions = {};
+
+    if(std::find(labels.begin(), labels.end(), "@pure") == labels.end())
+    {
+        variables = contexts.back().variables;
+        functions = contexts.back().functions;
+    }
+    else
+    {
+        for (const auto& func : contexts.back().functions) {
+            if (auto funcNode = std::dynamic_pointer_cast<FunctionNode>(func.second)) {
+                if (std::find(funcNode->labels.begin(), funcNode->labels.end(), "@pure") != funcNode->labels.end()) { // Если функция является чистой
+                    functions[func.first] = func.second;
+                }
+            }
+        }
+    }
+    
     // Если не вывилась ошибка, добавляем функцию в реестр
     Context currentFunction = {
         .labels = labels, // Добавляем метки функции
-        .variables = contexts.back().variables, // Добавляем переменные текущего контекста
-        .functions = contexts.back().functions, // Добавляем функции текущего контекста
+        .variables = variables, // Добавляем переменные текущего контекста
+        .functions = functions, // Добавляем функции текущего контекста
         .currentFunctionName = node.name,       // Имя функции 
         .returnType = node.returnType,          // Тип возвращаемого значения
         .returnedValue = false                  // Возвращаемое значение
@@ -229,7 +250,7 @@ void TypeSymbolVisitor::visit(ReturnNode &node)
 {
     // Проверяем, существует ли функция в реестре
     if (contexts.back().currentFunctionName.empty()) {
-        LogError("Return statement outside of function");
+        LogError("Return statement outside of function", node.shared_from_this());
     }
 
     // Проверяем тип возвращаемого значения
@@ -329,7 +350,7 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
     }
 
     if (expressionType != varTypeStr) 
-            LogError("Type mismatch: expected " + varTypeStr + ", got " + expressionType);
+            LogError("Type mismatch: expected " + varTypeStr + ", got " + expressionType, node.expression);
 
     // Добавляем переменную в реестр
     varAssign->expression = node.expression;
@@ -470,7 +491,7 @@ void TypeSymbolVisitor::visit(ContinueNode& node) {
 }
 
 void TypeSymbolVisitor::visit(CallNode& node) { 
-    // Длеаем список типов аргументов
+    // Делаем список типов аргументов
     std::vector<std::shared_ptr<TypeNode>> argTypes;
     for (size_t i = 0; i < node.arguments.size(); ++i) {
         node.arguments[i]->accept(*this);

@@ -76,3 +76,8 @@ void TypeSymbolVisitor::visit(KeyValueNode& node) {
     auto keyType = checkForIdentifier(node.key);
     auto valueType = checkForIdentifier(node.value);
 }
+
+void TypeSymbolVisitor::visit(ModuleMark &node)
+{
+    this->currentModuleName = node.moduleName;
+}
