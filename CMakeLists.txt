@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.24) 
-project(ms) 
-set(CMAKE_BUILD_TYPE Release)
+project(ms)
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 set(CMAKE_CXX_STANDARD 20)
@@ -89,6 +88,8 @@ add_executable(ms # Create an executable target named ms
     src/runtime/codegen/Declarations.cpp
     src/runtime/codegen/Arrays.cpp
     src/runtime/codegen/Statements.cpp
+    src/runtime/codegen/Expressions.cpp
+    src/runtime/codegen/TypeConversions.cpp
     src/CLI/cli.cpp
     src/CLI/ast_tools.cpp
     src/CLI/runner.cpp
@@ -98,5 +99,14 @@ add_executable(ms # Create an executable target named ms
 
 # Добавляем библиотеку D
 add_dependencies(ms build_dlib) 
+
+# DEBUG_MODE
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+  target_compile_definitions(ms PRIVATE DEBUG=true)
+  message(STATUS "Debug mode enabled (DEBUG=true)")
+else()
+  target_compile_definitions(ms PRIVATE DEBUG=false)
+  message(STATUS "Debug mode disabled (DEBUG=false)")
+endif()
 
 target_link_libraries(ms PRIVATE ${llvm_libs})

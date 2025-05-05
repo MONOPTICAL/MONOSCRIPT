@@ -19,4 +19,15 @@ namespace Arrays {
 namespace Statements {
     llvm::Value*                    handleReturnStatement(CodeGenContext& context, ReturnNode& node);
 };
+
+namespace Expressions {
+    llvm::Value*                    handleBinaryOperation(CodeGenContext& context, BinaryOpNode& node, llvm::Value* left, llvm::Value* right);
+    llvm::Value*                    handleUnaryOperation(CodeGenContext& context, UnaryOpNode& node, llvm::Value* operand);
+}
+
+namespace TypeConversions {
+    llvm::Value*                    convertValueToType(CodeGenContext& context, llvm::Value* value, llvm::Type* targetType, const std::string& name = "");
+    llvm::Value*                    applyImplicitCast(CodeGenContext& context, llvm::Value* value, std::shared_ptr<TypeNode> targetTypeNode, const std::string& name = "");
+    llvm::Value*                    loadValueIfPointer(CodeGenContext& context, llvm::Value* value, const std::string& name = "");
+}
 #endif

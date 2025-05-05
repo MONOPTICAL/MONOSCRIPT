@@ -70,31 +70,38 @@ int executeModule(llvm::Module* module, std::string mainFunction) {
     auto MainFn = MainSymbol.toPtr<int(*)()>();
 
     // Вызываем функцию
-    std::cout << "Executing " << mainFunction << "()...\n";
+    #if DEBUG
+        std::cout << "Executing " << mainFunction << "()...\n";
+    #endif
     int Result = MainFn();
-    std::cout << "Function " << mainFunction << "() executed.\n";
+    #if DEBUG
+        std::cout << "Function " << mainFunction << "() executed.\n";
+    #endif
 
     return Result;
 }
 
 int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& currentFilePath, bool showAST) {
+#if DEBUG
     auto t_start = std::chrono::high_resolution_clock::now();
-    
+#endif
     // Code generation
     CodeGenContext context(currentFilePath);
     ASTGen codeGen(context);
     combinedAST->accept(codeGen);
-    
+
+#if DEBUG
     auto t_codegen = std::chrono::high_resolution_clock::now();
 
+    
     std::cout << "\n--- LLVM IR ---" << std::endl;
     context.TheModule->print(llvm::outs(), nullptr);
     std::cout << "--- END LLVM IR ---\n" << std::endl;
     
     std::cout << "\n--- Запуск программы ---" << std::endl;
-    
+#endif
+
     try {
-        auto t_jit_start = std::chrono::high_resolution_clock::now();
         
         if (context.TheModule != nullptr) { 
             std::string entryFunctionName = "main";
@@ -111,10 +118,16 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
                 }
             }
             
+#if DEBUG
+            auto t_jit_start = std::chrono::high_resolution_clock::now();
+#endif
             int result = executeModule(context.TheModule.get(), entryFunctionName);
+#if DEBUG
             auto t_jit_end = std::chrono::high_resolution_clock::now();
-            std::cout << "Программа выполнена. Результат: " << result << std::endl;
+#endif
+            std::cout << "[" << entryFunctionName << " exited with code " << result << "]" << std::endl;
 
+#if DEBUG
             // Статистика по времени
             auto ms_codegen = std::chrono::duration_cast<std::chrono::milliseconds>(t_codegen - t_start).count();
             auto ms_jit = std::chrono::duration_cast<std::chrono::milliseconds>(t_jit_end - t_jit_start).count();
@@ -125,6 +138,7 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
             std::cout << "JIT + исполнение:  " << ms_jit << " мс" << std::endl;
             std::cout << "Всего:             " << ms_total << " мс" << std::endl;
             std::cout << "--- Конец таймингов ---\n" << std::endl;
+#endif
             
             return result;
         } else {

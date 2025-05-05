@@ -7,7 +7,7 @@ std::shared_ptr<ProgramNode> symanticParseModule(std::shared_ptr<ProgramNode> co
     // Type checking
     TypeSymbolVisitor typeSymbolVisitor;
     combinedAST->accept(typeSymbolVisitor);
-
+    
     if (showSymantic && combinedAST) {
         std::cout << "\n--- AST(2) ---\n";
         ASTDebugger::debug(combinedAST);

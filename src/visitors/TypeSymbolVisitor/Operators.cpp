@@ -12,7 +12,6 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
         type = node->inferredType;
 
     if (auto numberNode = std::dynamic_pointer_cast<NumberNode>(node)) {
-        IC(type->toString());
         if(type->toString() == "i1")
             callNode = std::make_shared<CallNode>(
                 "toString_bool",
@@ -28,7 +27,6 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
                 }
             );
     } else if (auto floatNumberNode = std::dynamic_pointer_cast<FloatNumberNode>(node)) {
-        IC(type->toString());
         callNode = std::make_shared<CallNode>(
             "toString_float",
             std::vector<std::shared_ptr<ASTNode>>{
@@ -36,7 +34,6 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
             }
         );
     } else if (auto binaryOpNode = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
-        IC(type->toString());
         callNode = std::make_shared<CallNode>(
             "toString_int",
             std::vector<std::shared_ptr<ASTNode>>{
@@ -44,7 +41,6 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
             }
         );
     } else if (auto unaryOpNode = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
-        IC(type->toString());
         callNode = std::make_shared<CallNode>(
             "toString_int",
             std::vector<std::shared_ptr<ASTNode>>{
@@ -52,7 +48,6 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
             }
         );
     } else if (auto call = std::dynamic_pointer_cast<CallNode>(node)) {
-        IC("x", type->toString());
         std::string toStringMethod;
 
         if (type->toString() == "float")
@@ -72,7 +67,7 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
 
     if (!callNode) 
         return node;
-    IC();
+
     return callNode;
 }
 
@@ -88,7 +83,7 @@ void TypeSymbolVisitor::handlePlusOperator(std::shared_ptr<BinaryOpNode>& node, 
     // string
     if (left == "string" || right == "string") {
         if (checkLabels("@strict") && !(left == "string" && right == "string"))
-            LogError("Implicit type casting is not allowed for '+' in @strict mode: " + left + " and " + right);
+            LogError("Implicit type casting is not allowed for '+' in @strict mode: " + left + " and " + right, node->right->shared_from_this());
         
         if (left != "string") {
             node->left = toStringHandler(node->left, *this);
@@ -107,7 +102,7 @@ void TypeSymbolVisitor::handlePlusOperator(std::shared_ptr<BinaryOpNode>& node, 
             bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == "float";
             bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == "float";
             if (leftImplicitFloat || rightImplicitFloat)
-                LogError("Implicit type casting is not allowed for '+' in @strict mode: " + left + " and " + right);
+                LogError("Implicit te casting is not allowed for '+' in @strict mode: " + left + " and " + right, node->right->shared_from_this());
         }
 
         if (left != "float") {
@@ -128,7 +123,7 @@ void TypeSymbolVisitor::handlePlusOperator(std::shared_ptr<BinaryOpNode>& node, 
         return;
     }
 
-    LogError("Unsupported operand types for '+': " + left + " and " + right);
+    LogError("Unsupported operand types for '+': " + left + " and " + right, node->right->shared_from_this());
 }
 
 void TypeSymbolVisitor::handleMinusOperator(std::shared_ptr<BinaryOpNode>& node, std::shared_ptr<TypeNode> leftType, std::shared_ptr<TypeNode> rightType)
@@ -143,7 +138,7 @@ void TypeSymbolVisitor::handleMinusOperator(std::shared_ptr<BinaryOpNode>& node,
 
     // string
     if (left == "string" || right == "string") {
-        LogError("Unsupported operand types for '-': " + left + " and " + right);
+        LogError("Unsupported operand types for '-': " + left + " and " + right, node->right->shared_from_this());
         return;
     }
 
@@ -153,7 +148,7 @@ void TypeSymbolVisitor::handleMinusOperator(std::shared_ptr<BinaryOpNode>& node,
             bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == "float";
             bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == "float";
             if (leftImplicitFloat || rightImplicitFloat)
-                LogError("Implicit type casting is not allowed for '-' in @strict mode: " + left + " and " + right);
+                LogError("Implicit type casting is not allowed for '-' in @strict mode: " + left + " and " + right, node->right->shared_from_this());
         }
 
         if (left != "float") {
@@ -174,7 +169,7 @@ void TypeSymbolVisitor::handleMinusOperator(std::shared_ptr<BinaryOpNode>& node,
         return;
     }
 
-    LogError("Unsupported operand types for '+': " + left + " and " + right);
+    LogError("Unsupported operand types for '+': " + left + " and " + right, node->right->shared_from_this());
 }
 
 void TypeSymbolVisitor::handleMulOperator(std::shared_ptr<BinaryOpNode>& node, std::shared_ptr<TypeNode> leftType, std::shared_ptr<TypeNode> rightType)
@@ -188,7 +183,7 @@ void TypeSymbolVisitor::handleMulOperator(std::shared_ptr<BinaryOpNode>& node, s
 
     // string
     if (left == "string" || right == "string") {
-        LogError("Unsupported operand types for '*': " + left + " and " + right);
+        LogError("Unsupported operand types for '*': " + left + " and " + right, node->right->shared_from_this());
         return;
     }
 
@@ -198,7 +193,7 @@ void TypeSymbolVisitor::handleMulOperator(std::shared_ptr<BinaryOpNode>& node, s
             bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == "float";
             bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == "float";
             if (leftImplicitFloat || rightImplicitFloat)
-                LogError("Implicit type casting is not allowed for '*' in @strict mode: " + left + " and " + right);
+                LogError("Implicit type casting is not allowed for '*' in @strict mode: " + left + " and " + right, node->right->shared_from_this());
         }
 
         if (left != "float") {
@@ -219,7 +214,7 @@ void TypeSymbolVisitor::handleMulOperator(std::shared_ptr<BinaryOpNode>& node, s
         return;
     }
 
-    LogError("Unsupported operand types for '+': " + left + " and " + right);
+    LogError("Unsupported operand types for '+': " + left + " and " + right, node->right->shared_from_this());
 }
 
 void TypeSymbolVisitor::handleDivOperator(std::shared_ptr<BinaryOpNode>& node, std::shared_ptr<TypeNode> leftType, std::shared_ptr<TypeNode> rightType)
@@ -232,7 +227,7 @@ void TypeSymbolVisitor::handleDivOperator(std::shared_ptr<BinaryOpNode>& node, s
     };
 
     if (left == "string" || right == "string") {
-        LogError("Unsupported operand types for '/': " + left + " and " + right);
+        LogError("Unsupported operand types for '/': " + left + " and " + right, node->right->shared_from_this());
         return;
     }
 
@@ -241,7 +236,7 @@ void TypeSymbolVisitor::handleDivOperator(std::shared_ptr<BinaryOpNode>& node, s
             bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == "float";
             bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == "float";
             if (leftImplicitFloat || rightImplicitFloat)
-                LogError("Implicit type casting is not allowed for '/' in @strict mode: " + left + " and " + right);
+                LogError("Implicit type casting is not allowed for '/' in @strict mode: " + left + " and " + right, node->right->shared_from_this());
         }
 
         if (left != "float") {
@@ -261,7 +256,7 @@ void TypeSymbolVisitor::handleDivOperator(std::shared_ptr<BinaryOpNode>& node, s
         return;
     }
 
-    LogError("Unsupported operand types for '/': " + left + " and " + right);
+    LogError("Unsupported operand types for '/': " + left + " and " + right, node->right->shared_from_this());
 }
 
 void TypeSymbolVisitor::handleModOperator(std::shared_ptr<BinaryOpNode>& node, std::shared_ptr<TypeNode> leftType, std::shared_ptr<TypeNode> rightType)
@@ -274,7 +269,7 @@ void TypeSymbolVisitor::handleModOperator(std::shared_ptr<BinaryOpNode>& node, s
     };
 
     if (left == "string" || right == "string") {
-        LogError("Unsupported operand types for '%': " + left + " and " + right);
+        LogError("Unsupported operand types for '%': " + left + " and " + right, node->right->shared_from_this());
         return;
     }
 
@@ -283,7 +278,7 @@ void TypeSymbolVisitor::handleModOperator(std::shared_ptr<BinaryOpNode>& node, s
             bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == "float";
             bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == "float";
             if (leftImplicitFloat || rightImplicitFloat)
-                LogError("Implicit type casting is not allowed for '%' in @strict mode: " + left + " and " + right);
+                LogError("Implicit type casting is not allowed for '%' in @strict mode: " + left + " and " + right, node->right->shared_from_this());
         }
 
         if (left != "float") {
@@ -303,7 +298,7 @@ void TypeSymbolVisitor::handleModOperator(std::shared_ptr<BinaryOpNode>& node, s
         return;
     }
 
-    LogError("Unsupported operand types for '%': " + left + " and " + right);
+    LogError("Unsupported operand types for '%': " + left + " and " + right, node->right->shared_from_this());
 }
 
 void TypeSymbolVisitor::handleCompareOperator(std::shared_ptr<BinaryOpNode>& node, std::shared_ptr<TypeNode> leftType, std::shared_ptr<TypeNode> rightType)
@@ -327,7 +322,7 @@ void TypeSymbolVisitor::handleCompareOperator(std::shared_ptr<BinaryOpNode>& nod
     else cmpOp = ""; // неизвестный оператор
 
     if (cmpOp.empty()) {
-        LogError("Unknown comparison operator: " + node->op);
+        LogError("Unknown comparison operator: " + node->op, node->right->shared_from_this());
         return;
     }
 
@@ -352,7 +347,7 @@ void TypeSymbolVisitor::handleCompareOperator(std::shared_ptr<BinaryOpNode>& nod
             bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == "float";
             bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == "float";
             if (leftImplicitFloat || rightImplicitFloat)
-                LogError("Implicit type casting is not allowed for '" + node->op + "' in @strict mode: " + left + " and " + right);
+                LogError("Implicit type casting is not allowed for '" + node->op + "' in @strict mode: " + left + " and " + right, node->right->shared_from_this());
         }
 
         if (left != "float") node->left->implicitCastTo = registry.findType("float");
@@ -369,7 +364,7 @@ void TypeSymbolVisitor::handleCompareOperator(std::shared_ptr<BinaryOpNode>& nod
         return;
     }
 
-    LogError("Unsupported operand types for comparison: " + left + " and " + right);
+    LogError("Unsupported operand types for comparison: " + left + " and " + right, node->right->shared_from_this());
 }
 
 void TypeSymbolVisitor::handleLogicalOperator(std::shared_ptr<BinaryOpNode>& node, std::shared_ptr<TypeNode> leftType, std::shared_ptr<TypeNode> rightType)
@@ -378,7 +373,7 @@ void TypeSymbolVisitor::handleLogicalOperator(std::shared_ptr<BinaryOpNode>& nod
     std::string right = rightType->toString();
 
     if (left != "i1" || right != "i1") {
-        LogError("Logical operators require boolean operands, got: " + left + " and " + right);
+        LogError("Logical operators require boolean operands, got: " + left + " and " + right, node->right->shared_from_this());
         return;
     }
 
@@ -387,7 +382,7 @@ void TypeSymbolVisitor::handleLogicalOperator(std::shared_ptr<BinaryOpNode>& nod
     if (op == "and") op = "and";
     else if (op == "or") op = "or";
     else {
-        LogError("Unknown logical operator: " + node->op);
+        LogError("Unknown logical operator: " + node->op, node->right->shared_from_this());
         return;
     }
 

@@ -214,7 +214,15 @@ void ASTGen::visit(ReturnNode& node) {
 }
 
 void ASTGen::visit(CallNode& node) {
-    llvm::Function* calleeFunc = declareFunctionFromTOML(node.callee, context.TheModule.get(), context.TheContext, STDLIB_TOML_PATH);
+    LogWarning("visit не реализован для CallNode: " + node.callee);
+    // Сначала в модуле ищем хуйню
+    llvm::Function* calleeFunc = context.TheModule->getFunction(node.callee);
+
+    // Если не нашли пробуем объявить через TOML
+    if (!calleeFunc) {
+        calleeFunc = declareFunctionFromTOML(node.callee, context.TheModule.get(), context.TheContext, STDLIB_TOML_PATH);
+    }
+
     if (!calleeFunc) {
         LogWarning("Неизвестная функция: " + node.callee);
         result = nullptr;
@@ -321,13 +329,58 @@ void ASTGen::visit(ModuleMark &node)
 }
 
 void ASTGen::visit(BinaryOpNode& node) {
-    LogWarning("visit не реализован для BinaryOpNode: " + node.op);
-    result = nullptr;
+    LogWarning("Обработка BinaryOpNode: " + node.op);
+
+    if (!node.left) {
+        LogWarning("Ошибка: левый операнд равен nullptr");
+        result = nullptr;
+        return;
+    }
+    node.left->accept(*this);
+    llvm::Value* left = getResult();
+    
+    if (!left) {
+        LogWarning("Ошибка: не удалось получить значение левого операнда");
+        result = nullptr;
+        return;
+    }
+  
+    if (!node.right) {
+        LogWarning("Ошибка: правый операнд равен nullptr");
+        result = nullptr;
+        return;
+    }
+    node.right->accept(*this);
+    llvm::Value* right = getResult();
+    
+    if (!right) {
+        LogWarning("Ошибка: не удалось получить значение правого операнда");
+        result = nullptr;
+        return;
+    }
+    
+    result = Expressions::handleBinaryOperation(context, node, left, right);
 }
 
 void ASTGen::visit(UnaryOpNode& node) {
-    LogWarning("visit не реализован для UnaryOpNode: " + node.op);
-    result = nullptr;
+    LogWarning("Обработка UnaryOpNode: " + node.op);
+
+    if (!node.operand) {
+        LogWarning("Ошибка: операнд равен nullptr");
+        result = nullptr;
+        return;
+    }
+    
+    node.operand->accept(*this);
+    llvm::Value* operand = getResult();
+    
+    if (!operand) {
+        LogWarning("Ошибка: не удалось получить значение операнда");
+        result = nullptr;
+        return;
+    }
+    
+    result = Expressions::handleUnaryOperation(context, node, operand);
 }
 
 void ASTGen::visit(IdentifierNode& node) {

@@ -158,14 +158,14 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
         if(!isStrict)
             isAuto = true;
         else
-            LogError("auto is not allowed in strict mode");
+            LogError("auto is not allowed in strict mode", node.shared_from_this());
 
     if (
         varType == "none"
         || varType == "null"
         || varType == "void"
     ) {
-        LogError("Type cannot be " + varType);
+        LogError("Type cannot be " + varType, node.shared_from_this());
     }
 
     if (isAuto)
@@ -267,7 +267,7 @@ void TypeSymbolVisitor::visit(ReturnNode &node)
 
         if (actualType != expectedType) {
             if (!(actualType == "null" && expectedType == "void"))
-                LogError("Return type mismatch: expected " + contexts.back().returnType->toString() + ", got " + node.expression->inferredType->toString());
+                LogError("Return type mismatch: expected " + contexts.back().returnType->toString() + ", got " + node.expression->inferredType->toString(), node.shared_from_this());
         }
     }
 
@@ -282,7 +282,7 @@ static bool isCompareOperator(const std::string& op) {
 void TypeSymbolVisitor::visit(VariableReassignNode& node) {
     // Проверяем, существует ли переменная в реестре
     if (contexts.back().variables.find(node.name) == contexts.back().variables.end()) {
-        LogError("Variable not found: " + node.name);
+        LogError("Variable not found: " + node.name, node.shared_from_this());
     }
 
     std::shared_ptr<VariableAssignNode> varAssign = std::dynamic_pointer_cast<VariableAssignNode>(contexts.back().variables[node.name]);
@@ -301,10 +301,10 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
         if (auto keyValue = std::dynamic_pointer_cast<KeyValueNode>(Block->statements[0])) {
             std::vector<std::string> types = { keyValue->key->inferredType->toString(), keyValue->value->inferredType->toString() };
             if (types[0] != Generic->typeParameters[0]->toString()) {
-                LogError("Key type mismatch: expected " + Generic->typeParameters[0]->toString() + ", got " + types[0]);
+                LogError("Key type mismatch: expected " + Generic->typeParameters[0]->toString() + ", got " + types[0], node.expression);
             }
             if (types[1] != Generic->typeParameters[1]->toString()) {
-                LogError("Value type mismatch: expected " + Generic->typeParameters[1]->toString() + ", got " + types[1]);
+                LogError("Value type mismatch: expected " + Generic->typeParameters[1]->toString() + ", got " + types[1], node.expression);
             }
             expressionType = "map<" + types[0] + ", " + types[1] + ">";
         } 
@@ -315,11 +315,11 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
                         if (isCompareOperator(binaryOp->op)) {
                             expressionType = "array<i1>";
                         } else {
-                            LogError("Type mismatch: expected i1, got " + Block->statements[0]->inferredType->toString());
+                            LogError("Type mismatch: expected i1, got " + Block->statements[0]->inferredType->toString(), node.expression);
                         }
                     }
                 else
-                    LogError("Element type mismatch: expected " + Generic->typeParameters[0]->toString() + ", got " + Block->statements[0]->inferredType->toString());
+                    LogError("Element type mismatch: expected " + Generic->typeParameters[0]->toString() + ", got " + Block->statements[0]->inferredType->toString(), node.expression);
             }
             else 
                 expressionType = "array<" + Block->statements[0]->inferredType->toString() + ">";
@@ -342,7 +342,7 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
             if (varTypeStr != "i1") {
                 if (auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.expression)) {
                     if ((binaryOp->op == "and" || binaryOp->op == "or" || binaryOp->op.rfind("icmp_", 0) == 0 || binaryOp->op.rfind("fcmp_", 0) == 0)) {
-                        LogError("Type mismatch: expected i1, got " + expressionType);
+                        LogError("Type mismatch: expected i1, got " + expressionType, node.expression);
                     }
                 }
             }
@@ -359,14 +359,14 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
 void TypeSymbolVisitor::visit(IfNode& node) {
     // Проверяем, существует ли функция в реестре
     if (contexts.back().currentFunctionName.empty()) {
-        LogError("If statement outside of function");
+        LogError("If statement outside of function", node.shared_from_this());
     }
 
     node.condition->accept(*this);
     std::string conditionType = node.condition->inferredType->toString();
 
     if (conditionType != "i1") 
-        LogError("If condition must be of type i1, got " + conditionType);
+        LogError("If condition must be of type i1, got " + conditionType, node.condition);
     else 
     {
         auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.condition);
@@ -405,7 +405,7 @@ void TypeSymbolVisitor::visit(IfNode& node) {
 void TypeSymbolVisitor::visit(ForNode& node) {
     // Проверяем, существует ли функция в реестре
     if (contexts.back().currentFunctionName.empty()) {
-        LogError("For statement outside of function");
+        LogError("For statement outside of function", node.shared_from_this());
     }
 
     // Проверяем тип переменной
@@ -413,7 +413,7 @@ void TypeSymbolVisitor::visit(ForNode& node) {
     std::string iterableType = node.iterable->inferredType->toString();
 
     if (iterableType == "none" || iterableType == "null" || iterableType == "void") {
-        LogError("Type cannot be " + iterableType);
+        LogError("Type cannot be " + iterableType, node.iterable);
     }
 
     node.varType = node.iterable->inferredType; // Устанавливаем тип итератора 
@@ -433,14 +433,14 @@ void TypeSymbolVisitor::visit(ForNode& node) {
 void TypeSymbolVisitor::visit(WhileNode& node) {
     // Проверяем, существует ли функция в реестре
     if (contexts.back().currentFunctionName.empty()) {
-        LogError("If statement outside of function");
+        LogError("If statement outside of function", node.shared_from_this());
     }
 
     node.condition->accept(*this);
     std::string conditionType = node.condition->inferredType->toString();
 
     if (conditionType != "i1") 
-        LogError("If condition must be of type i1, got " + conditionType);
+        LogError("If condition must be of type i1, got " + conditionType, node.condition);
     else 
     {
         auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.condition);
@@ -465,26 +465,28 @@ void TypeSymbolVisitor::visit(WhileNode& node) {
 void TypeSymbolVisitor::visit(BreakNode& node) {
     // Проверяем, существует ли функция в реестре
     if (contexts.back().currentFunctionName.empty()) {
-        LogError("Break statement outside of function");
+        LogError("Break statement outside of function", node.shared_from_this());
     }
 
     // Проверяем, что break находится внутри цикла
     if (contexts.back().currentFunctionName != "for" && contexts.back().currentFunctionName != "while") {
-        LogError("Break statement outside of loop");
+        LogError("Break statement outside of loop", node.shared_from_this());
     }
 
     node.inferredType = std::make_shared<SimpleTypeNode>("void");
 }
 
+
+// TODO: Сделать проверку 
 void TypeSymbolVisitor::visit(ContinueNode& node) {
     // Проверяем, существует ли функция в реестре
     if (contexts.back().currentFunctionName.empty()) {
-        LogError("Continue statement outside of function");
+        LogError("Continue statement outside of function", node.shared_from_this());
     }
 
     // Проверяем, что continue находится внутри цикла
     if (contexts.back().currentFunctionName != "for" && contexts.back().currentFunctionName != "while") {
-        LogError("Continue statement outside of loop");
+        LogError("Continue statement outside of loop", node.shared_from_this());
     }
 
     node.inferredType = std::make_shared<SimpleTypeNode>("void");
@@ -514,7 +516,7 @@ void TypeSymbolVisitor::visit(CallNode& node) {
 
         // Функция нихуя не найдена
         else
-            LogError("Function not found: " + node.callee);
+            LogError("Function not found: " + node.callee, node.shared_from_this());
     }
 
     // Проверяем типы аргументов
@@ -522,7 +524,7 @@ void TypeSymbolVisitor::visit(CallNode& node) {
 
     // Проверяем количество аргументов
     if (argTypes.size() != func->parameters.size()) {
-        LogError("Function " + node.callee + " expects " + std::to_string(func->parameters.size()) + " arguments, got " + std::to_string(argTypes.size()));
+        LogError("Function " + node.callee + " expects " + std::to_string(func->parameters.size()) + " arguments, got " + std::to_string(argTypes.size()), node.shared_from_this());
     }
 
     auto isNumeric = [](const std::shared_ptr<TypeNode>& type) {
@@ -538,7 +540,7 @@ void TypeSymbolVisitor::visit(CallNode& node) {
             if (isNumeric(argTypes[i]) && isNumeric(func->parameters[i].first))
                 node.arguments[i]->implicitCastTo = func->parameters[i].first;
             else
-                LogError("Function " + node.callee + " expects argument of type " + paramType + ", got " + argType);
+                LogError("Function " + node.callee + " expects argument of type " + paramType + ", got " + argType, node.arguments[i]);
     }
 
     node.inferredType = func->returnType; // Устанавливаем тип функции

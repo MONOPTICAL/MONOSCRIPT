@@ -138,7 +138,6 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
 
 std::shared_ptr<ASTNode> Parser::parseCast(std::shared_ptr<ASTNode> expression)
 {
-    IC();
     consume(TokenType::Arrow, "Expected '->' after expression"); // Проверяем наличие стрелки после выражения
     if(check(TokenType::Type))
     {

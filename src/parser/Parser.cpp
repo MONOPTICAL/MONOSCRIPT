@@ -12,7 +12,7 @@ std::shared_ptr<ProgramNode> Parser::parse()
     auto program = std::make_shared<ProgramNode>();
     program->line = lineIndex; program->column = tokenIndex;
     program->moduleName = moduleName;
-    IC(program->moduleName);
+    
     while (!isEndOfFile())
     {
         if (check(TokenType::None)) break; // конец файла

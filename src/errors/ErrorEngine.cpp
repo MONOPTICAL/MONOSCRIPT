@@ -1,6 +1,8 @@
 #include "headers/ErrorEngine.h"
 #include <iostream> // Используем cerr для ошибок
-#include <iomanip>  // Для форматирования вывода (например, setw)
+#include <iomanip>
+#include <cctype> // Для isspace
+#include <utility> // Добавлено для std::pair
 
 int ErrorEngine::getErrorCount() const {
     return errorCount;
@@ -56,24 +58,63 @@ void ErrorEngine::printSourceLine(int line, int column) {
 
     int lineCount = static_cast<int>(sourceLines->size());
 
-    std::cerr << "lineCount: " << lineCount << std::endl;  
-
-    // Затем проверяем границы
+    // Проверяем границы перед доступом к sourceLines
     if (line >= 0 && line < lineCount) {
-        const std::string& codeLine = (*sourceLines)[line];
+        // Лямбда теперь возвращает пару: очищенную строку и количество удаленных символов
+        auto removeLeadingPipesAndSpaces = [](const std::string& line) -> std::pair<std::string, size_t> {
+            size_t startPos = 0;
+            while (startPos < line.length() && (line[startPos] == '|' || std::isspace(static_cast<unsigned char>(line[startPos])))) {
+                startPos++;
+            }
+            return {line.substr(startPos), startPos};
+        };
+
+        const std::string& originalLine = (*sourceLines)[line];
+        auto [codeLine, removedCharsCount] = removeLeadingPipesAndSpaces(originalLine);
+
         // Вывод номера строки и самой строки
         std::cerr << std::setw(5) << line + 1 << " | " << codeLine << std::endl;
-        // Вывод указателя
-        std::cerr << std::setw(5) << "" << " | " << generatePointer(column) << std::endl;
+        // Вывод указателя (передаем очищенную строку, исходную колонку и кол-во удаленных символов)
+        std::cerr << std::setw(5) << "" << " | " << generatePointer(codeLine, column, removedCharsCount) << std::endl;
     } else {
         std::cerr << "    (Can't reach source code at line " << line + 1 << ")" << std::endl;
     }
 }
 
-std::string ErrorEngine::generatePointer(int column) {
-    if (column >= 0) {
-        // Создаем строку с пробелами до нужной колонки и ставим '^'
-        return std::string(column, ' ') + '^';
+std::string ErrorEngine::generatePointer(const std::string& cleanedLine, int originalColumn, int removedCharsCount) {
+    // Корректируем колонку для очищенной строки
+    int adjustedColumn = originalColumn - removedCharsCount;
+
+    // Проверка, что скорректированная колонка находится в пределах очищенной строки
+    if (adjustedColumn < 0 || adjustedColumn >= static_cast<int>(cleanedLine.length())) {
+         // Если колонка вне пределов, возвращаем старый указатель '^' на исходной позиции (или пустую строку)
+         if (originalColumn >= 0) {
+             return std::string(originalColumn, ' ') + '^'; // Используем исходную колонку для '^'
+         }
+         return "";
     }
-    return ""; // Если колонка некорректна
+
+    // Находим начало слова (двигаемся влево от adjustedColumn)
+    int wordStart = adjustedColumn;
+    while (wordStart > 0 && !std::isspace(static_cast<unsigned char>(cleanedLine[wordStart - 1]))) {
+        wordStart--;
+    }
+
+    // Находим конец слова (двигаемся вправо от adjustedColumn)
+    int wordEnd = adjustedColumn;
+    while (wordEnd < static_cast<int>(cleanedLine.length()) - 1 && !std::isspace(static_cast<unsigned char>(cleanedLine[wordEnd + 1]))) {
+        wordEnd++;
+    }
+
+    // Рассчитываем длину выделения
+    int highlightLength = wordEnd - wordStart + 1;
+    if (highlightLength <= 0) { // Защита
+         if (originalColumn >= 0) {
+             return std::string(originalColumn, ' ') + '^';
+         }
+         return "";
+    }
+
+    // Генерируем строку с пробелами и символами '~'
+    return std::string(wordStart, ' ') + std::string(highlightLength, '~');
 }

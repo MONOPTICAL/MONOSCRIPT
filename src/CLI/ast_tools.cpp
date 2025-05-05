@@ -45,15 +45,18 @@ std::shared_ptr<ProgramNode> parseAndLinkModules(
     std::shared_ptr<ProgramNode> combinedAST = std::make_shared<ProgramNode>();
     combinedAST->moduleName = program->moduleName;
     
+#if DEBUG
+
     std::cout << "--- Модули ---" << std::endl;
-    
+#endif     
     // Выводим информацию о связанных модулях
     for (const auto& [name, module] : linker.getModules()) {
+#if DEBUG
         std::cout << "Модуль: " << name << " (" << module.path << ")" << std::endl;
         std::cout << "  Функции: " << module.functions.size() << std::endl;
         std::cout << "  Глобальные переменные: " << module.globals.size() << std::endl;
         std::cout << "  Импортировано: " << module.imports.size() << " символов" << std::endl;
-        
+#endif
         // Копируем все узлы из текущего модуля в объединенный AST
         if (module.ast) {
             for (const auto& node : module.ast->body) {
@@ -68,14 +71,17 @@ std::shared_ptr<ProgramNode> parseAndLinkModules(
             }
         }
     }
-    
+
+#if DEBUG
     std::cout << "--- Конец модулей ---\n";
-    
+#endif    
+
     if (showAST && combinedAST) {
         std::cout << "\n--- Объединенный AST ---\n";
         ASTDebugger::debug(combinedAST);
         std::cout << "--- Конец объединенного AST ---\n";
     }
+
     
     // Инициализация ErrorEngine
     std::vector<std::string>* sourceFromTokens = new std::vector<std::string>();
@@ -87,6 +93,7 @@ std::shared_ptr<ProgramNode> parseAndLinkModules(
         sourceFromTokens->push_back(sourceLine);
     }
 
+#if DEBUG
     // Выводим для дебага
     std::cout << "\n--- Исходный код из токенов ---\n";
     int lineNumber = 0;
@@ -95,7 +102,7 @@ std::shared_ptr<ProgramNode> parseAndLinkModules(
         lineNumber++;
     }
     std::cout << "--- Конец исходного кода из токенов ---\n";
-
+#endif
 
     ErrorEngine::getInstance().initialize(*sourceFromTokens);
 
