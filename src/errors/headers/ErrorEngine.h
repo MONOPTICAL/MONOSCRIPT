@@ -50,5 +50,5 @@ private:
     // Error formatting and output
     void printError(int line, int column, const std::string& errorType, const std::string& message, const std::string& hint = "");
     void printSourceLine(int line, int column);
-    std::string generatePointer(int column);
+    std::string generatePointer(const std::string& cleanedLine, int originalColumn, int removedCharsCount);
 };

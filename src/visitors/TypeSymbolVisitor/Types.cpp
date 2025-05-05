@@ -32,7 +32,7 @@ void TypeSymbolVisitor::visit(IdentifierNode& node)
     // Проверяем, существует ли переменная в реестре
     auto it = contexts.back().variables.find(node.name);
     if (it == contexts.back().variables.end()) {
-        LogError("Variable not found: " + node.name);
+        LogError("Variable not found: " + node.name, node.shared_from_this());
     }
 
     std::shared_ptr<ASTNode> varAssign = contexts.back().variables[node.name];

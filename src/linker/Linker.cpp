@@ -17,8 +17,6 @@ bool Linker::addModule(const std::string& name, const std::string& path, std::sh
     module.name = name;
     module.path = path;
     module.ast = ast;
-
-    std::cout << "Adding module: " << path << std::endl;
     
     modules[name] = module;
     return true;
@@ -193,7 +191,6 @@ bool Linker::loadModule(const std::string& moduleName) {
         }
         
         // Парсинг в AST
-        std::cout << "!!!!!!!!!!!!!!!!!1Parsing module: " << moduleName << std::endl;
         Parser parser(tokens, moduleName);
         auto moduleAST = parser.parse();
         
@@ -248,6 +245,7 @@ bool Linker::validateImports() {
 }
 
 void Linker::debugModules() const {
+#if DEBUG
     std::cout << "\n-----------------------\n";
     for (const auto& [name, module] : modules) {
         std::cout << "Модуль: " << name << " (Путь: " << module.path << ")\n";
@@ -279,6 +277,7 @@ void Linker::debugModules() const {
         }
     }
     std::cout << "-----------------------\n\n";
+#endif
 }
 
 bool Linker::linkModules() {

@@ -39,7 +39,7 @@ CLIOptions parseArgs(int argc, char* argv[]) {
     }
     
     if (!options.showTokens && !options.showAST && !options.showSymantic) {
-        options.showTokens = options.showAST = options.showSymantic = true;
+        options.showTokens = options.showAST = options.showSymantic = false;
     }
     
     return options;

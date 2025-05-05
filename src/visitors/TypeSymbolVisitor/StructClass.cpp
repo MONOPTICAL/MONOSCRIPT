@@ -3,7 +3,7 @@
 void TypeSymbolVisitor::visit(StructNode& node) {
     // Проверяем, существует ли структура в реестре
     if (registry.findStruct(node.name)) {
-        LogError("Struct already defined: " + node.name);
+        LogError("Struct already defined: " + node.name, node.shared_from_this());
     }
 
     // Создаем новый контекст для структуры
