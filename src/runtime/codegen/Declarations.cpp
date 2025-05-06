@@ -8,6 +8,14 @@ namespace Declarations
         // Генерируем код для выражения
         node.expression->accept(codeGen);
         llvm::Value* value = codeGen.getResult();
+
+        std::shared_ptr<TypeNode> typeNode;
+        if (node.expression->inferredType)
+            typeNode = node.expression->inferredType;
+        else 
+            typeNode = node.type;
+        
+
         llvm::Type* valueType = value->getType();
         
         if (!value) {
@@ -15,47 +23,12 @@ namespace Declarations
             return nullptr;
         }
 
-        // Проверяем совместимость типов и выполняем преобразование при необходимости
-        if (value->getType() != varType) {
-            codeGen.LogWarning("Тип значения не совпадает с типом переменной " + node.name);
-            if (varType->isFloatTy() && value->getType()->isIntegerTy()) { // int -> float
-                value = context.Builder.CreateSIToFP(value, varType, "floatconv");
-            } else if (varType->isIntegerTy() && value->getType()->isFloatTy()) { // float -> int
-                value = context.Builder.CreateFPToSI(value, varType, "intconv");
-            } else if (node.type->toString() == "auto")  { // Другие преобразования типов
-                varType = value->getType();
-            }
-        }
-        
-        if (value->getType()->isPointerTy())
+        value = TypeConversions::loadValueIfPointer(context, value);
+        if(node.expression->implicitCastTo)
         {
-            // Делаем load только если value — alloca или глобальная переменная
-            if (llvm::AllocaInst* allocaInst = llvm::dyn_cast<llvm::AllocaInst>(value)) {
-                llvm::Type* loadedType = allocaInst->getAllocatedType();
-                value = context.Builder.CreateLoad(loadedType, value, "val_load");
-                valueType = value->getType();
-            } else if (llvm::GlobalVariable* globalVar = llvm::dyn_cast<llvm::GlobalVariable>(value)) {
-                llvm::Type* loadedType = globalVar->getValueType();
-                value = context.Builder.CreateLoad(loadedType, value, "val_load");
-                valueType = value->getType();
-            }
-            // если value — это уже char* из функции, ничего не делаем!
-        }
-        
-        // Проверяем совместимость типов и выполняем преобразование при необходимости
-        if (varType != valueType) {
-            codeGen.LogWarning("Тип значения не совпадает с типом переменной " + node.name);
-            if (valueType->isIntegerTy(1) && varType->isIntegerTy()) {
-                value = context.Builder.CreateZExt(value, varType, "zext_i1_to_i32");
-            } else if (valueType->isIntegerTy() && varType->isIntegerTy(1)) {
-                value = context.Builder.CreateTrunc(value, varType, "trunc_to_i1");
-            } else if (valueType->isIntegerTy() && varType->isIntegerTy()) {
-                value = context.Builder.CreateIntCast(value, varType, true, "cast_int2int");
-            } else if (valueType->isFloatingPointTy() && varType->isFloatingPointTy()) {
-                value = context.Builder.CreateFPCast(value, varType, "cast_fp2fp");
-            } else {
-                codeGen.LogWarning("!!!Неизвестное неявное приведение для переменной " + node.name + "!!!");
-            }
+            // Приведение типов
+            value = TypeConversions::convertValueToType(context, value, varType);
+            valueType = value->getType();
         }
 
         // Создаем переменную в таблице символов
@@ -81,9 +54,10 @@ namespace Declarations
             strConstant,             // Инициализатор
             node.name
         );
-        
+
         // Сохраняем переменную в таблице символов
         context.NamedValues[node.name] = globalVar;
+
         return globalVar;
     }
 
@@ -198,6 +172,7 @@ namespace Declarations
         );
         
         context.NamedValues[node.name] = globalVar;
+
         return globalVar;
     }
 
@@ -252,6 +227,7 @@ namespace Declarations
         }
         
         context.NamedValues[node.name] = globalVar;
+        codeGen.LogWarning("Глобальная переменная " + node.name + " создана");
         return globalVar;
     }
 }
@@ -264,7 +240,6 @@ llvm::Value *Declarations::handleSimpleReassignment(CodeGenContext &context, Var
     llvm::Value* value = codeGen.getResult();
     llvm::Type* valueType = value->getType();
     if (!value) {
-        codeGen.LogWarning("Не удалось сгенерировать код для выражения " + node.name);
         return nullptr;
     }
 

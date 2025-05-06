@@ -30,23 +30,11 @@ namespace Statements {
         } 
         else 
         {
-            if (returnValueType != returnType && !(returnType->isArrayTy())) 
-            {
-                codeGen.LogWarning("Тип возвращаемого значения не совпадает с типом функции");
-                if (returnValueType->isPointerTy()) {
-                    codeGen.LogWarning("переходим по указателю и возвращаем голое значение(не указатель)");
-                        
-                    result = context.Builder.CreateLoad(returnType, result, "load");
-                    return context.Builder.CreateRet(result);
-                }
-            }
+           result = TypeConversions::loadValueIfPointer(context, result, "return_load");
+           if(node.expression->implicitCastTo) 
+                result = TypeConversions::convertValueToType(context, result, returnValueType, "return_cast");
 
-            if (returnValueType->isPointerTy()) {
-                codeGen.LogWarning("возвращаем массив");
-                result = context.Builder.CreateLoad(returnType, result, "load");
-            }
-
-            return context.Builder.CreateRet(result);
+           return context.Builder.CreateRet(result);
         }
         return nullptr; // <-- TODO: check
     }

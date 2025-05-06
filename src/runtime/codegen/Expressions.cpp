@@ -21,7 +21,7 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
         right = TypeConversions::applyImplicitCast(context, right, node.right->implicitCastTo, "right");
     }
     
-    if (node.op == "add") {
+    if (node.op == "add" || node.op == "fadd") {
         if (left->getType()->isFloatingPointTy() || right->getType()->isFloatingPointTy()) {
             // Приводим оба операнда к типу float, если один из них float
             if (left->getType()->isIntegerTy()) {
@@ -35,7 +35,7 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
             return context.Builder.CreateAdd(left, right, "addtmp_int");
         }
     } 
-    else if (node.op == "sub") {
+    else if (node.op == "sub" || node.op == "fsub") {
         if (left->getType()->isFloatingPointTy() || right->getType()->isFloatingPointTy()) {
             if (left->getType()->isIntegerTy()) {
                 left = context.Builder.CreateSIToFP(left, llvm::Type::getFloatTy(context.TheContext), "int_to_float_left");
@@ -48,7 +48,7 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
             return context.Builder.CreateSub(left, right, "subtmp_int");
         }
     } 
-    else if (node.op == "mul") {
+    else if (node.op == "mul" || node.op == "fmul") {
         if (left->getType()->isFloatingPointTy() || right->getType()->isFloatingPointTy()) {
             if (left->getType()->isIntegerTy()) {
                 left = context.Builder.CreateSIToFP(left, llvm::Type::getFloatTy(context.TheContext), "int_to_float_left");
@@ -61,7 +61,7 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
             return context.Builder.CreateMul(left, right, "multmp_int");
         }
     } 
-    else if (node.op == "sdiv") {
+    else if (node.op == "sdiv" || node.op == "fdiv") {
         if (left->getType()->isFloatingPointTy() || right->getType()->isFloatingPointTy()) {
             if (left->getType()->isIntegerTy()) {
                 left = context.Builder.CreateSIToFP(left, llvm::Type::getFloatTy(context.TheContext), "int_to_float_left");
@@ -74,7 +74,7 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
             return context.Builder.CreateSDiv(left, right, "divtmp_int");
         }
     } 
-    else if (node.op == "srem") {
+    else if (node.op == "srem" || node.op == "frem") {
         if (left->getType()->isFloatingPointTy() || right->getType()->isFloatingPointTy()) {
             if (left->getType()->isIntegerTy()) {
                 left = context.Builder.CreateSIToFP(left, llvm::Type::getFloatTy(context.TheContext), "int_to_float_left");
@@ -98,6 +98,78 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
         std::vector<llvm::Value*> args = {left, right};
         return context.Builder.CreateCall(concatFunc, args, "concat_result");
     }
+    else if (node.op.starts_with("icmp")) {
+        // Сравнение
+        llvm::CmpInst::Predicate predicate;
+        if (node.op == "icmp_eq") 
+        { // ==
+            predicate = llvm::CmpInst::ICMP_EQ;
+        } 
+        else if (node.op == "icmp_ne") 
+        { // !=
+            predicate = llvm::CmpInst::ICMP_NE;
+        } 
+        else if (node.op == "icmp_slt") 
+        { // <
+            predicate = llvm::CmpInst::ICMP_SLT;
+        } 
+        else if (node.op == "icmp_sgt") 
+        { // >
+            predicate = llvm::CmpInst::ICMP_SGT;
+        } 
+        else if (node.op == "icmp_sge") 
+        { // >=
+            predicate = llvm::CmpInst::ICMP_SGE;
+        } 
+        else if (node.op == "icmp_sle") 
+        { // <=
+            predicate = llvm::CmpInst::ICMP_SLE;
+        } 
+        else 
+        {
+            std::cerr << "Warning: Неизвестная операция сравнения: " << node.op << std::endl;
+            return nullptr;
+        }
+        
+        return context.Builder.CreateICmp(predicate, left, right, "cmptmp");
+    }
+    /*
+    else if (node.op.starts_with("fcmp")) {
+        // Сравнение с плавающей точкой
+        llvm::CmpInst::Predicate predicate;
+        if (node.op == "fcmp_oeq") 
+        { // ==
+            predicate = llvm::CmpInst::FCMP_OEQ;
+        } 
+        else if (node.op == "fcmp_one") 
+        { // !=
+            predicate = llvm::CmpInst::FCMP_ONE;
+        } 
+        else if (node.op == "fcmp_olt") 
+        { // <
+            predicate = llvm::CmpInst::FCMP_OLT;
+        } 
+        else if (node.op == "fcmp_ogt") 
+        { // >
+            predicate = llvm::CmpInst::FCMP_OGT;
+        } 
+        else if (node.op == "fcmp_oge") 
+        { // >=
+            predicate = llvm::CmpInst::FCMP_OGE;
+        } 
+        else if (node.op == "fcmp_ole") 
+        { // <=
+            predicate = llvm::CmpInst::FCMP_OLE;
+        } 
+        else 
+        {
+            std::cerr << "Warning: Неизвестная операция сравнения с плавающей точкой: " << node.op << std::endl;
+            return nullptr;
+        }
+        
+        return context.Builder.CreateFCmp(predicate, left, right, "cmptmp");
+    }
+    */
     
     std::cerr << "Warning: Неизвестная бинарная операция: " << node.op << std::endl;
     return nullptr;
