@@ -10,11 +10,17 @@
 
 class Parser {
 public:
-    Parser(const std::vector<std::vector<Token>>& tokens);
+    Parser(const std::vector<std::vector<Token>>& tokens, std::string module) : 
+    moduleName(module), lines(tokens), lineIndex(0), tokenIndex(0)
+    {
+        this->currentNode = nullptr;
+    };
+
     std::shared_ptr<ProgramNode> parse();
 
 private:
     std::vector<std::vector<Token>> lines; // вектор токенов
+    std::string moduleName; // имя модуля
     int lineIndex; // индекс текущей строки токенов
     int tokenIndex; // индекс текущего токена в строке
     int currentIndent; // текущий уровень отступа

@@ -185,9 +185,13 @@ bool Linker::loadModule(const std::string& moduleName) {
         Lexer lexer(moduleContent);
         lexer.tokenize();
         const auto tokens = lexer.getTokens();
+
+        for (const auto& tokenVec : tokens) {
+            this->Tokens.push_back(tokenVec);
+        }
         
         // Парсинг в AST
-        Parser parser(tokens);
+        Parser parser(tokens, moduleName);
         auto moduleAST = parser.parse();
         
         if (!moduleAST) {
@@ -241,6 +245,7 @@ bool Linker::validateImports() {
 }
 
 void Linker::debugModules() const {
+#if DEBUG
     std::cout << "\n-----------------------\n";
     for (const auto& [name, module] : modules) {
         std::cout << "Модуль: " << name << " (Путь: " << module.path << ")\n";
@@ -272,6 +277,7 @@ void Linker::debugModules() const {
         }
     }
     std::cout << "-----------------------\n\n";
+#endif
 }
 
 bool Linker::linkModules() {

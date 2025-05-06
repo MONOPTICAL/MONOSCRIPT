@@ -12,7 +12,7 @@ class ASTDebugger
             }
     
             if (auto prog = std::dynamic_pointer_cast<ProgramNode>(node)) {
-                printIndent(indent); std::cout << "[ProgramNode]\n";
+                printIndent(indent); std::cout << "[Program] " << prog->moduleName << "\n";
                 for (const auto& stmt : prog->body) debug(stmt, indent + 2);
             }
             else if (auto func = std::dynamic_pointer_cast<FunctionNode>(node)) { 
@@ -34,6 +34,10 @@ class ASTDebugger
                 }
                 debug(func->body, indent + 2);
             }
+            else if (auto moduleMark = std::dynamic_pointer_cast<ModuleMark>(node))
+            {
+                printIndent(indent); std::cout << "[Module Mark] " << moduleMark->moduleName << "\n";
+            }   
             else if(auto ifNode = std::dynamic_pointer_cast<IfNode>(node))
             {
                 printIndent(indent); std::cout << "[IF CONDITION]: \n";
@@ -198,4 +202,4 @@ class ASTDebugger
             for (int i = 0; i < level; ++i) std::cout << ' ';
         }
 };
-//12819
+//30982

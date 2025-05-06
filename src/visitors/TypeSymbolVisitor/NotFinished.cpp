@@ -16,8 +16,3 @@ void TypeSymbolVisitor::visit(ImportNode &node)
 {
     // Не надо его реализовывать, он обрабатывается в другом месте(при загрузке модулей в AST)
 }
-
-void TypeSymbolVisitor::visit(LambdaNode &node)
-{
-    // TODO: реализовать обработку LambdaNode
-}

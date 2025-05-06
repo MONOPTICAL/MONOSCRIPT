@@ -32,7 +32,9 @@ void registerBuiltInFunctions(Registry& registry, const std::string& tomlPath)
                 nullptr
             )
         );
-        std::cout << "Добавлена встроенная функция: " << name << std::endl;
+        #if DEBUG
+            std::cout << "Добавлена встроенная функция: " << name << std::endl;
+        #endif
     }
 }
 

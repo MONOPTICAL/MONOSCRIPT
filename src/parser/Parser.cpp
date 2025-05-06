@@ -10,6 +10,9 @@
 std::shared_ptr<ProgramNode> Parser::parse()
 {
     auto program = std::make_shared<ProgramNode>();
+    program->line = lineIndex; program->column = tokenIndex;
+    program->moduleName = moduleName;
+    
     while (!isEndOfFile())
     {
         if (check(TokenType::None)) break; // конец файла
@@ -94,14 +97,18 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         // ↑ if we have keyword break, we have break statement
     else if (currentToken.type == TokenType::Keyword && currentToken.value == "break")
     {
-        return std::make_shared<BreakNode>(); // А тут и в continue нехуй заморачиваться, правильно? правильно
+        auto breakNode = std::make_shared<BreakNode>(); // А тут и в continue нехуй заморачиваться, правильно? правильно
+        breakNode->line = lineIndex; breakNode->column = tokenIndex;
+        return breakNode;
     }
     // Continue statement
         // continue
         // ↑ if we have keyword continue, we have continue statement
     else if (currentToken.type == TokenType::Keyword && currentToken.value == "continue")
     {
-        return std::make_shared<ContinueNode>();
+        auto continueNode = std::make_shared<ContinueNode>();
+        continueNode->line = lineIndex; continueNode->column = tokenIndex;
+        return continueNode;
     }
     else if (currentToken.type == TokenType::Identifier && (peek().type == TokenType::Dot || peek().type == TokenType::LeftBracket))
     {
@@ -113,6 +120,7 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
             {
                 advance();
                 auto reassignNode = std::make_shared<ReassignMemberNode>();
+                reassignNode->line = lineIndex; reassignNode->column = tokenIndex;
                 reassignNode->accessExpression = memberExpression;
                 reassignNode->expression = parseExpression();
 
