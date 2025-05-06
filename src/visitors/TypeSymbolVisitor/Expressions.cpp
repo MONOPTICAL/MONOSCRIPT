@@ -18,7 +18,7 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
 
     // "-"
     if (node.op == "-" || node.op == "sub" || node.op == "fsub") {
-        handlePlusOperator(root, leftType, rightType);
+        handleMinusOperator(root, leftType, rightType);
         node = *root;
         return;
     }
@@ -81,7 +81,7 @@ void TypeSymbolVisitor::visit(UnaryOpNode& node) {
         else if (std::dynamic_pointer_cast<LambdaNode>(node.operand)) {}
         else
         {
-            LogError("Unsupported operand type for '?'");
+            LogError("Unsupported operand type for '?'", node.shared_from_this());
             return;
         }
     }
@@ -94,10 +94,25 @@ void TypeSymbolVisitor::visit(UnaryOpNode& node) {
         else if (std::dynamic_pointer_cast<LambdaNode>(node.operand)) {}
         else
         {
-            LogError("Unsupported operand type for '!'");
+            LogError("Unsupported operand type for '!'", node.shared_from_this());
             return;
         }
     }
 
     node.inferredType = operandType;
+}
+
+void TypeSymbolVisitor::visit(LambdaNode &node)
+{
+    std::unordered_map<std::string, std::shared_ptr<ASTNode>> args = {};
+
+    Context currentFunction = {
+        .labels = {},
+        .variables = {},
+        .functions = {}, 
+        .currentFunctionName = "lambda", // TODO: Проверить не мешает ли это
+        .returnType = node.returnType, // Тип возвращаемого значения
+        .returnedValue = false // Возвращаемое значение
+    };
+
 }

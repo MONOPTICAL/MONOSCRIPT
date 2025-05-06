@@ -2,6 +2,7 @@
 #define SYMANTICVISITOR_H
 
 #include "../../parser/headers/AST.h"
+#include "../../errors/headers/ErrorEngine.h"
 #include "../../includes/icecream.hpp"
 #include "Register.h"
 #include "BuiltIn.h"
@@ -18,6 +19,7 @@ struct Context {
 class TypeSymbolVisitor : public ASTNodeVisitor {
 
 private:
+    std::unique_ptr<ErrorEngine>                                    errorEngine;
 
     std::vector<Context>                                            contexts;
 
@@ -26,6 +28,8 @@ private:
     Registry                                                        registry;
 
     std::shared_ptr<ProgramNode>                                    program; // Только для отладки
+
+    std::string                                                     currentModuleName;
 
     /*
     Проверяет, существует ли переменная в реестре(если переданный node является идентификатором)
@@ -95,7 +99,7 @@ private:
                                                                             const std::shared_ptr<ASTNode>& node, 
                                                                             int& maxRank);
 public:
-                                                                    TypeSymbolVisitor() 
+                                                                    TypeSymbolVisitor()
                                                                     {
                                                                         // Инициализация контекста
                                                                         Context globalContext = {
@@ -115,7 +119,7 @@ public:
 
     void                                                            debugContexts();
     
-    void                                                            LogError(const std::string& message);
+    void                                                            LogError(const std::string& message, std::shared_ptr<ASTNode> node = nullptr);
 
     void                                                            visit(SimpleTypeNode& node) override;
     void                                                            visit(GenericTypeNode& node) override;
@@ -145,6 +149,7 @@ public:
     void                                                            visit(AccessExpression& node) override;
     void                                                            visit(ImportNode& node) override;
     void                                                            visit(LambdaNode& node) override;
+    void                                                            visit(ModuleMark& node) override;
 };
 
 #endif // SYMANTICVISITOR_H

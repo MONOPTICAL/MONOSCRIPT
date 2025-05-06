@@ -10,6 +10,7 @@ class ASTGen : public ASTNodeVisitor {
 private:
     CodeGenContext&     context;
     llvm::Value*        result; // Текущий результат кодогенерации
+    std::string         currentModuleName; // Имя текущей функции
     
 public:
                         ASTGen(CodeGenContext& context);
@@ -47,6 +48,7 @@ public:
     void                visit(AccessExpression& node) override;
     void                visit(ImportNode& node) override;
     void                visit(LambdaNode& node) override;
+    void                visit(ModuleMark& node) override;
 };
 
 #endif // AST_VISITORS_H

@@ -1,36 +1,47 @@
 #include "../headers/TypeSymbolVisitor.h"
 #include "../../includes/ASTDebugger.hpp"
-void TypeSymbolVisitor::LogError(const std::string &message)
+void TypeSymbolVisitor::LogError(const std::string &message, std::shared_ptr<ASTNode> node)
 {
-    std::cout << "--- ERROR ---\n" << std::endl;
-    ASTDebugger::debug(this->program);
-    std::cout << "-------------\n";
-    throw std::runtime_error("Semantic Error: " + message);
+    if (node) {
+        int column;
+
+        if (!node->column) column = 0;
+        else column = node->column;
+        
+        ErrorEngine::getInstance().report(
+            node->line, 
+            column, 
+            this->currentModuleName, 
+            message
+        );
+    }
+    else
+        throw std::runtime_error("[" + this->currentModuleName + "]Semantic Error: " + message);
 }
 
 std::shared_ptr<TypeNode> TypeSymbolVisitor::checkForIdentifier(std::shared_ptr<ASTNode>& node)
 {
     if (!node) {
-        LogError("Node is null");
+        LogError("Node is null", node);
     }
     
     if (auto idNode = std::dynamic_pointer_cast<IdentifierNode>(node)) {
         auto it = contexts.back().variables.find(idNode->name);
         if (it == contexts.back().variables.end()) 
-            LogError("Variable not found: " + idNode->name);
+            LogError("Variable not found: " + idNode->name, node);
 
         auto varAssign = std::dynamic_pointer_cast<VariableAssignNode>(it->second);
         if (!varAssign) 
-            LogError("!!!This doesn't need to happen!!!");
+            LogError("!!!This doesn't need to happen!!!", node);
 
         if (varAssign->expression == nullptr) {
             if (!varAssign->inferredType)
-                LogError("Variable '" + idNode->name + "' has no inferred type");
+                LogError("Variable '" + idNode->name + "' has no inferred type", node);
             return varAssign->inferredType;
         }
 
         if (!varAssign->expression->inferredType)
-            LogError("Expression type is null for variable: " + idNode->name);
+            LogError("Expression type is null for variable: " + idNode->name, node);
 
         if (varAssign->expression && varAssign->expression->implicitCastTo) 
             std::cout << varAssign->implicitCastTo->toString() << std::endl;
@@ -39,20 +50,20 @@ std::shared_ptr<TypeNode> TypeSymbolVisitor::checkForIdentifier(std::shared_ptr<
     else if (auto varAssignNode = std::dynamic_pointer_cast<VariableAssignNode>(node)) {
         if (varAssignNode->expression == nullptr) {
             if (!varAssignNode->inferredType)
-                LogError("Variable '" + varAssignNode->name + "' has no inferred type");
+                LogError("Variable '" + varAssignNode->name + "' has no inferred type", node);
             if (varAssignNode->expression && varAssignNode->expression->implicitCastTo)
                 std::cout << varAssignNode->implicitCastTo->toString() << std::endl;
             return varAssignNode->inferredType;
         }
 
         if (!varAssignNode->expression->inferredType)
-            LogError("Expression type is null for variable: " + varAssignNode->name);
+            LogError("Expression type is null for variable: " + varAssignNode->name, node);
 
         return varAssignNode->expression->inferredType;
     }
 
     if (!node->inferredType)
-        LogError("Node type is null");
+        LogError("Node type is null", node);
 
     return node->inferredType;
 }
@@ -220,7 +231,7 @@ void TypeSymbolVisitor::castAndValidate(const std::shared_ptr<ASTNode>& node, co
         int value = num->value;
         std::string fromType = num->inferredType ? num->inferredType->toString() : (num->type ? num->type->toString() : "");
         if (targetType != "float" && !checkIntLimits(targetType, value)) {
-            visitor->LogError("Value " + std::to_string(value) + " does not fit in type " + targetType);
+            visitor->LogError("Value " + std::to_string(value) + " does not fit in type " + targetType, node);
         }
         if (fromType != targetType) {
             num->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
@@ -230,7 +241,7 @@ void TypeSymbolVisitor::castAndValidate(const std::shared_ptr<ASTNode>& node, co
     if (auto ident = std::dynamic_pointer_cast<IdentifierNode>(node))
     {
         if (!ident->inferredType)
-            visitor->LogError("Expression type is null for variable: " + ident->name);
+            visitor->LogError("Expression type is null for variable: " + ident->name, node);
         else if (ident->inferredType->toString() != targetType)
             if (getTypeRank(ident->inferredType->toString()) > 0)
                 ident->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
@@ -289,7 +300,7 @@ void TypeSymbolVisitor::findMaxRank(const std::shared_ptr<ASTNode>& node, int& m
         {            
             if (contexts.back().functions.find(call->callee) == contexts.back().functions.end()) {
                 if (registry.findFunction(call->callee) == nullptr) 
-                    LogError("Function not found: " + call->callee);
+                    LogError("Function not found: " + call->callee, node);
                 else
                 {
                     auto func = std::dynamic_pointer_cast<FunctionNode>(registry.findFunction(call->callee));
@@ -316,7 +327,7 @@ void TypeSymbolVisitor::castNumbersInBinaryTree(std::shared_ptr<ASTNode> node, c
         findMaxRank(node, maxRank);
         targetType = getTypeByRank(maxRank);
         if (targetType.empty()) {
-            LogError("Cannot deduce type for auto");
+            LogError("Cannot deduce type for auto", node);
             return;
         }
 
@@ -346,7 +357,7 @@ void TypeSymbolVisitor::validateCollectionElements(
         if (std::dynamic_pointer_cast<NoneNode>(expr))
             return;
 
-        LogError("Invalid collection initialization");
+        LogError("Invalid collection initialization", expr);
         return;
     }
     std::shared_ptr<ASTNode> lastStatement = block->statements[0];
@@ -392,7 +403,7 @@ void TypeSymbolVisitor::validateCollectionElements(
                 } else if (elemType->toString() != expectedElemType->toString()) {
                     if ((numericRank(elemType->toString(), maxRank) > 0 && numericRank(expectedElemType->toString(), maxRank) > 0))
                         continue;
-                    LogError("Element type mismatch: expected " + expectedElemType->toString() + ", got " + elemType->toString());
+                    LogError("Element type mismatch: expected " + expectedElemType->toString() + ", got " + elemType->toString(), statement);
                 }
             }
         }
@@ -413,7 +424,7 @@ void TypeSymbolVisitor::validateCollectionElements(
                     validateCollectionElements(expectedKeyType, keyValue->key, isAuto);
                 } else if (keyType->toString() != expectedKeyType->toString()) {
                     if (!(numericRank(keyType->toString(), maxRank) > 0 && numericRank(expectedKeyType->toString(), maxRank) > 0))
-                        LogError("Key type mismatch: expected " + expectedKeyType->toString() + ", got " + keyType->toString());
+                        LogError("Key type mismatch: expected " + expectedKeyType->toString() + ", got " + keyType->toString(), keyValue->key);
                 }
 
                 // Проверка значения
@@ -421,21 +432,21 @@ void TypeSymbolVisitor::validateCollectionElements(
                     validateCollectionElements(expectedValueType, keyValue->value, isAuto);
                 } else if (valueType->toString() != expectedValueType->toString()) {
                     if (!(numericRank(valueType->toString(), maxRank) > 0 && numericRank(expectedValueType->toString(), maxRank) > 0))   
-                        LogError("Value type mismatch: expected " + expectedValueType->toString() + ", got " + valueType->toString());
+                        LogError("Value type mismatch: expected " + expectedValueType->toString() + ", got " + valueType->toString(), keyValue->value);
                 }
 
                 // Проверка ключей на дубликацию
                 if (std::find(keys.begin(), keys.end(), keyValue->keyName) != keys.end()) {
-                    LogError("Duplicate key: " + keyValue->key->inferredType->toString());
+                    LogError("Duplicate key: " + keyValue->key->inferredType->toString(), keyValue->key);
                 }
                 keys.push_back(keyValue->keyName);
             } else {
                 statement->accept(*this);
-                LogError("Map initialization expects key-value pairs");
+                LogError("Map initialization expects key-value pairs", statement);
             }
         }
     } else {
-        LogError("Unknown generic collection: " + genericType->baseName);
+        LogError("Unknown generic collection: " + genericType->baseName, expr);
     }
     
     if (maxRank > 0) {
@@ -518,7 +529,7 @@ void TypeSymbolVisitor::applyImplicitCastToNumeric(
                 if (!isAuto) {
                     // Проверяем лимиты
                     if (!checkLimits(targetType, value)) {
-                        LogError("Element value " + std::to_string(value) + " does not fit in type " + targetType);
+                        LogError("Element value " + std::to_string(value) + " does not fit in type " + targetType, statement);
                     }
                 }
                 if (elemType && elemType->toString() != targetType) {
@@ -539,7 +550,7 @@ void TypeSymbolVisitor::applyImplicitCastToNumeric(
                             keyTargetType = simple->toString();
                     }
                     if (!isAuto && !checkLimits(keyTargetType, value)) {
-                        LogError("Key value " + std::to_string(value) + " does not fit in type " + keyTargetType);
+                        LogError("Key value " + std::to_string(value) + " does not fit in type " + keyTargetType, keyValue->key);
                     }
                     if (numNode->inferredType && numNode->inferredType->toString() != keyTargetType) {
                         numNode->implicitCastTo = std::make_shared<SimpleTypeNode>(keyTargetType);
@@ -557,7 +568,7 @@ void TypeSymbolVisitor::applyImplicitCastToNumeric(
                             valueTargetType = simple->toString();
                     }
                     if (!isAuto && !checkLimits(valueTargetType, value)) {
-                        LogError("Value " + std::to_string(value) + " does not fit in type " + valueTargetType);
+                        LogError("Value " + std::to_string(value) + " does not fit in type " + valueTargetType, keyValue->value);
                     }
                     if (numNode->inferredType && numNode->inferredType->toString() != valueTargetType) {
                         numNode->implicitCastTo = std::make_shared<SimpleTypeNode>(valueTargetType);
