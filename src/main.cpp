@@ -27,7 +27,8 @@ int main(int argc, char* argv[]) {
         // Выполнение только если указан флаг --run или run
         if (options.run) {
             std::string currentFilePath = std::filesystem::current_path().string();
-            return runProgram(combinedAST, currentFilePath, options.showAST);
+            runProgram(combinedAST, currentFilePath, options.showAST);
+            return 0;
         }
         
         // Если --run не указан, просто завершаем работу после анализа
