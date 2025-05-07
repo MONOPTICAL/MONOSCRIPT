@@ -21,7 +21,9 @@ llvm::Value* ASTGen::getResult() const {
 
 // Вспомогательная функция для вывода предупреждений
 void ASTGen::LogWarning(const std::string& message) {
+#if DEBUG
     std::cerr << "Warning: " << message << std::endl;
+#endif
 }
 
 // Реализации методов visitor для всех узлов AST
@@ -80,7 +82,6 @@ void ASTGen::visit(FunctionNode& node) {
     
     // Сохраняем старую таблицу символов и создаем новую
     auto oldNamedValues = context.NamedValues;
-    context.NamedValues.clear();
     
     // Обрабатываем параметры функции
     unsigned idx = 0;
@@ -110,6 +111,8 @@ void ASTGen::visit(FunctionNode& node) {
     context.NamedValues = oldNamedValues;
     
     result = func;
+
+    context.Builder.ClearInsertionPoint();
 }
 
 void ASTGen::visit(StructNode& node) {
@@ -385,11 +388,14 @@ void ASTGen::visit(UnaryOpNode& node) {
 
 void ASTGen::visit(IdentifierNode& node) {
     LogWarning("visit для IdentifierNode: " + node.name);
+
     // Базовая заглушка: ищем переменную в таблице символов
     if (context.NamedValues.find(node.name) != context.NamedValues.end()) {
         result = context.NamedValues[node.name];
+        LogWarning("Найдена переменная " + node.name);
         return;
     }
+
     result = nullptr;
 }
 
