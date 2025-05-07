@@ -84,6 +84,8 @@ void TypeSymbolVisitor::visit(UnaryOpNode& node) {
             LogError("Unsupported operand type for '?'", node.shared_from_this());
             return;
         }
+
+        node.op = "nullcheck";
     }
     else if (node.op == "!")
     {
@@ -97,6 +99,29 @@ void TypeSymbolVisitor::visit(UnaryOpNode& node) {
             LogError("Unsupported operand type for '!'", node.shared_from_this());
             return;
         }
+
+        node.op = "not";
+    }
+    else if (node.op == "-")
+    {
+        if (std::dynamic_pointer_cast<CallNode>(node.operand)) {}
+        else if (std::dynamic_pointer_cast<BinaryOpNode>(node.operand)) {}
+        else if (std::dynamic_pointer_cast<AccessExpression>(node.operand)) {}
+        else if (std::dynamic_pointer_cast<IdentifierNode>(node.operand)) {}
+        else if (std::dynamic_pointer_cast<NumberNode>(node.operand)) {}
+        else if (std::dynamic_pointer_cast<FloatNumberNode>(node.operand)) {}
+        else
+        {
+            LogError("Unsupported operand type for '-'", node.shared_from_this());
+            return;
+        }
+
+        node.op = "neg";
+    }
+    else
+    {
+        LogError("Unsupported unary operator: " + node.op, node.shared_from_this());
+        return;
     }
 
     node.inferredType = operandType;
