@@ -114,11 +114,11 @@ void compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::st
                 }
             }
         }
+#if DEBUG
         std::cerr << "\n--- LLVM IR ---" << std::endl;
         context.TheModule->print(llvm::outs(), nullptr);
         std::cerr << "--- END LLVM IR ---\n" << std::endl;
-
-                // Оптимизация клонированного модуля
+#endif
         {
             llvm::PassBuilder passBuilder;
             llvm::LoopAnalysisManager LAM;
@@ -138,9 +138,11 @@ void compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::st
             // Прогоняем *оптимизейшен*
             MPM.run(*context.TheModule, MAM);
         }
+#if DEBUG
         std::cerr << "\n--- LLVM IR(O2) ---" << std::endl;
         context.TheModule->print(llvm::outs(), nullptr);
         std::cerr << "--- END LLVM IR(O2) ---\n" << std::endl;
+#endif
         if (!emitExecutable(context.TheModule.get(), outputFile, entryFunctionName)) {
             std::cerr << "Ошибка при компиляции в исполняемый файл." << std::endl;
         }
