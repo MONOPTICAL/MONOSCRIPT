@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <cstdint>
 #include <map>
 
 class ASTNodeVisitor {
@@ -335,8 +336,8 @@ class IdentifierNode : public ASTNode {
 class NumberNode : public ASTNode {
     public:
         NumberNode() = default;
-        NumberNode(int value, std::shared_ptr<TypeNode> type) : value(value), type(type) {}
-        int value;
+        NumberNode(int64_t value, std::shared_ptr<TypeNode> type) : value(value), type(type) {}
+        int64_t value;
         std::shared_ptr<TypeNode> type; // тип числа (i32, i64, i8, i1)
 
 

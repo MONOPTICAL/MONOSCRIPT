@@ -5,7 +5,9 @@ struct CLIOptions {
     bool showTokens = false;
     bool showAST = false;
     bool showSymantic = false;
-    bool run = false; // LLVM
+    bool runJIT = false; // LLVM JIT
+    bool compileExecutable = false; // LLVM Compile
+    std::string ExecutableFile;
     std::string inputFile;
 };
 
