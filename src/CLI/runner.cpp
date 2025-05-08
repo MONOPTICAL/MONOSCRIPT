@@ -16,6 +16,11 @@
 #include <chrono>
 #include <dlfcn.h>
 
+#include <llvm/IR/PassManager.h>
+#include <llvm/Passes/PassBuilder.h>
+#include <llvm/Passes/PassPlugin.h>
+#include <llvm/IR/LegacyPassManager.h>
+
 int executeModule(llvm::Module* module, std::string mainFunction) {
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
@@ -62,6 +67,39 @@ int executeModule(llvm::Module* module, std::string mainFunction) {
         }
     }
 
+#if DEBUG
+    std::cout << "\n--- LLVM IR ---" << std::endl;
+    ClonedModule->print(llvm::outs(), nullptr);
+    std::cout << "--- END LLVM IR ---\n" << std::endl;
+#endif
+
+    // Оптимизация клонированного модуля
+    {
+        llvm::PassBuilder passBuilder;
+        llvm::LoopAnalysisManager LAM;
+        llvm::FunctionAnalysisManager FAM;
+        llvm::CGSCCAnalysisManager CGAM;
+        llvm::ModuleAnalysisManager MAM;
+    
+        // АНАЛизаторы
+        passBuilder.registerModuleAnalyses(MAM); // АНАЛизирует на уровне всего модуля(llvm::Module)
+        passBuilder.registerCGSCCAnalyses(CGAM); // АНАЛизирует на вызовы функций(llvm::CallInst)
+        passBuilder.registerFunctionAnalyses(FAM); // АНАЛизирует на уровне функций(llvm::Function)
+        passBuilder.registerLoopAnalyses(LAM); // АНАЛизирует на уровне циклов
+        passBuilder.crossRegisterProxies(LAM, FAM, CGAM, MAM); // Связываем анализаторы друг с другом
+    
+        llvm::ModulePassManager MPM = passBuilder.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
+    
+        // Прогоняем *оптимизейшен*
+        MPM.run(*ClonedModule, MAM);
+    }
+
+#if DEBUG
+    std::cout << "\n--- LLVM IR(O2) ---" << std::endl;
+    ClonedModule->print(llvm::outs(), nullptr);
+    std::cout << "--- END LLVM IR(O2) ---\n" << std::endl;
+#endif
+
     // ThreadSafeModule
     llvm::orc::ThreadSafeModule TSM(std::move(ClonedModule), std::move(Ctx));
     ExitOnErr(JIT->addIRModule(std::move(TSM)));
@@ -93,11 +131,6 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
 #if DEBUG
     auto t_codegen = std::chrono::high_resolution_clock::now();
 
-    
-    std::cout << "\n--- LLVM IR ---" << std::endl;
-    context.TheModule->print(llvm::outs(), nullptr);
-    std::cout << "--- END LLVM IR ---\n" << std::endl;
-    
     std::cout << "\n--- Запуск программы ---" << std::endl;
 #endif
 

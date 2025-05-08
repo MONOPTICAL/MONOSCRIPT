@@ -2,6 +2,7 @@
 #include "CLI/headers/ast_tools.h"
 #include "CLI/headers/runner.h"
 #include "CLI/headers/symantic.h"
+#include "CLI/headers/compile.h"
 #include "errors/headers/ErrorEngine.h"
 #include <iostream>
 #include <chrono>
@@ -25,9 +26,18 @@ int main(int argc, char* argv[]) {
         combinedAST = symanticParseModule(combinedAST, options.showSymantic);
         
         // Выполнение только если указан флаг --run или run
-        if (options.run) {
+        if (options.runJIT) {
             std::string currentFilePath = std::filesystem::current_path().string();
-            return runProgram(combinedAST, currentFilePath, options.showAST);
+            runProgram(combinedAST, currentFilePath, options.showAST);
+            return 0;
+        }
+
+        if (options.compileExecutable) {
+            // Компиляция в исполняемый файл
+            std::string outputFile = options.ExecutableFile.empty() ? "output" : options.ExecutableFile;
+            compileToExecutable(combinedAST, outputFile);
+            std::cout << "Компиляция завершена. Исполняемый файл: " << outputFile << std::endl;
+            return 0;
         }
         
         // Если --run не указан, просто завершаем работу после анализа

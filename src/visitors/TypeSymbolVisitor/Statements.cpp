@@ -77,6 +77,10 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
         }
     }
     
+    if(std::find(labels.begin(), labels.end(), "@entry") != labels.end() || node.name == "main")
+        if(node.returnType->toString() != "i32" && node.returnType->toString() != "void")
+            LogError("Function " + node.name + " must return i32 or void");
+
     // Если не вывилась ошибка, добавляем функцию в реестр
     Context currentFunction = {
         .labels = labels, // Добавляем метки функции
@@ -104,6 +108,8 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
         contexts[0].functions[node.name] = node.shared_from_this();
     else
         contexts.back().functions[node.name] = node.shared_from_this();
+
+    currentFunction.functions[node.name] = node.shared_from_this(); // Добавляем функцию в текущий контекст
     
     // Добавляем функцию в реестр
     contexts.push_back(currentFunction);
@@ -400,6 +406,7 @@ void TypeSymbolVisitor::visit(IfNode& node) {
         // Убираем контекст блока else
         contexts.pop_back();
     }
+    
 }
 
 void TypeSymbolVisitor::visit(ForNode& node) {

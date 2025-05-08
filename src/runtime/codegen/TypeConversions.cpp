@@ -14,7 +14,7 @@ llvm::Value* TypeConversions::loadValueIfPointer(CodeGenContext& context, llvm::
     
     std::string loadName = name.empty() ? "load" : name + "_load";
 #if DEBUG
-    std::cerr << "!!@Warning: Применение loadValueIfPointer к " << value->getName().str() << std::endl;
+    std::cerr << "Warning: Применение loadValueIfPointer к " << value->getName().str() << std::endl;
     std::cerr << "Тип value: ";
     value->getType()->print(llvm::errs());
     std::cerr << std::endl;
@@ -22,6 +22,7 @@ llvm::Value* TypeConversions::loadValueIfPointer(CodeGenContext& context, llvm::
 
     if (llvm::AllocaInst* allocaInst = llvm::dyn_cast<llvm::AllocaInst>(value)) {
         llvm::Type* loadedType = allocaInst->getAllocatedType();
+        std::cerr << "Hello from AllocaInst" << std::endl;
         if (loadedType->isArrayTy() && loadedType->getArrayElementType()->isIntegerTy(8)) {
             
             llvm::Value* zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(context.TheContext), 0);
@@ -36,19 +37,26 @@ llvm::Value* TypeConversions::loadValueIfPointer(CodeGenContext& context, llvm::
         return context.Builder.CreateLoad(loadedType, value, loadName);
     } 
     else if (llvm::GlobalVariable* globalVar = llvm::dyn_cast<llvm::GlobalVariable>(value)) {
+        std::cerr << "Hello from GlobalVariable" << std::endl;
         llvm::Type* valueType = globalVar->getValueType();
         // Специальная обработка для строк (массив i8)
         if (valueType->isArrayTy() && valueType->getArrayElementType()->isIntegerTy(8)) {
+            std::cerr << "Hello from GlobalVariable with array" << std::endl;
             llvm::Value* zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(context.TheContext), 0);
-            return context.Builder.CreateInBoundsGEP(
+            auto* gep = context.Builder.CreateInBoundsGEP(
                 valueType, 
                 globalVar, 
                 {zero, zero}, 
-                name + "_gep");        
+                name + "_gep");
+            llvm::errs() << "GEP создан: ";
+            gep->print(llvm::errs());
+            llvm::errs() << "\n";
+            return gep;
         }
+        std::cerr << "Hello from GlobalVariable" << std::endl;
         return context.Builder.CreateLoad(valueType, value, loadName);
     }
-
+ 
     return value;  // Для других указателей оставляем как есть
 }
 
