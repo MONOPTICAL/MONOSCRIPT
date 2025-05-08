@@ -36,6 +36,25 @@ extern(C) char* toString_int(const int a) nothrow @nogc
     return result;
 }
 
+extern(C) char* toString_long(const long a) nothrow @nogc
+{
+    import core.stdc.stdio : sprintf;
+    import core.stdc.string : strlen, strcpy;
+    import core.stdc.stdlib : malloc;
+
+    char[32] buffer;
+    sprintf(buffer.ptr, "%ld", a);
+
+    size_t len_a = strlen(buffer.ptr);
+
+    char* result = cast(char*)malloc(len_a + 1);
+    if (result is null) return null;
+
+    strcpy(result, buffer.ptr);
+
+    return result;
+}
+
 extern(C) char* toString_bool(const bool a) nothrow @nogc
 {
     import core.stdc.string : strlen, strcpy;

@@ -8,11 +8,13 @@ extern(C) int sum(const int a, const int b) nothrow @nogc
 extern(C) void echo(const char* str) nothrow
 {
     import core.stdc.stdio : printf;
+    
     printf("%s\n", str);
 }
 
-extern(C) void test(const bool a) nothrow @nogc
+extern(C) void test() nothrow @nogc
 {
     import core.stdc.stdio : printf;
-    printf("%d\n", a);
+
+    printf("Hello from D!\n");
 }

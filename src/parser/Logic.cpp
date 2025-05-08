@@ -297,7 +297,7 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
     if (currentToken.type == TokenType::Number) // Если токен - число
     {
         advance(); // Переходим к следующему токену
-        std::optional<int> intValue; // Переменная для хранения значения числа
+        std::optional<int64_t> intValue; // Переменная для хранения значения числа
         std::optional<float> floatValue; // Переменная для хранения значения числа с плавающей точкой
         try
         {
@@ -307,7 +307,7 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
             }
             else
             {
-                intValue = std::stoi(currentToken.value); // Преобразуем строку в число
+                intValue = std::stoll(currentToken.value); // Преобразуем строку в число
             }
         }
         catch (const std::invalid_argument& e) // Если преобразование не удалось, выбрасываем исключение

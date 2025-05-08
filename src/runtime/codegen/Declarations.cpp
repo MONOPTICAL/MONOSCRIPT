@@ -50,10 +50,14 @@ namespace Declarations
             *context.TheModule,
             strConstant->getType(),  // Тип - массив символов
             node.isConst,            // isConstant
-            llvm::GlobalValue::CommonLinkage,
+            llvm::GlobalValue::PrivateLinkage,
             strConstant,             // Инициализатор
             node.name
         );
+
+        // Устанавливаем атрибуты для глобальной переменной
+        globalVar->setAlignment(llvm::MaybeAlign(1)); // Выравнивание 1 байт
+        globalVar->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global); // Глобальный адрес
 
         // Сохраняем переменную в таблице символов
         context.NamedValues[node.name] = globalVar;
@@ -166,7 +170,7 @@ namespace Declarations
             *context.TheModule,
             arrayType,
             node.isConst,
-            llvm::GlobalValue::CommonLinkage,
+            llvm::GlobalValue::PrivateLinkage,
             arrayConstant,
             node.name
         );
@@ -216,7 +220,7 @@ namespace Declarations
             *context.TheModule,
             varType,
             node.isConst, // isConstant
-            llvm::GlobalValue::CommonLinkage,
+            llvm::GlobalValue::PrivateLinkage,
             llvm::Constant::getNullValue(varType), // Инициализатор
             node.name
         );

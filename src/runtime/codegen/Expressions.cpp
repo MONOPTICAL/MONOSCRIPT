@@ -127,7 +127,9 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
         } 
         else 
         {
+#if DEBUG
             std::cerr << "Warning: Неизвестная операция сравнения: " << node.op << std::endl;
+#endif
             return nullptr;
         }
         
@@ -170,8 +172,9 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
         return context.Builder.CreateFCmp(predicate, left, right, "cmptmp");
     }
     */
-    
+#if DEBUG    
     std::cerr << "Warning: Неизвестная бинарная операция: " << node.op << std::endl;
+#endif
     return nullptr;
 }
 

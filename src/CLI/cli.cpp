@@ -10,6 +10,7 @@ void printHelp(const char* programName) {
               << "  --ast            🌳 Show AST\n"
               << "  --symantic       🔍 Show symantic analysis\n"
               << "  --run, run       ▶️  Execute the program via LLVM\n"
+              << "  --compile        🏗️  Compile to executable\n"
               << "\n⌨️ If FILE is not specified, input is read from standard input.\n"
               << std::endl;
 }
@@ -29,7 +30,15 @@ CLIOptions parseArgs(int argc, char* argv[]) {
         } else if (arg == "--symantic") {
             options.showSymantic = true;
         } else if (arg == "--run" || arg == "run") {
-            options.run = true;
+            options.runJIT = true;
+        } else if (arg == "--compile") {
+            options.compileExecutable = true;
+            if (i + 1 < argc) {
+                options.ExecutableFile = argv[++i];
+            } else {
+                std::cerr << "Error: --compile requires an output file name." << std::endl;
+                exit(1);
+            }
         } else if (arg[0] != '-') {
             options.inputFile = arg;
         } else {

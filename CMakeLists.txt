@@ -94,6 +94,7 @@ add_executable(ms # Create an executable target named ms
     src/CLI/ast_tools.cpp
     src/CLI/runner.cpp
     src/CLI/symantic.cpp
+    src/CLI/compile.cpp
     src/errors/ErrorEngine.cpp
 )
 
