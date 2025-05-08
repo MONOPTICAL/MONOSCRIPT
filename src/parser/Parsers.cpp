@@ -196,8 +196,7 @@ std::shared_ptr<ASTNode> Parser::parseIf()
             elseBlock = parseBlock(expectedIndent);
         }
     }
-    else
-    
+
     lineIndex--; // Без этого он скипает 2 линии а не одну
 
     auto ifNode = std::make_shared<IfNode>(condition, thenBlock, elseBlock);

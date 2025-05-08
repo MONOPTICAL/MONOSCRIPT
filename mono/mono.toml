@@ -24,6 +24,11 @@ ret = "string"
 args = ["float"]
 
 [[function]]
+name = "toString_long"
+ret = "string"
+args = ["i64"]
+
+[[function]]
 name = "echo"
 ret = "void"
 args = ["string"]
@@ -31,4 +36,4 @@ args = ["string"]
 [[function]]
 name = "test"
 ret = "void"
-args = ["i1"]
+args = []

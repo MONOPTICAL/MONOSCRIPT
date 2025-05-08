@@ -66,9 +66,13 @@ void ASTGen::visit(FunctionNode& node) {
         paramTypes.push_back(context.getLLVMType(param.first, context.TheContext));
     }
     
+    bool isMain = (node.name == "main" || std::find(node.labels.begin(), node.labels.end(), "@entry") != node.labels.end());
     llvm::Type* returnLLVMType = llvm::Type::getVoidTy(context.TheContext);
     if (node.returnType) {
         returnLLVMType = context.getLLVMType(node.returnType, context.TheContext);
+    }
+    if (isMain) {
+        returnLLVMType = llvm::Type::getInt32Ty(context.TheContext);
     }
     
     llvm::FunctionType* funcType = llvm::FunctionType::get(returnLLVMType, paramTypes, false);
@@ -87,24 +91,41 @@ void ASTGen::visit(FunctionNode& node) {
     unsigned idx = 0;
     for (auto &arg : func->args()) {
         arg.setName(node.parameters[idx++].second);
+        context.NamedValues[arg.getName().str()] = &arg;
     }
-    
+
     // Генерируем тело функции, если оно есть
     if (node.body) {
         node.body->accept(*this);
     }
-    
+
+    if (currentBlock) {
+        context.Builder.SetInsertPoint(currentBlock);
+    }
+
     // Добавляем return, если его нет
+    llvm::BasicBlock* currentInsertionBlock = context.Builder.GetInsertBlock();
     if (!entryBlock->getTerminator()) {
-        if (returnLLVMType->isVoidTy()) {
+        if (isMain) {
+            // main всегда возвращает 0, если пользователь не указал return
+            context.Builder.CreateRet(llvm::ConstantInt::get(returnLLVMType, 0));
+        } else if (returnLLVMType->isVoidTy()) {
             context.Builder.CreateRetVoid();
         } else {
             context.Builder.CreateRet(llvm::Constant::getNullValue(returnLLVMType));
         }
     }
 
-    if (currentBlock) {
-        context.Builder.SetInsertPoint(currentBlock);
+    // Новая проверка для текущего блока
+    if (currentInsertionBlock && currentInsertionBlock != entryBlock && !currentInsertionBlock->getTerminator()) {
+        context.Builder.SetInsertPoint(currentInsertionBlock);
+        if (isMain) {
+            context.Builder.CreateRet(llvm::ConstantInt::get(returnLLVMType, 0));
+        } else if (returnLLVMType->isVoidTy()) {
+            context.Builder.CreateRetVoid();
+        } else {
+            context.Builder.CreateRet(llvm::Constant::getNullValue(returnLLVMType));
+        }
     }
     
     // Восстанавливаем старую таблицу символов
@@ -123,12 +144,36 @@ void ASTGen::visit(StructNode& node) {
 void ASTGen::visit(BlockNode& node) {
     LogWarning("visit для BlockNode: выполняю обработку " + std::to_string(node.statements.size()) + " инструкций");
     result = nullptr;
-    
+
+    // Сохраняем точку вставки до генерации блока
+    llvm::BasicBlock* prevBlock = context.Builder.GetInsertBlock();
+
+    llvm::BasicBlock* ifcont = nullptr;
+
+    bool isInEntryBlock = (prevBlock && prevBlock->getName() == "entry");
+
     for (auto& stmt : node.statements) {
-        if (stmt) {
-            stmt->accept(*this);
-            // Результат последнего оператора становится результатом блока
+        if (!stmt) continue;
+
+        stmt->accept(*this);
+
+        // Если это вложенная функция, то чтобы не терялась точка вставки
+        if (dynamic_cast<FunctionNode*>(stmt.get()) && prevBlock) {
+            context.Builder.SetInsertPoint(prevBlock);
         }
+        if (dynamic_cast<IfNode*>(stmt.get()) && prevBlock) {
+            prevBlock = context.Builder.GetInsertBlock();
+            if(prevBlock->getName().str() == "ifcont") {
+                ifcont = prevBlock;
+            }
+            context.Builder.SetInsertPoint(prevBlock);
+        }
+    }
+
+    // Восстанавливаем точку вставки после генерации блока
+    if (prevBlock) 
+    {
+        context.Builder.SetInsertPoint(prevBlock);
     }
 }
 
@@ -198,7 +243,50 @@ void ASTGen::visit(VariableReassignNode& node) {
 }
 
 void ASTGen::visit(IfNode& node) {
-    LogWarning("visit не реализован для IfNode");
+    LogWarning("visit для IfNode");
+
+    // Генерируем код для условия
+    node.condition->accept(*this);
+    llvm::Value* condValue = getResult();
+    if (!condValue) {
+        LogWarning("Ошибка: не удалось вычислить условие");
+        result = nullptr;
+        return;
+    }
+
+    if (!condValue->getType()->isIntegerTy(1)) {
+        condValue = context.Builder.CreateICmpNE(
+            condValue, 
+            llvm::Constant::getNullValue(condValue->getType()),
+            "ifcond"
+        );
+    }
+
+    llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
+    llvm::BasicBlock* thenBlock = llvm::BasicBlock::Create(context.TheContext, "then", function);
+    llvm::BasicBlock* mergeBlock = llvm::BasicBlock::Create(context.TheContext, "ifcont", function);
+    llvm::BasicBlock* elseBlock = nullptr;
+
+    if (node.elseBlock) {
+        elseBlock = llvm::BasicBlock::Create(context.TheContext, "else", function);
+        context.Builder.CreateCondBr(condValue, thenBlock, elseBlock);
+    } else {
+        context.Builder.CreateCondBr(condValue, thenBlock, mergeBlock);
+    }
+
+    context.Builder.SetInsertPoint(thenBlock);
+    node.thenBlock->accept(*this);
+    if (!context.Builder.GetInsertBlock()->getTerminator())
+        context.Builder.CreateBr(mergeBlock);
+
+    if (node.elseBlock) {
+        context.Builder.SetInsertPoint(elseBlock);
+        node.elseBlock->accept(*this);
+        if (!context.Builder.GetInsertBlock()->getTerminator())
+            context.Builder.CreateBr(mergeBlock);
+    }
+
+    context.Builder.SetInsertPoint(mergeBlock);
     result = nullptr;
 }
 
