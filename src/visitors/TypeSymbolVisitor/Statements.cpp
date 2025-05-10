@@ -295,6 +295,10 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
     std::shared_ptr<TypeNode> varType = varAssign->inferredType;
     std::string varTypeStr = varType->toString();
 
+    if (varAssign->isConst) {
+        LogError("Cannot reassign constant variable: " + node.name, node.shared_from_this());
+    }
+
     std::string expressionType;
     if (varTypeStr.starts_with("array")
         || varTypeStr.starts_with("map")
