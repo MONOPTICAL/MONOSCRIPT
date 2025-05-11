@@ -68,116 +68,178 @@ namespace Declarations
     llvm::Value* handleGlobalArrayVariable(CodeGenContext &context, VariableAssignNode &node, llvm::Type *varType, std::shared_ptr<BlockNode> blockExpr)
     {
         ASTGen codeGen(context);
-
-        if (!std::dynamic_pointer_cast<KeyValueNode>(blockExpr->statements[0])) {
-            codeGen.LogWarning("Инициализация массива");
-        } else {
-            // TODO: реализовать инициализацию map
+        
+        if (!blockExpr->statements.empty() && std::dynamic_pointer_cast<KeyValueNode>(blockExpr->statements[0])) {
             codeGen.LogWarning("Инициализация map не реализована");
             return nullptr;
         }
-        
-        if (!varType->isArrayTy()) {
-            codeGen.LogWarning("Переменная " + node.name + " является массивом но динамический инициализированый");
-            auto TypeNode = std::make_shared<GenericTypeNode>("array");
-            TypeNode->typeParameters.push_back(context.getTypeByASTNode(blockExpr->statements[0]));
-            varType = context.getLLVMType(TypeNode, context.TheContext);
-            if (!varType) {
-                codeGen.LogWarning("Не удалось получить тип для массива " + node.name);
-                return nullptr;
+    
+        codeGen.LogWarning("Инициализация массива: " + node.name);
+    
+        // 1. Определяем тип элементов
+        llvm::Type* elementType = nullptr;
+        if (auto genType = std::dynamic_pointer_cast<GenericTypeNode>(node.type)) {
+            if (genType->baseName == "array" && !genType->typeParameters.empty()) {
+                elementType = context.getLLVMType(genType->typeParameters[0], context.TheContext);
             }
-            codeGen.LogWarning("Тип массива " + TypeNode->toString());
+        } 
+        
+        if (!elementType && !blockExpr->statements.empty()) {
+            // Если тип не указан явно, выводим из первого элемента
+            auto firstElem = blockExpr->statements[0];
+            firstElem->accept(codeGen);
+            llvm::Value* firstValue = codeGen.getResult();
+            elementType = firstValue->getType();
         }
-
-        // Создаем массив констант для инициализации
-        std::vector<llvm::Constant*> elements;
-        for (int i = 0; i < blockExpr->statements.size(); ++i) {
-            if (!blockExpr->statements[i]) {
-                continue;
+    
+        if (!elementType) {
+            codeGen.LogWarning("Не удалось определить тип элементов массива " + node.name);
+            elementType = llvm::Type::getInt32Ty(context.TheContext); // Fallback
+        }
+    
+        // 2. Создаём или получаем тип структуры массива
+        std::string typeName = "array_struct";
+        llvm::StructType* arrayStruct = llvm::StructType::getTypeByName(context.TheContext, typeName);
+        
+        if (!arrayStruct) {
+            arrayStruct = llvm::StructType::create(
+                context.TheContext,
+                {
+                    llvm::PointerType::get(context.TheContext, 0),     // data: ptr
+                    llvm::Type::getInt32Ty(context.TheContext),        // length: i32
+                    llvm::Type::getInt32Ty(context.TheContext)         // capacity: i32
+                },
+                typeName
+            );
+        }
+    
+        // 3. Выделяем память для элементов массива
+        size_t arraySize = blockExpr->statements.size();
+        llvm::Value* dataPtr = nullptr;
+        
+        // Выделяем память для данных (либо через malloc, либо создаём глобальный массив)
+        if (arraySize > 0) {
+            // Создаём глобальный массив данных для инициализации
+            std::vector<llvm::Constant*> elementConstants;
+            bool allConstant = true;
+            
+            int index = 0;
+            for (auto& stmt : blockExpr->statements) {
+                if (!stmt) continue;
+                
+                // Специальная обработка для строк и других типов...
+                if (auto stringNode = std::dynamic_pointer_cast<StringNode>(stmt)) {
+                    llvm::Constant* strConst = llvm::ConstantDataArray::getString(
+                        context.TheContext, stringNode->value, true);
+                    llvm::GlobalVariable* strGlobal = new llvm::GlobalVariable(
+                        *context.TheModule,
+                        strConst->getType(),
+                        true,
+                        llvm::GlobalValue::PrivateLinkage,
+                        strConst,
+                        "str_elem_" + std::to_string(index)
+                    );
+                    llvm::Constant* strPtr = llvm::ConstantExpr::getBitCast(
+                        strGlobal, 
+                        llvm::PointerType::get(context.TheContext, 0)
+                    );
+                    elementConstants.push_back(strPtr);
+                } 
+                else {
+                    stmt->accept(codeGen);
+                    llvm::Value* elemValue = codeGen.getResult();
+                    
+                    if (llvm::Constant* constVal = llvm::dyn_cast<llvm::Constant>(elemValue)) {
+                        elementConstants.push_back(constVal);
+                    } else {
+                        // Если хотя бы один элемент не константа, не сможем создать ConstantArray
+                        allConstant = false;
+                        elementConstants.push_back(llvm::UndefValue::get(elementType));
+                        codeGen.LogWarning("Элемент массива не константа");
+                    }
+                }
+                index++;
             }
             
-            // Специальная обработка для строковых элементов
-            if (auto stringNode = std::dynamic_pointer_cast<StringNode>(blockExpr->statements[i])) {
-                // Создаём константную строку
-                llvm::Constant* strConstant = llvm::ConstantDataArray::getString(
-                    context.TheContext, stringNode->value, true);
+            if (allConstant && !elementConstants.empty()) {
+                // Создаём глобальный массив данных
+                llvm::ArrayType* dataArrayType = llvm::ArrayType::get(elementType, arraySize);
+                llvm::Constant* dataArray = llvm::ConstantArray::get(dataArrayType, elementConstants);
                 
-                // Создаём глобальную строковую переменную
-                llvm::GlobalVariable* strGlobal = new llvm::GlobalVariable(
+                llvm::GlobalVariable* dataGlobal = new llvm::GlobalVariable(
                     *context.TheModule,
-                    strConstant->getType(),
+                    dataArrayType,
                     true, // isConstant
                     llvm::GlobalValue::PrivateLinkage,
-                    strConstant,
-                    "str" + std::to_string(i)
+                    dataArray,
+                    node.name + "_data"
                 );
                 
-                // Получаем указатель на неё (правильного типа)
-                llvm::Constant* strPtr = llvm::ConstantExpr::getBitCast(
-                    strGlobal, 
-                    llvm::PointerType::get(llvm::Type::getInt8Ty(context.TheContext), 0)
+                dataPtr = llvm::ConstantExpr::getBitCast(
+                    dataGlobal,
+                    llvm::PointerType::get(context.TheContext, 0)
                 );
-                
-                elements.push_back(strPtr);
-            }
-            else if (auto identifierNode = std::dynamic_pointer_cast<IdentifierNode>(blockExpr->statements[i])) {
-                // Если это идентификатор, получаем его значение из таблицы символов
-                llvm::Value* idValue = context.NamedValues[identifierNode->name];
-                if (!idValue) {
-                    codeGen.LogWarning("Идентификатор " + identifierNode->name + " не найден в таблице символов");
-                    elements.push_back(llvm::Constant::getNullValue(varType->getArrayElementType()));
-                    continue;
-                }
-                
-                if (llvm::GlobalVariable* globalVar = llvm::dyn_cast<llvm::GlobalVariable>(idValue)) {
-                    llvm::Constant* castedPtr = llvm::ConstantExpr::getBitCast(
-                        globalVar,
-                        llvm::PointerType::get(llvm::Type::getInt8Ty(context.TheContext), 0)
-                    );
-                    elements.push_back(castedPtr);
-                } else {
-                    codeGen.LogWarning("Идентификатор " + identifierNode->name + " не найден в таблице символов");
-                    elements.push_back(llvm::Constant::getNullValue(varType->getArrayElementType()));
-                }
-            }
-            else {
-                blockExpr->statements[i]->accept(codeGen);
-                llvm::Value* elementValue = codeGen.getResult();
-                
-                // Преобразуем Value* в Constant*
-                if (llvm::Constant* constVal = llvm::dyn_cast<llvm::Constant>(elementValue)) {
-                    elements.push_back(constVal);
-                } else {
-                    codeGen.LogWarning("Элемент не является константой, используем 0");
-                    elements.push_back(llvm::Constant::getNullValue(varType->getArrayElementType()));
-                }
             }
         }
         
-        // Создаем константный массив
-        llvm::Type* elementType = varType->getArrayElementType();
-        llvm::ArrayType* arrayType = llvm::ArrayType::get(elementType, elements.size());
-        llvm::Constant* arrayConstant;
-        
-        if (!elements.empty()) {
-            arrayConstant = llvm::ConstantArray::get(arrayType, elements);
-        } else {
-            arrayConstant = llvm::ConstantAggregateZero::get(varType);
+        // Если не все элементы константы или массив пуст, используем malloc
+        if (!dataPtr) {
+            // Fallback на malloc если не все элементы константы
+            llvm::Function* mallocFunc = context.getOrDeclareFunction("malloc",
+                llvm::FunctionType::get(
+                    llvm::PointerType::get(context.TheContext, 0),
+                    llvm::Type::getInt32Ty(context.TheContext),
+                    false
+                )
+            );
+            
+            llvm::Value* elemSize = llvm::ConstantInt::get(
+                llvm::Type::getInt32Ty(context.TheContext),
+                context.TheModule->getDataLayout().getTypeAllocSize(elementType)
+            );
+            
+            llvm::Value* bytesToAllocate = llvm::ConstantInt::get(
+                llvm::Type::getInt32Ty(context.TheContext),
+                arraySize * context.TheModule->getDataLayout().getTypeAllocSize(elementType)
+            );
+            
+            // В глобальном контексте нельзя вызывать функции, поэтому используем внешнюю инициализацию
+            // Создаем глобальную функцию-инициализатор
+            dataPtr = llvm::ConstantPointerNull::get(llvm::PointerType::get(context.TheContext, 0));
         }
+    
+        // 4. Создаем глобальную переменную структуры массива
+        llvm::Constant* structInitializer = llvm::ConstantStruct::get(
+            arrayStruct,
+            {
+                llvm::cast<llvm::Constant>(dataPtr),
+                llvm::ConstantInt::get(llvm::Type::getInt32Ty(context.TheContext), arraySize),
+                llvm::ConstantInt::get(llvm::Type::getInt32Ty(context.TheContext), arraySize)
+            }
+        );
         
-        // Создаем глобальную переменную с константным инициализатором
-        llvm::GlobalVariable* globalVar = new llvm::GlobalVariable(
+        llvm::GlobalVariable* arrayVar = new llvm::GlobalVariable(
             *context.TheModule,
-            arrayType,
+            arrayStruct,
             node.isConst,
             llvm::GlobalValue::PrivateLinkage,
-            arrayConstant,
+            structInitializer,
             node.name
         );
         
-        context.NamedValues[node.name] = globalVar;
-
-        return globalVar;
+        // 5. Сохраняем переменную в таблицу символов и тип элементов в таблицу типов
+        context.NamedValues[node.name] = arrayVar;
+        context.arrayElementTypes[arrayVar] = elementType;
+    
+        // 6. Если нужно динамически заполнить массив (не все элементы константы),
+        // создаём функцию-инициализатор, которая будет вызвана до main()
+        if (!dataPtr || llvm::isa<llvm::ConstantPointerNull>(dataPtr)) {
+            // Это сложно реализовать в контексте глобальных переменных
+            // и требует создания глобальных конструкторов
+            codeGen.LogWarning("Для массива " + node.name + " требуется динамическая инициализация");
+        }
+        
+        return arrayVar;
     }
 
     llvm::Value* handleGlobalVariable(CodeGenContext& context, VariableAssignNode& node, llvm::Type* varType)

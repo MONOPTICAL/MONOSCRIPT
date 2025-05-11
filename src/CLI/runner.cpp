@@ -21,7 +21,7 @@
 #include <llvm/Passes/PassPlugin.h>
 #include <llvm/IR/LegacyPassManager.h>
 
-int executeModule(llvm::Module* module, std::string mainFunction) {
+int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimization) {
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
     llvm::InitializeNativeTargetAsmParser();
@@ -73,7 +73,7 @@ int executeModule(llvm::Module* module, std::string mainFunction) {
     std::cout << "--- END LLVM IR ---\n" << std::endl;
 #endif
 
-    // Оптимизация клонированного модуля
+    if(!offOptimization)
     {
         llvm::PassBuilder passBuilder;
         llvm::LoopAnalysisManager LAM;
@@ -119,7 +119,7 @@ int executeModule(llvm::Module* module, std::string mainFunction) {
     return Result;
 }
 
-int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& currentFilePath, bool showAST) {
+int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& currentFilePath, bool showAST, bool offOptimization) {
 #if DEBUG
     auto t_start = std::chrono::high_resolution_clock::now();
 #endif
@@ -154,7 +154,7 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
 #if DEBUG
             auto t_jit_start = std::chrono::high_resolution_clock::now();
 #endif
-            int result = executeModule(context.TheModule.get(), entryFunctionName);
+            int result = executeModule(context.TheModule.get(), entryFunctionName, offOptimization);
 #if DEBUG
             auto t_jit_end = std::chrono::high_resolution_clock::now();
 #endif

@@ -38,7 +38,7 @@ private:
     std::shared_ptr<TypeNode>                                       checkForIdentifier(std::shared_ptr<ASTNode>& node);
 
     void                                                            castNumbersInBinaryTree(
-                                                                        std::shared_ptr<ASTNode> node, 
+                                                                        std::shared_ptr<ASTNode>& node, 
                                                                         const std::string& expectedType);
     
     void                                                            validateCollectionElements(
@@ -98,6 +98,23 @@ private:
     void                                                            findMaxRank(
                                                                             const std::shared_ptr<ASTNode>& node, 
                                                                             int& maxRank);
+
+    int                                                             getTypeRank(
+                                                                        const std::string& type);
+
+    std::string                                                     getTypeByRank(
+                                                                        int rank);
+    
+    void                                                            castAllNumbersToType(
+                                                                        const std::shared_ptr<ASTNode>& node, 
+                                                                        const std::string& targetType); 
+
+    std::shared_ptr<TypeNode>                                       get_common_type_from_list(
+                                                                            std::vector<std::shared_ptr<TypeNode>>& types,
+                                                                            std::shared_ptr<ASTNode> error_context_node, // Для LogError в правильном контексте
+                                                                            bool allow_numeric_promotion_for_simple_types);
+    std::shared_ptr<TypeNode>                                       infer_collection_type_revised(std::shared_ptr<BlockNode> block);
+
 public:
                                                                     TypeSymbolVisitor()
                                                                     {

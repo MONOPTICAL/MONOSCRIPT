@@ -1,5 +1,7 @@
 #include "../headers/TypeSymbolVisitor.h"
+#include "../../includes/ASTDebugger.hpp"
 #include <string_view>
+
 void TypeSymbolVisitor::visit(ProgramNode &node)
 {
     this->program = std::make_shared<ProgramNode>(node);
@@ -174,40 +176,38 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
         LogError("Type cannot be " + varType, node.shared_from_this());
     }
 
-    if (isAuto)
-    {
-        if (auto block = std::dynamic_pointer_cast<BlockNode>(node.expression))
-        {
-            if (std::dynamic_pointer_cast<KeyValueNode>(block->statements[0]))
-            {
-                auto keyValue = std::dynamic_pointer_cast<KeyValueNode>(block->statements[0]);
-                keyValue->key->accept(*this);
-                keyValue->value->accept(*this);
+    if (isAuto) {
+        if (auto block = std::dynamic_pointer_cast<BlockNode>(node.expression)) {
+            std::shared_ptr<TypeNode> inferredType = infer_collection_type_revised(block);
 
-                auto genericType = std::make_shared<GenericTypeNode>("map");
-                genericType->typeParameters.push_back(keyValue->key->inferredType);
-                genericType->typeParameters.push_back(keyValue->value->inferredType);
+            if (inferredType->toString() == "auto_empty_collection") {
+                bool blockIsMapSyntax = false; 
 
-                node.type = genericType;
-                varType = genericType->toString();
+                if (blockIsMapSyntax) {
+                    auto mapType = std::make_shared<GenericTypeNode>("map");
+                    mapType->typeParameters.push_back(std::make_shared<SimpleTypeNode>("auto"));
+                    mapType->typeParameters.push_back(std::make_shared<SimpleTypeNode>("auto"));
+                    node.type = mapType;
+                } else {
+                    auto arrayType = std::make_shared<GenericTypeNode>("array");
+                    arrayType->typeParameters.push_back(std::make_shared<SimpleTypeNode>("auto"));
+                    node.type = arrayType;
+                }
+                LogError("Ambiguous empty collection initializer for 'auto' variable '" + node.name + "'. Resolved based on syntax (assuming array if unclear).", node.shared_from_this());
+            } else if (inferredType->toString().rfind("error_", 0) == 0) {
+                LogError("Failed to infer type for collection assigned to 'auto' variable '" + node.name + "': " + inferredType->toString(), node.expression);
             }
-            else
-            {
-                auto firstStatement = block->statements[0];
-                firstStatement->accept(*this);
-
-                auto genericType = std::make_shared<GenericTypeNode>("array");
-                genericType->typeParameters.push_back(firstStatement->inferredType);
-
-                node.type = genericType;
-                varType = genericType->toString();
+            else {
+                node.type = inferredType;
             }
+            varType = node.type->toString(); // Обновляем varType после вывода
         }
     }
 
     if (varType.starts_with("array")
         || varType.starts_with("map")
     ) {
+        ASTDebugger::debug(node.expression);
         validateCollectionElements(node.type, node.expression, isAuto);
     }
     else
@@ -216,7 +216,9 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
         auto expressionType = node.expression->inferredType->toString();
         
         if (isStrict)
-        {} 
+        {
+            
+        } 
         else if (expressionType != "none" && expressionType != "string")
         {        
             castNumbersInBinaryTree(node.expression, isAuto ? "auto" : varType);
@@ -260,20 +262,29 @@ void TypeSymbolVisitor::visit(ReturnNode &node)
     }
 
     // Проверяем тип возвращаемого значения
-    if (node.expression) {
-        node.expression->accept(*this);
-        std::string expectedType = contexts.back().returnType->toString();
-        std::string actualType;
-        castAndValidate(node.expression, expectedType, this);
-        
-        if (node.expression->implicitCastTo)
-            actualType = node.expression->implicitCastTo->toString();
+    if (node.expression)
+    {
+        if (auto block = std::dynamic_pointer_cast<BlockNode>(node.expression))
+        {
+            node.expression->accept(*this);
+            validateCollectionElements(contexts.back().returnType, node.expression, false);
+        }
         else
-            actualType = node.expression->inferredType->toString();
+        {
+            node.expression->accept(*this);
+            std::string expectedType = contexts.back().returnType->toString();
+            castAndValidate(node.expression, expectedType, this);
+            std::string actualType;
 
-        if (actualType != expectedType) {
-            if (!(actualType == "null" && expectedType == "void"))
-                LogError("Return type mismatch: expected " + contexts.back().returnType->toString() + ", got " + node.expression->inferredType->toString(), node.shared_from_this());
+            if (node.expression->implicitCastTo)
+                actualType = node.expression->implicitCastTo->toString();
+            else
+                actualType = node.expression->inferredType->toString();
+
+            if (actualType != expectedType) {
+                if (!(actualType == "null" && expectedType == "void"))
+                    LogError("Return type mismatch: expected " + contexts.back().returnType->toString() + ", got " + node.expression->inferredType->toString(), node.shared_from_this());
+            }
         }
     }
 
@@ -285,6 +296,7 @@ static bool isCompareOperator(const std::string& op) {
            op == "and" || op == "or";
 }
 
+// TODO: Переделать функцию полность потому что она хуйня ебанная
 void TypeSymbolVisitor::visit(VariableReassignNode& node) {
     // Проверяем, существует ли переменная в реестре
     if (contexts.back().variables.find(node.name) == contexts.back().variables.end()) {
@@ -329,7 +341,10 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
                         }
                     }
                 else
+                {
+                    
                     LogError("Element type mismatch: expected " + Generic->typeParameters[0]->toString() + ", got " + Block->statements[0]->inferredType->toString(), node.expression);
+                }
             }
             else 
                 expressionType = "array<" + Block->statements[0]->inferredType->toString() + ">";
@@ -479,8 +494,15 @@ void TypeSymbolVisitor::visit(BreakNode& node) {
         LogError("Break statement outside of function", node.shared_from_this());
     }
 
-    // Проверяем, что break находится внутри цикла
-    if (contexts.back().currentFunctionName != "for" && contexts.back().currentFunctionName != "while") {
+    bool inLoop = false;
+    for (auto it = contexts.rbegin(); it != contexts.rend(); ++it) {
+        if (it->currentFunctionName == "for" || it->currentFunctionName == "while") {
+            inLoop = true;
+            break;
+        }
+    }
+
+    if (!inLoop) {
         LogError("Break statement outside of loop", node.shared_from_this());
     }
 
@@ -495,11 +517,17 @@ void TypeSymbolVisitor::visit(ContinueNode& node) {
         LogError("Continue statement outside of function", node.shared_from_this());
     }
 
-    // Проверяем, что continue находится внутри цикла
-    if (contexts.back().currentFunctionName != "for" && contexts.back().currentFunctionName != "while") {
-        LogError("Continue statement outside of loop", node.shared_from_this());
+    bool inLoop = false;
+    for (auto it = contexts.rbegin(); it != contexts.rend(); ++it) {
+        if (it->currentFunctionName == "for" || it->currentFunctionName == "while") {
+            inLoop = true;
+            break;
+        }
     }
 
+    if (!inLoop) {
+        LogError("Continue statement outside of loop", node.shared_from_this());
+    }
     node.inferredType = std::make_shared<SimpleTypeNode>("void");
 }
 
@@ -549,7 +577,14 @@ void TypeSymbolVisitor::visit(CallNode& node) {
 
         if (argType != paramType)
             if (isNumeric(argTypes[i]) && isNumeric(func->parameters[i].first))
-                node.arguments[i]->implicitCastTo = func->parameters[i].first;
+            {
+                if(auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.arguments[i]))
+                {
+                    castNumbersInBinaryTree(node.arguments[i], paramType);
+                }
+                else
+                    node.arguments[i]->implicitCastTo = func->parameters[i].first;
+            }
             else
                 LogError("Function " + node.callee + " expects argument of type " + paramType + ", got " + argType, node.arguments[i]);
     }

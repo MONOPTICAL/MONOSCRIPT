@@ -1,0 +1,789 @@
+{
+    "@@locale": "en",
+  
+    "appTitle": "MONOSCRIPT",
+    "@appTitle": {
+      "description": "Application title"
+    },
+    
+    "navOverview": "Overview",
+    "@navOverview": {
+      "description": "Navigation menu item for Overview page"
+    },
+    
+    "navGetStarted": "Get Started",
+    "@navGetStarted": {
+      "description": "Navigation menu item for Get Started page" 
+    },
+    
+    "navDocs": "Docs",
+    "@navDocs": {
+      "description": "Navigation menu item for Documentation page"
+    },
+    
+    "navCommunity": "Community",
+    "@navCommunity": {
+      "description": "Navigation menu item for Community page"
+    },
+    
+    "navBlog": "Blog",
+    "@navBlog": {
+      "description": "Navigation menu item for Blog page"
+    },
+    
+    "languageEN": "EN",
+    "@languageEN": {
+      "description": "English language selector"
+    },
+    
+    "languageRU": "RU",
+    "@languageRU": {
+      "description": "Russian language selector"
+    },
+    
+    "welcomeTitle": "The MONOSCRIPT Programming Language",
+    "@welcomeTitle": {
+      "description": "Main page headline"
+    },
+    
+    "betaVersion": "0.1 Beta",
+    "@betaVersion": {
+      "description": "Version label shown near the title"
+    },
+    
+    "welcomeSlogan": "\"Secure, readable plugin language: Kubernetes, security, automation scripts\"",
+    "@welcomeSlogan": {
+      "description": "Main page tagline shown under title"
+    },
+    
+    "githubButtonLabel": "github.com/MONOPTICAL/MONOSCRIPT",
+    "@githubButtonLabel": {
+      "description": "Label for GitHub repository button"
+    },
+    
+    "downloadButtonLabel": "Download for Linux",
+    "@downloadButtonLabel": {
+      "description": "Label for download button"
+    },
+    
+    "codeExamplesTitle": "Code Examples",
+    "@codeExamplesTitle": {
+      "description": "Title for code examples section"
+    },
+    
+    "codeExamplesDescription": "Explore different aspects of MONOscript through these practical examples. Select one to see the code and its output.",
+    "@codeExamplesDescription": {
+      "description": "Description for code examples section"
+    },
+    
+    "byLabel": "By ",
+    "@byLabel": {
+      "description": "Label displayed before company name"
+    },
+    
+    "companyName": "MONOPTICAL",
+    "@companyName": {
+      "description": "Company name"
+    },
+    
+    "exampleFibonacci": "Fibonacci",
+    "@exampleFibonacci": {
+      "description": "Name of Fibonacci code example"
+    },
+    
+    "exampleFibonacciDesc": "Classic Fibonacci number calculation algorithm",
+    "@exampleFibonacciDesc": {
+      "description": "Description of Fibonacci code example"
+    },
+    
+    "exampleHelloWorld": "Hello World",
+    "@exampleHelloWorld": {
+      "description": "Name of Hello World code example"
+    },
+    
+    "exampleHelloWorldDesc": "Simple text output example",
+    "@exampleHelloWorldDesc": {
+      "description": "Description of Hello World code example"
+    },
+    
+    "exampleSort": "Sort",
+    "@exampleSort": {
+      "description": "Name of Sort code example"
+    },
+    
+    "exampleSortDesc": "Implementation of bubble sort algorithm",
+    "@exampleSortDesc": {
+      "description": "Description of Sort code example"
+    },
+    
+    "exampleGeneralCode": "General Code",
+    "@exampleGeneralCode": {
+      "description": "Name of General Code example"
+    },
+    
+    "exampleGeneralCodeDesc": "Example of string manipulation and type conversion",
+    "@exampleGeneralCodeDesc": {
+      "description": "Description of General Code example"
+    },
+    
+    "exampleModules": "Modules",
+    "@exampleModules": {
+      "description": "Name of Modules code example"
+    },
+    
+    "exampleModulesDesc": "Example of module usage",
+    "@exampleModulesDesc": {
+      "description": "Description of Modules code example"
+    },
+    
+    "terminalLabel": "monoscript",
+    "@terminalLabel": {
+      "description": "Label shown in terminal window"
+    },
+    
+    "outputTitle": "Output",
+    "@outputTitle": {
+      "description": "Title for output console"
+    },
+    
+    "consoleCommand": "monoscript run example.mono",
+    "@consoleCommand": {
+      "description": "Command shown in console"
+    },
+    
+    "noExampleSelected": "No example selected",
+    "@noExampleSelected": {
+      "description": "Message when no code example is selected"
+    },
+    
+    "executionTime": "Execution time: {time} ms",
+    "@executionTime": {
+      "description": "Execution time message with a time placeholder",
+      "placeholders": {
+        "time": {
+          "type": "String",
+          "example": "6572"
+        }
+      }
+    },
+    
+    "outputFibonacci": "2971215073",
+    "@outputFibonacci": {
+      "description": "Console output for Fibonacci example"
+    },
+    
+    "outputHelloWorld": "Hello World!!!",
+    "@outputHelloWorld": {
+      "description": "Console output for Hello World example"
+    },
+    
+    "outputSortBefore": "Before sort: [5, 3, 1, 4, 2]",
+    "@outputSortBefore": {
+      "description": "Console output for Sort example (before sorting)"
+    },
+    
+    "outputSortAfter": "After sort: [1, 2, 3, 4, 5]",
+    "@outputSortAfter": {
+      "description": "Console output for Sort example (after sorting)"
+    },
+    
+    "outputGeneralCodeResult": "Hellox hz2 World!",
+    "@outputGeneralCodeResult": {
+      "description": "Console output for General Code example (result)"
+    },
+    
+    "outputGeneralCodeExit": "[main exited with code 4]",
+    "@outputGeneralCodeExit": {
+      "description": "Console output for General Code example (exit code)"
+    },
+    
+    "outputModulesValues": "a: 5, b: 10",
+    "@outputModulesValues": {
+      "description": "Console output for Modules example (values)"
+    },
+    
+    "outputModulesResult": "Sum: 15, Mul: 50",
+    "@outputModulesResult": {
+      "description": "Console output for Modules example (results)"
+    },
+    
+    "outputModulesExit": "[moduleTest exited with code 0]",
+    "@outputModulesExit": {
+      "description": "Console output for Modules example (exit code)"
+    },
+    
+    "outputDefaultExit": "Program exited with code 0",
+    "@outputDefaultExit": {
+      "description": "Default exit message for console output"
+    },
+    
+    "codeFeaturesTitle": "Code Features",
+    "@codeFeaturesTitle": {
+      "description": "Title for code features section"
+    },
+    
+    "featureRecursionTitle": "Recursion",
+    "@featureRecursionTitle": {
+      "description": "Title for recursion feature"
+    },
+    
+    "featureRecursionDesc": "Function calls itself to calculate Fibonacci sequence",
+    "@featureRecursionDesc": {
+      "description": "Description for recursion feature"
+    },
+    
+    "featureTypeCastingTitle": "Type Casting",
+    "@featureTypeCastingTitle": {
+      "description": "Title for type casting feature"
+    },
+    
+    "featureTypeCastingDesc": "Explicit casting using the \"->\" operator (n - 1->i64)",
+    "@featureTypeCastingDesc": {
+      "description": "Description for type casting feature"
+    },
+    
+    "featurePureAnnotationTitle": "@pure Annotation",
+    "@featurePureAnnotationTitle": {
+      "description": "Title for pure annotation feature"
+    },
+    
+    "featurePureAnnotationDesc": "Functions marked as pure have no side effects",
+    "@featurePureAnnotationDesc": {
+      "description": "Description for pure annotation feature"
+    },
+    
+    "featureStrictAnnotationTitle": "@strict Annotation",
+    "@featureStrictAnnotationTitle": {
+      "description": "Title for strict annotation feature"
+    },
+    
+    "featureStrictAnnotationDesc": "Ensures stricter type checking and memory safety",
+    "@featureStrictAnnotationDesc": {
+      "description": "Description for strict annotation feature"
+    },
+    
+    "featureEntryPointTitle": "Entry Point Declaration",
+    "@featureEntryPointTitle": {
+      "description": "Title for entry point declaration feature"
+    },
+    
+    "featureEntryPointDesc": "@entry annotation marks the program's entry point",
+    "@featureEntryPointDesc": {
+      "description": "Description for entry point declaration feature"
+    },
+    
+    "featureVoidReturnTypeTitle": "void Return Type",
+    "@featureVoidReturnTypeTitle": {
+      "description": "Title for void return type feature"
+    },
+    
+    "featureVoidReturnTypeDesc": "Function doesn't return any value",
+    "@featureVoidReturnTypeDesc": {
+      "description": "Description for void return type feature"
+    },
+    
+    "featureEchoStatementTitle": "Echo Statement",
+    "@featureEchoStatementTitle": {
+      "description": "Title for echo statement feature"
+    },
+    
+    "featureEchoStatementDesc": "Built-in echo function for console output",
+    "@featureEchoStatementDesc": {
+      "description": "Description for echo statement feature"
+    },
+    
+    "featureStringLiteralsTitle": "String Literals",
+    "@featureStringLiteralsTitle": {
+      "description": "Title for string literals feature"
+    },
+    
+    "featureStringLiteralsDesc": "Direct usage of string literals with double quotes",
+    "@featureStringLiteralsDesc": {
+      "description": "Description for string literals feature"
+    },
+    
+    "featureArrayManipulationTitle": "Array Manipulation",
+    "@featureArrayManipulationTitle": {
+      "description": "Title for array manipulation feature"
+    },
+    
+    "featureArrayManipulationDesc": "Creating and manipulating typed arrays (array<i32>)",
+    "@featureArrayManipulationDesc": {
+      "description": "Description for array manipulation feature"
+    },
+    
+    "featureForInLoopTitle": "For-in Loop",
+    "@featureForInLoopTitle": {
+      "description": "Title for for-in loop feature"
+    },
+    
+    "featureForInLoopDesc": "Iterating over ranges using for-in syntax",
+    "@featureForInLoopDesc": {
+      "description": "Description for for-in loop feature"
+    },
+    
+    "featureInitAssignTitle": "Initialize-Assign Operator",
+    "@featureInitAssignTitle": {
+      "description": "Title for initialize-assign operator feature"
+    },
+    
+    "featureInitAssignDesc": "Uses ^= to initialize variables with their first value",
+    "@featureInitAssignDesc": {
+      "description": "Description for initialize-assign operator feature"
+    },
+    
+    "featureArrayIndexingTitle": "Array Indexing",
+    "@featureArrayIndexingTitle": {
+      "description": "Title for array indexing feature"
+    },
+    
+    "featureArrayIndexingDesc": "Direct access to array elements with [] notation",
+    "@featureArrayIndexingDesc": {
+      "description": "Description for array indexing feature"
+    },
+    
+    "featureStringConcatTitle": "String Concatenation",
+    "@featureStringConcatTitle": {
+      "description": "Title for string concatenation feature"
+    },
+    
+    "featureStringConcatDesc": "Joining strings with \"+\" operator",
+    "@featureStringConcatDesc": {
+      "description": "Description for string concatenation feature"
+    },
+    
+    "featureBooleanOpsTitle": "Boolean Operations",
+    "@featureBooleanOpsTitle": {
+      "description": "Title for boolean operations feature"
+    },
+    
+    "featureBooleanOpsDesc": "Complex boolean conditions with comparison operators",
+    "@featureBooleanOpsDesc": {
+      "description": "Description for boolean operations feature"
+    },
+    
+    "featureTypeConversionTitle": "Type Conversion",
+    "@featureTypeConversionTitle": {
+      "description": "Title for type conversion feature"
+    },
+    
+    "featureTypeConversionDesc": "Converting between data types using toString_int()",
+    "@featureTypeConversionDesc": {
+      "description": "Description for type conversion feature"
+    },
+    
+    "featureMultipleFunctionsTitle": "Multiple Functions",
+    "@featureMultipleFunctionsTitle": {
+      "description": "Title for multiple functions feature"
+    },
+    
+    "featureMultipleFunctionsDesc": "Code organization with helper functions",
+    "@featureMultipleFunctionsDesc": {
+      "description": "Description for multiple functions feature"
+    },
+    
+    "featureModuleDeclTitle": "Module Declaration",
+    "@featureModuleDeclTitle": {
+      "description": "Title for module declaration feature"
+    },
+    
+    "featureModuleDeclDesc": "Using \"use\" keyword to import modules",
+    "@featureModuleDeclDesc": {
+      "description": "Description for module declaration feature"
+    },
+    
+    "featureFinalVarsTitle": "Final Variables",
+    "@featureFinalVarsTitle": {
+      "description": "Title for final variables feature"
+    },
+    
+    "featureFinalVarsDesc": "Using \"final\" for constant values",
+    "@featureFinalVarsDesc": {
+      "description": "Description for final variables feature"
+    },
+    
+    "featureModuleTestingTitle": "Module Testing",
+    "@featureModuleTestingTitle": {
+      "description": "Title for module testing feature"
+    },
+    
+    "featureModuleTestingDesc": "Testing module functions in a separate file",
+    "@featureModuleTestingDesc": {
+      "description": "Description for module testing feature"
+    },
+    
+    "overviewSectionTitle": "MONOSCRIPT Language: Overview",
+    "@overviewSectionTitle": {
+      "description": "Title for language overview section"
+    },
+    
+    "overviewSectionDesc": "MONOSCRIPT is a fast, intuitive programming language designed for secure code execution in various environments.",
+    "@overviewSectionDesc": {
+      "description": "Main description for language overview section"
+    },
+    
+    "performanceTitle": "High Performance",
+    "@performanceTitle": {
+      "description": "Title for performance feature"
+    },
+    
+    "performanceDesc": "Thanks to LLVM Backend, compiler written in C++ and standard library written in D and Zig, MONOSCRIPT provides optimal execution speed.",
+    "@performanceDesc": {
+      "description": "Description for performance feature"
+    },
+    
+    "securityTitle": "Secure Execution",
+    "@securityTitle": {
+      "description": "Title for security feature"
+    },
+    
+    "securityDesc": "Created with an emphasis on code execution security in various environments, including Kubernetes and containers.",
+    "@securityDesc": {
+      "description": "Description for security feature"
+    },
+    
+    "paradigmsTitle": "Supported Paradigms",
+    "@paradigmsTitle": {
+      "description": "Title for supported paradigms section"
+    },
+    
+    "paradigmImperative": "Imperative",
+    "@paradigmImperative": {
+      "description": "Name of imperative paradigm"
+    },
+    
+    "paradigmImperativeDesc": "Traditional constructs: if, for, while, mutability, and step-by-step execution",
+    "@paradigmImperativeDesc": {
+      "description": "Description of imperative paradigm"
+    },
+    
+    "paradigmFunctional": "Functional",
+    "@paradigmFunctional": {
+      "description": "Name of functional paradigm"
+    },
+    
+    "paradigmFunctionalDesc": "Lambdas, pure functions, pattern matching",
+    "@paradigmFunctionalDesc": {
+      "description": "Description of functional paradigm"
+    },
+    
+    "paradigmModular": "Modular",
+    "@paradigmModular": {
+      "description": "Name of modular paradigm"
+    },
+    
+    "paradigmModularDesc": "Organization using use, modules and namespaces",
+    "@paradigmModularDesc": {
+      "description": "Description of modular paradigm"
+    },
+    
+    "paradigmStructural": "Structural",
+    "@paradigmStructural": {
+      "description": "Name of structural paradigm"
+    },
+    
+    "paradigmStructuralDesc": "Custom structures with methods and encapsulation support",
+    "@paradigmStructuralDesc": {
+      "description": "Description of structural paradigm"
+    },
+    
+    "licenseSectionTitle": "Open Source License",
+    "@licenseSectionTitle": {
+      "description": "Title for license section"
+    },
+    
+    "licenseBadge": "LGPL-2.1",
+    "@licenseBadge": {
+      "description": "License badge text"
+    },
+    
+    "licenseDescription": "MONOscript is proudly licensed under the GNU Lesser General Public License v2.1, ensuring that the language remains free and open source.",
+    "@licenseDescription": {
+      "description": "Description of the license"
+    },
+    
+    "benefitCollabTitle": "Community Collaboration",
+    "@benefitCollabTitle": {
+      "description": "Title for community collaboration benefit"
+    },
+    
+    "benefitCollabDesc": "Join a growing community of developers who contribute to and improve the language",
+    "@benefitCollabDesc": {
+      "description": "Description for community collaboration benefit"
+    },
+    
+    "benefitIntegrationTitle": "Commercial Integration",
+    "@benefitIntegrationTitle": {
+      "description": "Title for commercial integration benefit"
+    },
+    
+    "benefitIntegrationDesc": "Use MONOscript in proprietary software while keeping your code private",
+    "@benefitIntegrationDesc": {
+      "description": "Description for commercial integration benefit"
+    },
+    
+    "benefitModifyTitle": "Freedom to Modify",
+    "@benefitModifyTitle": {
+      "description": "Title for freedom to modify benefit"
+    },
+    
+    "benefitModifyDesc": "Adapt the language to your specific needs while sharing improvements",
+    "@benefitModifyDesc": {
+      "description": "Description for freedom to modify benefit"
+    },
+    
+    "openSourceBelief": "We believe in the power of open source software to drive innovation and create better technologies for everyone.",
+    "@openSourceBelief": {
+      "description": "Statement about open source belief"
+    },
+    
+    "roadmapSectionTitle": "Project Roadmap",
+    "@roadmapSectionTitle": {
+      "description": "Title for roadmap section"
+    },
+    
+    "roadmapStatus": "Active Development",
+    "@roadmapStatus": {
+      "description": "Current status of the project"
+    },
+    
+    "roadmapDescription": "MONOscript is rapidly evolving, with new features and improvements coming not just daily, but hourly. Our dedicated team is committed to making this language powerful, secure, and accessible.",
+    "@roadmapDescription": {
+      "description": "Description of the roadmap"
+    },
+    
+    "roadmapQ22025": "Q2 2025",
+    "@roadmapQ22025": {
+      "description": "Q2 2025 timeframe"
+    },
+    
+    "roadmapQ22025Milestone": "First Beta Release",
+    "@roadmapQ22025Milestone": {
+      "description": "Milestone for Q2 2025"
+    },
+    
+    "roadmapQ22025Status": "Current",
+    "@roadmapQ22025Status": {
+      "description": "Status for Q2 2025 milestone"
+    },
+    
+    "roadmapQ32025": "Q3 2025",
+    "@roadmapQ32025": {
+      "description": "Q3 2025 timeframe"
+    },
+    
+    "roadmapQ32025Milestone": "Ecosystem Extensions",
+    "@roadmapQ32025Milestone": {
+      "description": "Milestone for Q3 2025"
+    },
+    
+    "roadmapQ32025Status": "Planned",
+    "@roadmapQ32025Status": {
+      "description": "Status for Q3 2025 milestone"
+    },
+    
+    "roadmapQ42025": "Q4 2025",
+    "@roadmapQ42025": {
+      "description": "Q4 2025 timeframe"
+    },
+    
+    "roadmapQ42025Milestone": "Full IDE Support",
+    "@roadmapQ42025Milestone": {
+      "description": "Milestone for Q4 2025"
+    },
+    
+    "roadmapQ42025Status": "Planned",
+    "@roadmapQ42025Status": {
+      "description": "Status for Q4 2025 milestone"
+    },
+    
+    "roadmapQ12026": "Q1 2026",
+    "@roadmapQ12026": {
+      "description": "Q1 2026 timeframe"
+    },
+    
+    "roadmapQ12026Milestone": "v1.0 Stable",
+    "@roadmapQ12026Milestone": {
+      "description": "Milestone for Q1 2026"
+    },
+    
+    "roadmapQ12026Status": "Planned",
+    "@roadmapQ12026Status": {
+      "description": "Status for Q1 2026 milestone"
+    },
+    
+    "roadmapFeedback": "Have suggestions for our roadmap? We actively incorporate community feedback into our development priorities.",
+    "@roadmapFeedback": {
+      "description": "Message encouraging roadmap feedback"
+    },
+    
+    "actionDocsTitle": "Documentation",
+    "@actionDocsTitle": {
+      "description": "Title for documentation action button"
+    },
+    
+    "actionDocsDesc": "You already hooked up with MONOscript? See the documentation!",
+    "@actionDocsDesc": {
+      "description": "Description for documentation action button"
+    },
+    
+    "actionGetStartedTitle": "Get Started",
+    "@actionGetStartedTitle": {
+      "description": "Title for get started action button"
+    },
+    
+    "actionGetStartedDesc": "New to MONOscript? Start your journey with our beginner guides!",
+    "@actionGetStartedDesc": {
+      "description": "Description for get started action button"
+    },
+    
+    "actionContributeTitle": "Contribute",
+    "@actionContributeTitle": {
+      "description": "Title for contribute action button"
+    },
+    
+    "actionContributeDesc": "Help us improve MONOscript by contributing to the project",
+    "@actionContributeDesc": {
+      "description": "Description for contribute action button"
+    },
+    
+    "actionBlogTitle": "Blog",
+    "@actionBlogTitle": {
+      "description": "Title for blog action button"
+    },
+    
+    "actionBlogDesc": "Read the latest news and articles about MONOscript",
+    "@actionBlogDesc": {
+      "description": "Description for blog action button"
+    },
+    
+    "actionWarning": "Warning: using MONOscript may lead to uncontrollable urges to rewrite everything in a more secure way",
+    "@actionWarning": {
+      "description": "Humorous warning message"
+    },
+    
+    "footerLogoMono": "MONO",
+    "@footerLogoMono": {
+      "description": "First part of footer logo text"
+    },
+    
+    "footerLogoScript": "script",
+    "@footerLogoScript": {
+      "description": "Second part of footer logo text"
+    },
+    
+    "footerSlogan": "Secure, readable plugin language",
+    "@footerSlogan": {
+      "description": "Footer slogan text"
+    },
+    
+    "footerDocumentationTitle": "Documentation",
+    "@footerDocumentationTitle": {
+      "description": "Title for documentation footer section"
+    },
+    
+    "footerDocLink1": "Language Reference",
+    "@footerDocLink1": {
+      "description": "Documentation link 1"
+    },
+    
+    "footerDocLink2": "Standard Library",
+    "@footerDocLink2": {
+      "description": "Documentation link 2"
+    },
+    
+    "footerDocLink3": "Security",
+    "@footerDocLink3": {
+      "description": "Documentation link 3"
+    },
+    
+    "footerDocLink4": "Installation",
+    "@footerDocLink4": {
+      "description": "Documentation link 4"
+    },
+    
+    "footerCommunityTitle": "Community",
+    "@footerCommunityTitle": {
+      "description": "Title for community footer section"
+    },
+    
+    "footerCommunityLink1": "GitHub",
+    "@footerCommunityLink1": {
+      "description": "Community link 1"
+    },
+    
+    "footerCommunityLink2": "Discord",
+    "@footerCommunityLink2": {
+      "description": "Community link 2"
+    },
+    
+    "footerCommunityLink3": "Twitter",
+    "@footerCommunityLink3": {
+      "description": "Community link 3"
+    },
+    
+    "footerCommunityLink4": "Blog",
+    "@footerCommunityLink4": {
+      "description": "Community link 4"
+    },
+    
+    "footerResourcesTitle": "Resources",
+    "@footerResourcesTitle": {
+      "description": "Title for resources footer section"
+    },
+    
+    "footerResourcesLink1": "Tutorials",
+    "@footerResourcesLink1": {
+      "description": "Resources link 1"
+    },
+    
+    "footerResourcesLink2": "Examples",
+    "@footerResourcesLink2": {
+      "description": "Resources link 2"
+    },
+    
+    "footerResourcesLink3": "Use Cases",
+    "@footerResourcesLink3": {
+      "description": "Resources link 3"
+    },
+    
+    "footerResourcesLink4": "FAQ",
+    "@footerResourcesLink4": {
+      "description": "Resources link 4"
+    },
+    
+    "footerCopyright": "© 2025 MONOPTICAL Corp. All rights reserved",
+    "@footerCopyright": {
+      "description": "Copyright notice in footer"
+    },
+    
+    "tooltipEmail": "Email",
+    "@tooltipEmail": {
+      "description": "Tooltip for email icon"
+    },
+    
+    "tooltipDiscord": "Discord",
+    "@tooltipDiscord": {
+      "description": "Tooltip for Discord icon"
+    },
+    
+    "tooltipGitHub": "GitHub",
+    "@tooltipGitHub": {
+      "description": "Tooltip for GitHub icon"
+    },
+    
+    "tooltipWebsite": "Website",
+    "@tooltipWebsite": {
+      "description": "Tooltip for website icon"
+    },
+    
+    "securityInMindText": "Made with security in mind",
+    "@securityInMindText": {
+      "description": "Security motto in footer"
+    },
+    
+    "versionText": "Version 0.1 Beta",
+    "@versionText": {
+      "description": "Version text in footer"
+    }
+  }
