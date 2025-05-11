@@ -1,0 +1,789 @@
+{
+    "@@locale": "ru",
+
+    "appTitle": "MONOSCRIPT",
+    "@appTitle": {
+        "description": "Название приложения"
+    },
+
+    "navOverview": "Обзор",
+    "@navOverview": {
+        "description": "Пункт меню навигации для страницы обзора"
+    },
+
+    "navGetStarted": "Начать",
+    "@navGetStarted": {
+        "description": "Пункт меню навигации для страницы начала работы"
+    },
+
+    "navDocs": "Документация",
+    "@navDocs": {
+        "description": "Пункт меню навигации для страницы документации"
+    },
+
+    "navCommunity": "Сообщество",
+    "@navCommunity": {
+        "description": "Пункт меню навигации для страницы сообщества"
+    },
+
+    "navBlog": "Блог",
+    "@navBlog": {
+        "description": "Пункт меню навигации для страницы блога"
+    },
+
+    "languageEN": "EN",
+    "@languageEN": {
+        "description": "Переключатель английского языка"
+    },
+
+    "languageRU": "RU",
+    "@languageRU": {
+        "description": "Переключатель русского языка"
+    },
+
+    "welcomeTitle": "Язык программирования MONOSCRIPT",
+    "@welcomeTitle": {
+        "description": "Заголовок главной страницы"
+    },
+
+    "betaVersion": "0.1 Бета",
+    "@betaVersion": {
+        "description": "Метка версии рядом с заголовком"
+    },
+
+    "welcomeSlogan": "\"Безопасный, читаемый язык плагинов: Kubernetes, безопасность, автоматизация\"",
+    "@welcomeSlogan": {
+        "description": "Слоган на главной странице под заголовком"
+    },
+
+    "githubButtonLabel": "github.com/MONOPTICAL/MONOSCRIPT",
+    "@githubButtonLabel": {
+        "description": "Подпись кнопки репозитория GitHub"
+    },
+
+    "downloadButtonLabel": "Скачать для Linux",
+    "@downloadButtonLabel": {
+        "description": "Подпись кнопки скачивания"
+    },
+
+    "codeExamplesTitle": "Примеры кода",
+    "@codeExamplesTitle": {
+        "description": "Заголовок раздела с примерами кода"
+    },
+
+    "codeExamplesDescription": "Изучайте различные аспекты MONOscript с помощью этих практических примеров. Выберите пример, чтобы увидеть код и результат.",
+    "@codeExamplesDescription": {
+        "description": "Описание раздела с примерами кода"
+    },
+
+    "byLabel": "От ",
+    "@byLabel": {
+        "description": "Подпись перед названием компании"
+    },
+
+    "companyName": "MONOPTICAL",
+    "@companyName": {
+        "description": "Название компании"
+    },
+
+    "exampleFibonacci": "Фибоначчи",
+    "@exampleFibonacci": {
+        "description": "Название примера с Фибоначчи"
+    },
+
+    "exampleFibonacciDesc": "Классический алгоритм вычисления чисел Фибоначчи",
+    "@exampleFibonacciDesc": {
+        "description": "Описание примера с Фибоначчи"
+    },
+
+    "exampleHelloWorld": "Привет, мир",
+    "@exampleHelloWorld": {
+        "description": "Название примера Hello World"
+    },
+
+    "exampleHelloWorldDesc": "Пример простого вывода текста",
+    "@exampleHelloWorldDesc": {
+        "description": "Описание примера Hello World"
+    },
+
+    "exampleSort": "Сортировка",
+    "@exampleSort": {
+        "description": "Название примера сортировки"
+    },
+
+    "exampleSortDesc": "Реализация алгоритма пузырьковой сортировки",
+    "@exampleSortDesc": {
+        "description": "Описание примера сортировки"
+    },
+
+    "exampleGeneralCode": "Общий код",
+    "@exampleGeneralCode": {
+        "description": "Название примера общего кода"
+    },
+
+    "exampleGeneralCodeDesc": "Пример работы со строками и преобразования типов",
+    "@exampleGeneralCodeDesc": {
+        "description": "Описание примера общего кода"
+    },
+
+    "exampleModules": "Модули",
+    "@exampleModules": {
+        "description": "Название примера с модулями"
+    },
+
+    "exampleModulesDesc": "Пример использования модулей",
+    "@exampleModulesDesc": {
+        "description": "Описание примера с модулями"
+    },
+
+    "terminalLabel": "monoscript",
+    "@terminalLabel": {
+        "description": "Подпись в окне терминала"
+    },
+
+    "outputTitle": "Вывод",
+    "@outputTitle": {
+        "description": "Заголовок консоли вывода"
+    },
+
+    "consoleCommand": "monoscript run example.mono",
+    "@consoleCommand": {
+        "description": "Команда, отображаемая в консоли"
+    },
+
+    "noExampleSelected": "Пример не выбран",
+    "@noExampleSelected": {
+        "description": "Сообщение, когда пример кода не выбран"
+    },
+
+    "executionTime": "Время выполнения: {time} мс",
+    "@executionTime": {
+        "description": "Сообщение о времени выполнения с плейсхолдером времени",
+        "placeholders": {
+            "time": {
+                "type": "String",
+                "example": "6572"
+            }
+        }
+    },
+
+    "outputFibonacci": "2971215073",
+    "@outputFibonacci": {
+        "description": "Вывод консоли для примера Фибоначчи"
+    },
+
+    "outputHelloWorld": "Hello World!!!",
+    "@outputHelloWorld": {
+        "description": "Вывод консоли для примера Hello World"
+    },
+
+    "outputSortBefore": "До сортировки: [5, 3, 1, 4, 2]",
+    "@outputSortBefore": {
+        "description": "Вывод консоли для примера сортировки (до сортировки)"
+    },
+
+    "outputSortAfter": "После сортировки: [1, 2, 3, 4, 5]",
+    "@outputSortAfter": {
+        "description": "Вывод консоли для примера сортировки (после сортировки)"
+    },
+
+    "outputGeneralCodeResult": "Hellox hz2 World!",
+    "@outputGeneralCodeResult": {
+        "description": "Вывод консоли для примера общего кода (результат)"
+    },
+
+    "outputGeneralCodeExit": "[main завершился с кодом 4]",
+    "@outputGeneralCodeExit": {
+        "description": "Вывод консоли для примера общего кода (код выхода)"
+    },
+
+    "outputModulesValues": "a: 5, b: 10",
+    "@outputModulesValues": {
+        "description": "Вывод консоли для примера модулей (значения)"
+    },
+
+    "outputModulesResult": "Сумма: 15, Произведение: 50",
+    "@outputModulesResult": {
+        "description": "Вывод консоли для примера модулей (результаты)"
+    },
+
+    "outputModulesExit": "[moduleTest завершился с кодом 0]",
+    "@outputModulesExit": {
+        "description": "Вывод консоли для примера модулей (код выхода)"
+    },
+
+    "outputDefaultExit": "Программа завершилась с кодом 0",
+    "@outputDefaultExit": {
+        "description": "Сообщение по умолчанию о завершении программы"
+    },
+
+    "codeFeaturesTitle": "Возможности кода",
+    "@codeFeaturesTitle": {
+        "description": "Заголовок раздела возможностей кода"
+    },
+
+    "featureRecursionTitle": "Рекурсия",
+    "@featureRecursionTitle": {
+        "description": "Заголовок возможности рекурсии"
+    },
+
+    "featureRecursionDesc": "Функция вызывает саму себя для вычисления последовательности Фибоначчи",
+    "@featureRecursionDesc": {
+        "description": "Описание возможности рекурсии"
+    },
+
+    "featureTypeCastingTitle": "Приведение типов",
+    "@featureTypeCastingTitle": {
+        "description": "Заголовок возможности приведения типов"
+    },
+
+    "featureTypeCastingDesc": "Явное приведение с помощью оператора \"->\" (n - 1->i64)",
+    "@featureTypeCastingDesc": {
+        "description": "Описание возможности приведения типов"
+    },
+
+    "featurePureAnnotationTitle": "Аннотация @pure",
+    "@featurePureAnnotationTitle": {
+        "description": "Заголовок возможности аннотации pure"
+    },
+
+    "featurePureAnnotationDesc": "Функции, помеченные как pure, не имеют побочных эффектов",
+    "@featurePureAnnotationDesc": {
+        "description": "Описание возможности аннотации pure"
+    },
+
+    "featureStrictAnnotationTitle": "Аннотация @strict",
+    "@featureStrictAnnotationTitle": {
+        "description": "Заголовок возможности аннотации strict"
+    },
+
+    "featureStrictAnnotationDesc": "Обеспечивает более строгую проверку типов и безопасность памяти",
+    "@featureStrictAnnotationDesc": {
+        "description": "Описание возможности аннотации strict"
+    },
+
+    "featureEntryPointTitle": "Объявление точки входа",
+    "@featureEntryPointTitle": {
+        "description": "Заголовок возможности объявления точки входа"
+    },
+
+    "featureEntryPointDesc": "Аннотация @entry отмечает точку входа программы",
+    "@featureEntryPointDesc": {
+        "description": "Описание возможности объявления точки входа"
+    },
+
+    "featureVoidReturnTypeTitle": "Тип возвращаемого значения void",
+    "@featureVoidReturnTypeTitle": {
+        "description": "Заголовок возможности типа void"
+    },
+
+    "featureVoidReturnTypeDesc": "Функция не возвращает значение",
+    "@featureVoidReturnTypeDesc": {
+        "description": "Описание возможности типа void"
+    },
+
+    "featureEchoStatementTitle": "Оператор echo",
+    "@featureEchoStatementTitle": {
+        "description": "Заголовок возможности оператора echo"
+    },
+
+    "featureEchoStatementDesc": "Встроенная функция echo для вывода в консоль",
+    "@featureEchoStatementDesc": {
+        "description": "Описание возможности оператора echo"
+    },
+
+    "featureStringLiteralsTitle": "Строковые литералы",
+    "@featureStringLiteralsTitle": {
+        "description": "Заголовок возможности строковых литералов"
+    },
+
+    "featureStringLiteralsDesc": "Прямое использование строковых литералов в двойных кавычках",
+    "@featureStringLiteralsDesc": {
+        "description": "Описание возможности строковых литералов"
+    },
+
+    "featureArrayManipulationTitle": "Работа с массивами",
+    "@featureArrayManipulationTitle": {
+        "description": "Заголовок возможности работы с массивами"
+    },
+
+    "featureArrayManipulationDesc": "Создание и работа с типизированными массивами (array<i32>)",
+    "@featureArrayManipulationDesc": {
+        "description": "Описание возможности работы с массивами"
+    },
+
+    "featureForInLoopTitle": "Цикл for-in",
+    "@featureForInLoopTitle": {
+        "description": "Заголовок возможности цикла for-in"
+    },
+
+    "featureForInLoopDesc": "Итерация по диапазонам с помощью синтаксиса for-in",
+    "@featureForInLoopDesc": {
+        "description": "Описание возможности цикла for-in"
+    },
+
+    "featureInitAssignTitle": "Оператор инициализации-присваивания",
+    "@featureInitAssignTitle": {
+        "description": "Заголовок возможности оператора инициализации-присваивания"
+    },
+
+    "featureInitAssignDesc": "Использует ^= для инициализации переменных их первым значением",
+    "@featureInitAssignDesc": {
+        "description": "Описание возможности оператора инициализации-присваивания"
+    },
+
+    "featureArrayIndexingTitle": "Индексация массива",
+    "@featureArrayIndexingTitle": {
+        "description": "Заголовок возможности индексации массива"
+    },
+
+    "featureArrayIndexingDesc": "Прямой доступ к элементам массива с помощью []",
+    "@featureArrayIndexingDesc": {
+        "description": "Описание возможности индексации массива"
+    },
+
+    "featureStringConcatTitle": "Конкатенация строк",
+    "@featureStringConcatTitle": {
+        "description": "Заголовок возможности конкатенации строк"
+    },
+
+    "featureStringConcatDesc": "Объединение строк с помощью оператора \"+\"",
+    "@featureStringConcatDesc": {
+        "description": "Описание возможности конкатенации строк"
+    },
+
+    "featureBooleanOpsTitle": "Булевы операции",
+    "@featureBooleanOpsTitle": {
+        "description": "Заголовок возможности булевых операций"
+    },
+
+    "featureBooleanOpsDesc": "Сложные булевы условия с операторами сравнения",
+    "@featureBooleanOpsDesc": {
+        "description": "Описание возможности булевых операций"
+    },
+
+    "featureTypeConversionTitle": "Преобразование типов",
+    "@featureTypeConversionTitle": {
+        "description": "Заголовок возможности преобразования типов"
+    },
+
+    "featureTypeConversionDesc": "Преобразование между типами данных с помощью toString_int()",
+    "@featureTypeConversionDesc": {
+        "description": "Описание возможности преобразования типов"
+    },
+
+    "featureMultipleFunctionsTitle": "Несколько функций",
+    "@featureMultipleFunctionsTitle": {
+        "description": "Заголовок возможности нескольких функций"
+    },
+
+    "featureMultipleFunctionsDesc": "Организация кода с помощью вспомогательных функций",
+    "@featureMultipleFunctionsDesc": {
+        "description": "Описание возможности нескольких функций"
+    },
+
+    "featureModuleDeclTitle": "Объявление модуля",
+    "@featureModuleDeclTitle": {
+        "description": "Заголовок возможности объявления модуля"
+    },
+
+    "featureModuleDeclDesc": "Использование ключевого слова \"use\" для импорта модулей",
+    "@featureModuleDeclDesc": {
+        "description": "Описание возможности объявления модуля"
+    },
+
+    "featureFinalVarsTitle": "Финальные переменные",
+    "@featureFinalVarsTitle": {
+        "description": "Заголовок возможности финальных переменных"
+    },
+
+    "featureFinalVarsDesc": "Использование \"final\" для константных значений",
+    "@featureFinalVarsDesc": {
+        "description": "Описание возможности финальных переменных"
+    },
+
+    "featureModuleTestingTitle": "Тестирование модулей",
+    "@featureModuleTestingTitle": {
+        "description": "Заголовок возможности тестирования модулей"
+    },
+
+    "featureModuleTestingDesc": "Тестирование функций модуля в отдельном файле",
+    "@featureModuleTestingDesc": {
+        "description": "Описание возможности тестирования модулей"
+    },
+
+    "overviewSectionTitle": "Язык MONOSCRIPT: Обзор",
+    "@overviewSectionTitle": {
+        "description": "Заголовок раздела обзора языка"
+    },
+
+    "overviewSectionDesc": "MONOSCRIPT — это быстрый, интуитивно понятный язык программирования, созданный для безопасного выполнения кода в различных средах.",
+    "@overviewSectionDesc": {
+        "description": "Основное описание раздела обзора языка"
+    },
+
+    "performanceTitle": "Высокая производительность",
+    "@performanceTitle": {
+        "description": "Заголовок возможности производительности"
+    },
+
+    "performanceDesc": "Благодаря LLVM Backend, компилятору на C++ и стандартной библиотеке на D и Zig, MONOSCRIPT обеспечивает оптимальную скорость выполнения.",
+    "@performanceDesc": {
+        "description": "Описание возможности производительности"
+    },
+
+    "securityTitle": "Безопасное выполнение",
+    "@securityTitle": {
+        "description": "Заголовок возможности безопасности"
+    },
+
+    "securityDesc": "Создан с упором на безопасность выполнения кода в различных средах, включая Kubernetes и контейнеры.",
+    "@securityDesc": {
+        "description": "Описание возможности безопасности"
+    },
+
+    "paradigmsTitle": "Поддерживаемые парадигмы",
+    "@paradigmsTitle": {
+        "description": "Заголовок раздела поддерживаемых парадигм"
+    },
+
+    "paradigmImperative": "Императивная",
+    "@paradigmImperative": {
+        "description": "Название императивной парадигмы"
+    },
+
+    "paradigmImperativeDesc": "Традиционные конструкции: if, for, while, изменяемость и пошаговое выполнение",
+    "@paradigmImperativeDesc": {
+        "description": "Описание императивной парадигмы"
+    },
+
+    "paradigmFunctional": "Функциональная",
+    "@paradigmFunctional": {
+        "description": "Название функциональной парадигмы"
+    },
+
+    "paradigmFunctionalDesc": "Лямбды, чистые функции, сопоставление с образцом",
+    "@paradigmFunctionalDesc": {
+        "description": "Описание функциональной парадигмы"
+    },
+
+    "paradigmModular": "Модульная",
+    "@paradigmModular": {
+        "description": "Название модульной парадигмы"
+    },
+
+    "paradigmModularDesc": "Организация с помощью use, модулей и пространств имён",
+    "@paradigmModularDesc": {
+        "description": "Описание модульной парадигмы"
+    },
+
+    "paradigmStructural": "Структурная",
+    "@paradigmStructural": {
+        "description": "Название структурной парадигмы"
+    },
+
+    "paradigmStructuralDesc": "Пользовательские структуры с методами и поддержкой инкапсуляции",
+    "@paradigmStructuralDesc": {
+        "description": "Описание структурной парадигмы"
+    },
+
+    "licenseSectionTitle": "Открытая лицензия",
+    "@licenseSectionTitle": {
+        "description": "Заголовок раздела лицензии"
+    },
+
+    "licenseBadge": "LGPL-2.1",
+    "@licenseBadge": {
+        "description": "Текст бейджа лицензии"
+    },
+
+    "licenseDescription": "MONOscript распространяется под лицензией GNU Lesser General Public License v2.1, что гарантирует его свободу и открытость.",
+    "@licenseDescription": {
+        "description": "Описание лицензии"
+    },
+
+    "benefitCollabTitle": "Совместная работа сообщества",
+    "@benefitCollabTitle": {
+        "description": "Заголовок преимущества совместной работы"
+    },
+
+    "benefitCollabDesc": "Присоединяйтесь к растущему сообществу разработчиков, которые вносят вклад и улучшают язык",
+    "@benefitCollabDesc": {
+        "description": "Описание преимущества совместной работы"
+    },
+
+    "benefitIntegrationTitle": "Коммерческая интеграция",
+    "@benefitIntegrationTitle": {
+        "description": "Заголовок преимущества коммерческой интеграции"
+    },
+
+    "benefitIntegrationDesc": "Используйте MONOscript в проприетарном ПО, сохраняя свой код приватным",
+    "@benefitIntegrationDesc": {
+        "description": "Описание преимущества коммерческой интеграции"
+    },
+
+    "benefitModifyTitle": "Свобода модификации",
+    "@benefitModifyTitle": {
+        "description": "Заголовок преимущества свободы модификации"
+    },
+
+    "benefitModifyDesc": "Адаптируйте язык под свои нужды и делитесь улучшениями",
+    "@benefitModifyDesc": {
+        "description": "Описание преимущества свободы модификации"
+    },
+
+    "openSourceBelief": "Мы верим в силу открытого ПО для развития инноваций и создания лучших технологий для всех.",
+    "@openSourceBelief": {
+        "description": "Утверждение о вере в open source"
+    },
+
+    "roadmapSectionTitle": "Дорожная карта проекта",
+    "@roadmapSectionTitle": {
+        "description": "Заголовок раздела дорожной карты"
+    },
+
+    "roadmapStatus": "Активная разработка",
+    "@roadmapStatus": {
+        "description": "Текущий статус проекта"
+    },
+
+    "roadmapDescription": "MONOscript быстро развивается: новые функции и улучшения появляются не только ежедневно, но и ежечасно. Наша команда стремится сделать язык мощным, безопасным и доступным.",
+    "@roadmapDescription": {
+        "description": "Описание дорожной карты"
+    },
+
+    "roadmapQ22025": "2 квартал 2025",
+    "@roadmapQ22025": {
+        "description": "Временной промежуток 2 квартал 2025"
+    },
+
+    "roadmapQ22025Milestone": "Первый бета-релиз",
+    "@roadmapQ22025Milestone": {
+        "description": "Веха для 2 квартала 2025"
+    },
+
+    "roadmapQ22025Status": "Текущий",
+    "@roadmapQ22025Status": {
+        "description": "Статус вехи 2 квартала 2025"
+    },
+
+    "roadmapQ32025": "3 квартал 2025",
+    "@roadmapQ32025": {
+        "description": "Временной промежуток 3 квартал 2025"
+    },
+
+    "roadmapQ32025Milestone": "Расширения экосистемы",
+    "@roadmapQ32025Milestone": {
+        "description": "Веха для 3 квартала 2025"
+    },
+
+    "roadmapQ32025Status": "Запланировано",
+    "@roadmapQ32025Status": {
+        "description": "Статус вехи 3 квартала 2025"
+    },
+
+    "roadmapQ42025": "4 квартал 2025",
+    "@roadmapQ42025": {
+        "description": "Временной промежуток 4 квартал 2025"
+    },
+
+    "roadmapQ42025Milestone": "Полная поддержка IDE",
+    "@roadmapQ42025Milestone": {
+        "description": "Веха для 4 квартала 2025"
+    },
+
+    "roadmapQ42025Status": "Запланировано",
+    "@roadmapQ42025Status": {
+        "description": "Статус вехи 4 квартала 2025"
+    },
+
+    "roadmapQ12026": "1 квартал 2026",
+    "@roadmapQ12026": {
+        "description": "Временной промежуток 1 квартал 2026"
+    },
+
+    "roadmapQ12026Milestone": "v1.0 Stable",
+    "@roadmapQ12026Milestone": {
+        "description": "Веха для 1 квартала 2026"
+    },
+
+    "roadmapQ12026Status": "Запланировано",
+    "@roadmapQ12026Status": {
+        "description": "Статус вехи 1 квартала 2026"
+    },
+
+    "roadmapFeedback": "Есть предложения по дорожной карте? Мы активно учитываем обратную связь сообщества при определении приоритетов разработки.",
+    "@roadmapFeedback": {
+        "description": "Сообщение с призывом к обратной связи по дорожной карте"
+    },
+
+    "actionDocsTitle": "Документация",
+    "@actionDocsTitle": {
+        "description": "Заголовок кнопки документации"
+    },
+
+    "actionDocsDesc": "Уже знакомы с MONOscript? Ознакомьтесь с документацией!",
+    "@actionDocsDesc": {
+        "description": "Описание кнопки документации"
+    },
+
+    "actionGetStartedTitle": "Начать",
+    "@actionGetStartedTitle": {
+        "description": "Заголовок кнопки начала работы"
+    },
+
+    "actionGetStartedDesc": "Впервые в MONOscript? Начните с наших руководств для новичков!",
+    "@actionGetStartedDesc": {
+        "description": "Описание кнопки начала работы"
+    },
+
+    "actionContributeTitle": "Внести вклад",
+    "@actionContributeTitle": {
+        "description": "Заголовок кнопки вклада"
+    },
+
+    "actionContributeDesc": "Помогите нам улучшить MONOscript, внося свой вклад в проект",
+    "@actionContributeDesc": {
+        "description": "Описание кнопки вклада"
+    },
+
+    "actionBlogTitle": "Блог",
+    "@actionBlogTitle": {
+        "description": "Заголовок кнопки блога"
+    },
+
+    "actionBlogDesc": "Читайте последние новости и статьи о MONOscript",
+    "@actionBlogDesc": {
+        "description": "Описание кнопки блога"
+    },
+
+    "actionWarning": "Внимание: использование MONOscript может вызвать непреодолимое желание переписать всё более безопасно",
+    "@actionWarning": {
+        "description": "Шутливое предупреждение"
+    },
+
+    "footerLogoMono": "MONO",
+    "@footerLogoMono": {
+        "description": "Первая часть текста логотипа в футере"
+    },
+
+    "footerLogoScript": "script",
+    "@footerLogoScript": {
+        "description": "Вторая часть текста логотипа в футере"
+    },
+
+    "footerSlogan": "Безопасный, читаемый язык плагинов",
+    "@footerSlogan": {
+        "description": "Слоган в футере"
+    },
+
+    "footerDocumentationTitle": "Документация",
+    "@footerDocumentationTitle": {
+        "description": "Заголовок раздела документации в футере"
+    },
+
+    "footerDocLink1": "Справочник языка",
+    "@footerDocLink1": {
+        "description": "Ссылка на документацию 1"
+    },
+
+    "footerDocLink2": "Стандартная библиотека",
+    "@footerDocLink2": {
+        "description": "Ссылка на документацию 2"
+    },
+
+    "footerDocLink3": "Безопасность",
+    "@footerDocLink3": {
+        "description": "Ссылка на документацию 3"
+    },
+
+    "footerDocLink4": "Установка",
+    "@footerDocLink4": {
+        "description": "Ссылка на документацию 4"
+    },
+
+    "footerCommunityTitle": "Сообщество",
+    "@footerCommunityTitle": {
+        "description": "Заголовок раздела сообщества в футере"
+    },
+
+    "footerCommunityLink1": "GitHub",
+    "@footerCommunityLink1": {
+        "description": "Ссылка на сообщество 1"
+    },
+
+    "footerCommunityLink2": "Discord",
+    "@footerCommunityLink2": {
+        "description": "Ссылка на сообщество 2"
+    },
+
+    "footerCommunityLink3": "Twitter",
+    "@footerCommunityLink3": {
+        "description": "Ссылка на сообщество 3"
+    },
+
+    "footerCommunityLink4": "Блог",
+    "@footerCommunityLink4": {
+        "description": "Ссылка на сообщество 4"
+    },
+
+    "footerResourcesTitle": "Ресурсы",
+    "@footerResourcesTitle": {
+        "description": "Заголовок раздела ресурсов в футере"
+    },
+
+    "footerResourcesLink1": "Учебники",
+    "@footerResourcesLink1": {
+        "description": "Ссылка на ресурсы 1"
+    },
+
+    "footerResourcesLink2": "Примеры",
+    "@footerResourcesLink2": {
+        "description": "Ссылка на ресурсы 2"
+    },
+
+    "footerResourcesLink3": "Сценарии использования",
+    "@footerResourcesLink3": {
+        "description": "Ссылка на ресурсы 3"
+    },
+
+    "footerResourcesLink4": "FAQ",
+    "@footerResourcesLink4": {
+        "description": "Ссылка на ресурсы 4"
+    },
+
+    "footerCopyright": "© 2025 MONOPTICAL Corp. Все права защищены",
+    "@footerCopyright": {
+        "description": "Авторское право в футере"
+    },
+
+    "tooltipEmail": "Email",
+    "@tooltipEmail": {
+        "description": "Подсказка для иконки email"
+    },
+
+    "tooltipDiscord": "Discord",
+    "@tooltipDiscord": {
+        "description": "Подсказка для иконки Discord"
+    },
+
+    "tooltipGitHub": "GitHub",
+    "@tooltipGitHub": {
+        "description": "Подсказка для иконки GitHub"
+    },
+
+    "tooltipWebsite": "Сайт",
+    "@tooltipWebsite": {
+        "description": "Подсказка для иконки сайта"
+    },
+
+    "securityInMindText": "Создано с заботой о безопасности",
+    "@securityInMindText": {
+        "description": "Девиз безопасности в футере"
+    },
+
+    "versionText": "Версия 0.1 Бета",
+    "@versionText": {
+        "description": "Текст версии в футере"
+    }
+}

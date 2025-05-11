@@ -114,6 +114,7 @@
         "syncstream": "cpp",
         "typeindex": "cpp",
         "valarray": "cpp",
-        "filesystem": "cpp"
+        "filesystem": "cpp",
+        "*.inc": "cpp"
     }
 }

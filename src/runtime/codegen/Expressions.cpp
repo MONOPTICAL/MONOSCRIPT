@@ -13,6 +13,13 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
     left = TypeConversions::loadValueIfPointer(context, left, "left");
     right = TypeConversions::loadValueIfPointer(context, right, "right");
 
+    std::cerr << "Left operand type: ";
+    left->getType()->print(llvm::errs());
+    std::cerr << "\nRight operand type: ";
+    right->getType()->print(llvm::errs());
+    std::cerr << "\nOperation: " << node.op << "\n";
+
+    // Приведение типов
     if (node.left->implicitCastTo) {
         left = TypeConversions::applyImplicitCast(context, left, node.left->implicitCastTo, "left");
     }
@@ -21,6 +28,27 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
         right = TypeConversions::applyImplicitCast(context, right, node.right->implicitCastTo, "right");
     }
     
+    if (left->getType() != right->getType()) {
+        if (left->getType()->isIntegerTy() && right->getType()->isIntegerTy()) {
+            unsigned leftWidth = left->getType()->getIntegerBitWidth();
+            unsigned rightWidth = right->getType()->getIntegerBitWidth();
+            
+            if (leftWidth > rightWidth) {
+                right = context.Builder.CreateIntCast(
+                    right, left->getType(), true, "implicit_cast_right"
+                );
+            } else {
+                left = context.Builder.CreateIntCast(
+                    left, right->getType(), true, "implicit_cast_left"
+                );
+            }
+            
+#if DEBUG
+            std::cerr << "Это нихуя не правильный подход и надо исправлять TypeSymbolVisitor, это временное решение" << std::endl;
+#endif
+        }
+    }
+
     if (node.op == "add" || node.op == "fadd") {
         if (left->getType()->isFloatingPointTy() || right->getType()->isFloatingPointTy()) {
             // Приводим оба операнда к типу float, если один из них float
@@ -63,6 +91,7 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
     } 
     else if (node.op == "sdiv" || node.op == "fdiv") {
         if (left->getType()->isFloatingPointTy() || right->getType()->isFloatingPointTy()) {
+            // Обработка float деления...
             if (left->getType()->isIntegerTy()) {
                 left = context.Builder.CreateSIToFP(left, llvm::Type::getFloatTy(context.TheContext), "int_to_float_left");
             }
@@ -71,9 +100,49 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
             }
             return context.Builder.CreateFDiv(left, right, "divtmp_float");
         } else {
-            return context.Builder.CreateSDiv(left, right, "divtmp_int");
+            // Упрощенный вариант для целочисленного деления:
+            llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
+
+            llvm::BasicBlock* currentBlock = context.Builder.GetInsertBlock();
+
+            llvm::BasicBlock* trapBlock = llvm::BasicBlock::Create(context.TheContext, "trap", function);
+            llvm::BasicBlock* divBlock = llvm::BasicBlock::Create(context.TheContext, "div", function);
+
+            // Проверка на делитель == 0
+            llvm::Value* isZero = context.Builder.CreateICmpEQ(
+                right, llvm::ConstantInt::get(right->getType(), 0), "is_zero_check"
+            );
+            context.Builder.CreateCondBr(isZero, trapBlock, divBlock);
+
+            // Код в trap-блоке
+            context.Builder.SetInsertPoint(trapBlock);
+            llvm::Function* trapFunc = llvm::Intrinsic::getOrInsertDeclaration(
+                context.TheModule.get(), llvm::Intrinsic::trap
+            );
+            context.Builder.CreateCall(trapFunc);
+            context.Builder.CreateUnreachable();
+
+            // Код в блоке деления
+            context.Builder.SetInsertPoint(divBlock);
+            auto div = context.Builder.CreateSDiv(left, right, "divtmp_int");
+            // Создаем переход к продолжению
+            llvm::BasicBlock* continueBlock = llvm::BasicBlock::Create(
+                context.TheContext, "div_continue", function
+            );
+            context.Builder.CreateBr(continueBlock);
+
+            // Устанавливаем точку вставки на блок продолжения
+            context.Builder.SetInsertPoint(continueBlock);
+
+            // Создаем PHI-узел для результата деления
+            llvm::PHINode* phi = context.Builder.CreatePHI(
+                div->getType(), 1, "div_result"
+            );
+            phi->addIncoming(div, divBlock);
+
+            return phi;
         }
-    } 
+    }
     else if (node.op == "srem" || node.op == "frem") {
         if (left->getType()->isFloatingPointTy() || right->getType()->isFloatingPointTy()) {
             if (left->getType()->isIntegerTy()) {
@@ -136,6 +205,7 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
         return context.Builder.CreateICmp(predicate, left, right, "cmptmp");
     }
     /*
+    TODO: Сделать поддержку float
     else if (node.op.starts_with("fcmp")) {
         // Сравнение с плавающей точкой
         llvm::CmpInst::Predicate predicate;

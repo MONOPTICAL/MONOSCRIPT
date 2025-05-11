@@ -26,7 +26,7 @@ void Lexer::tokenize()
                     this->isInMultilineComment=false;
             else if (isStringnotFinished)
             {
-                if (y == '"')
+                if (y == '"' && currentTokenValue[currentTokenValue.size()-1] != '\\')
                 {
                     currentTokenValue += y;
                     isStringnotFinished = false;
@@ -262,22 +262,6 @@ void Lexer::addToken(TokenType type, const std::string &value)
 {
     std::string trimmed = ParsingFunctions::trim(value); // for safety reasons
     char first = trimmed[0]; if(first-0 < 33) return; // ёбанный компилятор сука
-    if(type == TokenType::String)
-    { 
-        // Remove one backslash from any double backslash sequence
-        std::string fixed;
-        for (size_t i = 0; i < trimmed.size(); ++i) {
-            if (trimmed[i] == '\\' && i + 1 < trimmed.size() && trimmed[i + 1] == '\\') {
-                // Skip one backslash
-                fixed += '\\';
-                ++i;
-            } else {
-                fixed += trimmed[i];
-            }
-        }
-        trimmed = fixed;
-        IC(trimmed);
-    }
     //IC(trimmed);
     Token token = {type, trimmed, currentLine, currentIndex};
     currentTokens.push_back(token);

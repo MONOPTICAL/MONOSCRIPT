@@ -357,7 +357,38 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
     {
         advance(); // Переходим к следующему токену
         
-        auto stringNode = std::make_shared<StringNode>(currentToken.value.substr(1, currentToken.value.length()-2)); // Создаём узел строки обризаяя кавычки
+        std::string strValue = currentToken.value.substr(1, currentToken.value.length()-2); // Получаем значение строки обрезая кавычки
+
+        // Обрабатываем экранированные последовательности
+        std::string processedValue;
+        processedValue.reserve(strValue.length()); // Резервируем память для оптимизации
+        
+        for (size_t i = 0; i < strValue.length(); ++i) {
+            if (strValue[i] == '\\' && i + 1 < strValue.length()) {
+                // Обработка экранированных последовательностей
+                switch (strValue[i + 1]) {
+                    case 'n': processedValue.push_back('\n'); break;
+                    case 't': processedValue.push_back('\t'); break;
+                    case 'r': processedValue.push_back('\r'); break;
+                    case 'f': processedValue.push_back('\f'); break;
+                    case 'b': processedValue.push_back('\b'); break;
+                    case '0': processedValue.push_back('\0'); break;
+                    case '\'': processedValue.push_back('\''); break;
+                    case '"': processedValue.push_back('"'); break;
+                    case '\\': processedValue.push_back('\\'); break;
+                    default: 
+                        // Неизвестная экранированная последовательность - сохраняем как есть
+                        processedValue.push_back('\\');
+                        processedValue.push_back(strValue[i + 1]);
+                        break;
+                }
+                ++i;
+            } else {
+                processedValue.push_back(strValue[i]);
+            }
+        }
+        
+        auto stringNode = std::make_shared<StringNode>(processedValue); // Используем обработанное значение // Создаём узел строки обризаяя кавычки
         stringNode->line = lineIndex; stringNode->column = tokenIndex; // Устанавливаем строку и колонку для узла
         
         return stringNode; // Возвращаем узел строки
@@ -513,6 +544,17 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         auto expression = parseExpression(); // Разбираем выражение внутри скобок
 
         consume(TokenType::RightParen, "Expected ')' after expression"); // Проверяем наличие правой скобки
+
+        /*
+        TODO: Каст выражений с помощью CastNode.
+        Пример: (1+2)->i32
+        if (check(TokenType::Arrow)) // Если есть каст, то кастим
+        {
+            auto cast = std::make_shared<CastNode>(expression);
+            cast->line = lineIndex; cast->column = tokenIndex; // Устанавливаем строку и колонку для узла
+            return parseCast(cast);
+        }
+        */
         return expression; // Возвращаем разобранное выражение
     }
     else if (currentToken.type == TokenType::Keyword)

@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
         // Выполнение только если указан флаг --run или run
         if (options.runJIT) {
             std::string currentFilePath = std::filesystem::current_path().string();
-            runProgram(combinedAST, currentFilePath, options.showAST);
+            runProgram(combinedAST, currentFilePath, options.showAST, options.offOptimization);
             return 0;
         }
 

@@ -1,26 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:provider/provider.dart';
 import 'package:syntax_highlight/syntax_highlight.dart';
+import 'documentation_page.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'providers/locale_provider.dart';
 import 'dart:js' as js;
-
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'MONOSCRIPT Docs',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blueGrey,
-        brightness: Brightness.dark,
-        fontFamily: 'Inter',
-      ),
-      home: MonoScriptPage(),
-    );
-  }
-}
 
 // Класс для хранения примеров кода
 class CodeExample {
-  final String name;
+  final String name;  
   final String code;
   final String description;
   
@@ -125,12 +114,20 @@ use
   
   CodeExample? selectedExample;
   Highlighter? highlighter;
+  String _currentLanguage = 'EN';
 
   @override
   void initState() {
     super.initState();
     selectedExample = examples[0];
     _initializeHighlighter();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final localeProvider = Provider.of<LocaleProvider>(context, listen: false);
+      setState(() {
+        _currentLanguage = localeProvider.locale.languageCode == 'ru' ? 'RU' : 'EN';
+      });
+    });
   }
   
   Future<void> _initializeHighlighter() async {
@@ -146,13 +143,21 @@ use
   
   Widget _getHighlightedCode(String code) {
     if (highlighter != null) {
-      return Text.rich(highlighter!.highlight(code));
+      return Text.rich(
+        highlighter!.highlight(code),
+        style: TextStyle(
+          fontFamily: 'Fira Code',
+          fontSize: 16,
+          height: 1.5,
+          color: Colors.white,
+        ),
+        );
     } else {
       return Text(
         code,
         style: TextStyle(
           fontFamily: 'Fira Code',
-          fontSize: 14,
+          fontSize: 16,
           height: 1.5,
           color: Colors.white,
         ),
@@ -181,11 +186,26 @@ use
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: <Widget>[
-                  _navBarItem('Overview', isActive: true),
-                  _navBarItem('Get Started'),
-                  _navBarItem('Docs'),
-                  _navBarItem('Community'),
-                  _navBarItem('Blog'),
+                  _navBarItem(AppLocalizations.of(context)!.navOverview, isActive: true),
+                  _navBarItem(AppLocalizations.of(context)!.navGetStarted),
+                  _navBarItem(AppLocalizations.of(context)!.navDocs),
+                  _navBarItem(AppLocalizations.of(context)!.navCommunity),
+                  _navBarItem(AppLocalizations.of(context)!.navBlog),
+                  // Добавляем разделитель и переключатель языка
+                  Padding(
+                    padding: const EdgeInsets.only(left: 24.0),
+                    child: Row(
+                      children: [
+                        Container(
+                          height: 24,
+                          width: 1,
+                          color: Color(0xFFCCCCCC),
+                        ),
+                        SizedBox(width: 24),
+                        _languageSelector(),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -198,8 +218,14 @@ use
             children: <Widget>[
               // Основной контент
               _welcomeContent(),
+
               _smallOverview(),
 
+              _roadmapSection(), 
+
+              _licenseSection(), 
+
+              _actionButtons(),
               // Дополнительное пространство
               SizedBox(height: 40),
 
@@ -227,7 +253,7 @@ Widget _welcomeContent() {
               children: [
                 // Заголовок и описание
                 Padding(
-                  padding: EdgeInsets.fromLTRB(80.0, 48.0, 24.0, 0.0),
+                  padding: EdgeInsets.fromLTRB(160.0, 48.0, 160.0, 0.0), // было 80.0, 48.0, 24.0, 0.0
                   child: Row(  // Row для размещения заголовка и логотипа рядом
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -237,10 +263,11 @@ Widget _welcomeContent() {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
                             _buildTitle(),
+                            
                             SizedBox(height: 16),
                             Text(
                               '"Secure, readable plugin language: Kubernetes, security, automation scripts"',
-                              style: TextStyle(
+                              style: TextStyle( 
                                 fontSize: 16,
                                 fontStyle: FontStyle.italic,
                                 color: Colors.white70,
@@ -249,28 +276,80 @@ Widget _welcomeContent() {
                             SizedBox(height: 24),
                             _buildButtonRow(),
                             SizedBox(height: 40),
-                            
-                            // Секция с примерами кода
-                            Text(
-                              'Code Examples',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                                        
+                            Padding(
+                              padding: EdgeInsets.fromLTRB(0, 0.0, 16.0, 16.0), // Такие же отступы как у блока кода ниже
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Левая часть - примеры кода с шириной как у блока кода
+                                  Expanded(
+                                    flex: 9, // Такой же flex как у блока кода
+                                    child: Container(
+                                      padding: EdgeInsets.all(24),
+                                      decoration: BoxDecoration(
+                                        color: Color(0xFF0D1117).withOpacity(0.5),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: Color(0xFF30363D),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          // Заголовок с иконкой
+                                          Row(
+                                            children: [
+                                              Icon(Icons.code, size: 24, color: Colors.white),
+                                              SizedBox(width: 16),
+                                              Text(
+                                                'Code Examples',
+                                                style: TextStyle(
+                                                  fontSize: 22,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          Divider(
+                                            color: Color(0xFF30363D),
+                                            height: 24,
+                                          ),
+                                          // Описание секции
+                                          Text(
+                                            'Explore different aspects of MONOscript through these practical examples. Select one to see the code and its output.',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              color: Colors.white70,
+                                              height: 1.5,
+                                            ),
+                                          ),
+                                          SizedBox(height: 16),
+                                          // Выбор примеров кода
+                                          _buildExampleChips(),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  
+                                  // Добавляем пустое пространство справа, чтобы сохранить пропорции как у блока кода
+                                  SizedBox(width: 24),
+                                  Expanded(flex: 3, child: SizedBox()),
+                                ],
                               ),
                             ),
-                            SizedBox(height: 8),
-                            
-                            // Выбор примеров кода
-                            _buildExampleChips(),
+
                           ],
                         ),
                       ),
                       
                       // Логотип и текст MONOPTICAL справа
                       Container(
-                        width: 450,
-                        padding: EdgeInsets.fromLTRB(0, 0, 48, 0),
+                        // Убираем фиксированную ширину
+                        width: MediaQuery.of(context).size.width * 0.3, // Адаптивная ширина - 30% экрана
+                        padding: EdgeInsets.fromLTRB(0, 0, 0, 0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -296,14 +375,30 @@ Widget _welcomeContent() {
                                       letterSpacing: 0.5,
                                     ),
                                   ),
-                                  Text(
-                                    'MONOPTICAL',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color.fromARGB(255, 61, 58, 54),
-                                      letterSpacing: 0.8,
-                                    ),
+                                  Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      // Текст MONOPTICAL
+                                      Text(
+                                        'MONOPTICAL',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color.fromARGB(255, 61, 58, 54),
+                                          letterSpacing: 0.8,
+                                        ),
+                                      ),
+                                      // Горизонтальная линия, проходящая через середину букв
+                                      Positioned(
+                                        top: 12.5, // Примерно половина высоты шрифта
+                                        left: 0,
+                                        right: 0,
+                                        child: Container(
+                                          height: 1.5, // Толщина линии
+                                          color: const Color.fromARGB(178, 61, 58, 54),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   SizedBox(width: 6),
                                   Icon(Icons.verified, size: 16, color: Colors.black54)
@@ -311,26 +406,28 @@ Widget _welcomeContent() {
                               ),
                             ),
                             SizedBox(height: 8),
-                            Container(
-                              width: 450,
-                              height: 250,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                color: Colors.white,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black26,
-                                    blurRadius: 10,
-                                    spreadRadius: 2,
-                                    offset: Offset(0, 4),
+                            // Адаптивный контейнер для изображения
+                            AspectRatio(
+                              aspectRatio: 16/11, // Поддерживаем соотношение сторон
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                  color: Colors.white,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black26,
+                                      blurRadius: 10,
+                                      spreadRadius: 2,
+                                      offset: Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Image(
+                                    image: AssetImage("images/FullLogo.png"),
+                                    fit: BoxFit.contain, // contain вместо cover для сохранения пропорций
                                   ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: Image(
-                                  image: AssetImage("images/FullLogo.png"),
-                                  fit: BoxFit.cover,
                                 ),
                               ),
                             ),
@@ -344,7 +441,7 @@ Widget _welcomeContent() {
                 
                 // Секция примера кода 
                 Padding(
-                  padding: EdgeInsets.fromLTRB(80.0, 24.0, 24.0, 16.0),
+                  padding: EdgeInsets.fromLTRB(160.0, 24.0, 160.0, 16.0),
                   child: selectedExample != null && selectedExample!.description.isNotEmpty
                     ? Text(
                         selectedExample!.description,
@@ -359,7 +456,7 @@ Widget _welcomeContent() {
                 
                 // Блок кода с фиксированной высотой
                 Padding(
-                  padding: EdgeInsets.fromLTRB(80.0, 0.0, 24.0, 24.0),
+                  padding: EdgeInsets.fromLTRB(160.0, 0.0, 160.0, 24.0), 
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -554,9 +651,6 @@ Widget _welcomeContent() {
                       ],
                   ),
                 ),
-                
-                // Дополнительное пространство внизу
-                SizedBox(height: 40),
               ],
             ),
           ),
@@ -569,7 +663,7 @@ Widget _welcomeContent() {
 Widget _smallOverview() {
   return Container(
     padding: EdgeInsets.all(24),
-    margin: EdgeInsets.fromLTRB(80, 6, 48, 0),
+    margin: EdgeInsets.fromLTRB(160, 20, 160, 0), // было 80, 20, 48, 0
     decoration: BoxDecoration(
       color: Color(0xFF0D1117).withOpacity(0.7),
       borderRadius: BorderRadius.circular(12),
@@ -588,13 +682,23 @@ Widget _smallOverview() {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'MONOSCRIPT Language: Overview',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+        Row(
+          children: [
+            Icon(Icons.subject, size: 28, color: Colors.white),
+            SizedBox(width: 16),
+            Text(
+              'MONOSCRIPT Language: Overview',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+        Divider(
+          color: Color(0xFF30363D),
+          height: 24,
         ),
         SizedBox(height: 16),
         
@@ -613,7 +717,7 @@ Widget _smallOverview() {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.speed, color: Colors.orangeAccent, size: 24),
+            Icon(Icons.speed, color: Colors.white, size: 24),
             SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -647,7 +751,7 @@ Widget _smallOverview() {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.security, color: Colors.orangeAccent, size: 24),
+            Icon(Icons.security, color: Colors.white, size: 24),
             SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -663,7 +767,7 @@ Widget _smallOverview() {
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'Created with an emphasis on code execution security in various environments, including Kubernetes and containers (more details in a separate section).',
+                    'Created with an emphasis on code execution security in various environments, including Kubernetes and containers.',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.white70,
@@ -709,10 +813,578 @@ Widget _smallOverview() {
   );
 }
 
+// Раздел о лицензии LGPL-2.1 и Open-Source
+Widget _licenseSection() {
+  return Container(
+    padding: EdgeInsets.all(24),
+    margin: EdgeInsets.fromLTRB(160, 0, 160, 0), // было 80, 0, 48, 0
+    decoration: BoxDecoration(
+      color: Color(0xFF0D1117).withOpacity(0.7),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: Color(0xFF30363D),
+        width: 1,
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.gavel, size: 28, color: Colors.white),
+            SizedBox(width: 16),
+            Text(
+              'Open Source License',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            Spacer(),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Color(0xFF2E5C87),
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: Text(
+                'LGPL-2.1',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        Divider(
+          color: Color(0xFF30363D),
+          height: 24,
+        ),
+        SizedBox(height: 16),
+        
+        // Main description
+        Text(
+          'MONOscript is proudly licensed under the GNU Lesser General Public License v2.1, ensuring that the language remains free and open source.',
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.white,
+            height: 1.5,
+          ),
+        ),
+        SizedBox(height: 16),
+        
+        // Benefits grid
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // First column
+            Expanded(
+              child: _licenseBenefitItem(
+                Icons.handshake, 
+                'Community Collaboration', 
+                'Join a growing community of developers who contribute to and improve the language'
+              ),
+            ),
+            SizedBox(width: 16),
+            // Second column
+            Expanded(
+              child: _licenseBenefitItem(
+                Icons.integration_instructions, 
+                'Commercial Integration', 
+                'Use MONOscript in proprietary software while keeping your code private'
+              ),
+            ),
+            SizedBox(width: 16),
+            // Third column
+            Expanded(
+              child: _licenseBenefitItem(
+                Icons.lock_open, 
+                'Freedom to Modify', 
+                'Adapt the language to your specific needs while sharing improvements'
+              ),
+            ),
+          ],
+        ),
+        
+        SizedBox(height: 16),
+        Container(
+          padding: EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Color(0xFF1A2231),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.favorite, color: Colors.white, size: 20),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'We believe in the power of open source software to drive innovation and create better technologies for everyone.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.white70,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Helper for license benefits
+Widget _licenseBenefitItem(IconData icon, String title, String description) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Icon(icon, color: Colors.white, size: 20),
+          SizedBox(width: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+      SizedBox(height: 8),
+      Text(
+        description,
+        style: TextStyle(
+          fontSize: 14,
+          color: Colors.white70,
+        ),
+      ),
+    ],
+  );
+}
+
+// Раздел с мини-RoadMap
+Widget _roadmapSection() {
+  return Container(
+    padding: EdgeInsets.all(24),
+    margin: EdgeInsets.fromLTRB(160, 24, 160, 24), // было 80, 24, 48, 24
+    decoration: BoxDecoration(
+      color: Color(0xFF0D1117).withOpacity(0.7),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: Color(0xFF30363D),
+        width: 1,
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.timeline, size: 28, color: Colors.white),
+            SizedBox(width: 16),
+            Text(
+              'Project Roadmap',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(width: 16),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Color(0xFF1E4422),
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: Text(
+                'Active Development',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        Divider(
+          color: Color(0xFF30363D),
+          height: 24,
+        ),
+        SizedBox(height: 16),
+        
+        Text(
+          'MONOscript is rapidly evolving, with new features and improvements coming not just daily, but hourly. Our dedicated team is committed to making this language powerful, secure, and accessible.',
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.white,
+            height: 1.5,
+          ),
+        ),
+        SizedBox(height: 24),
+        
+        // Timeline visualization
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _roadmapItem('Q2 2025', 'First Beta Release', 'Current', true),
+            _roadmapItem('Q3 2025', 'Ecosystem Extensions', 'Planned'),
+            _roadmapItem('Q4 2025', 'Full IDE Support', 'Planned'),
+            _roadmapItem('Q1 2026', 'v1.0 Stable', 'Planned'),
+          ],
+        ),
+        
+        SizedBox(height: 16),
+        Container(
+          padding: EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Color(0xFF1A2231),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.lightbulb, color: Colors.white, size: 20),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Have suggestions for our roadmap? We actively incorporate community feedback into our development priorities.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.white70,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Helper for roadmap items
+Widget _roadmapItem(String quarter, String milestone, String status, [bool isCurrent = false]) {
+  return Expanded(
+    child: Container(
+      margin: EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              color: isCurrent ? Color(0xFF1E4422) : Color(0xFF1A2231),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Text(
+                quarter,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          Container(
+            width: 2,
+            height: 30,
+            color: isCurrent ? Color(0xFF1E4422) : Color(0xFF1A2231),
+          ),
+          Container(
+            height: 16,
+            width: 16,
+            decoration: BoxDecoration(
+              color: isCurrent ? Color(0xFF1E4422) : Color(0xFF1A2231),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isCurrent ? Colors.white : Color(0xFF30363D),
+                width: 2,
+              ),
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            milestone,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            status,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: isCurrent ? Colors.greenAccent : Colors.white70,
+              fontStyle: isCurrent ? FontStyle.normal : FontStyle.italic,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _actionButtons() {
+  return Container(
+    padding: EdgeInsets.fromLTRB(160, 32, 160, 16), // было 80, 32, 48, 16
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Верхний ряд кнопок: Documentation и Get Started
+        Row(
+          children: [
+            // Кнопка Documentation (левая верхняя)
+            Expanded(
+              child: Container(
+                margin: EdgeInsets.only(bottom: 16, right: 12),
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => DocumentationPage(),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
+                    elevation: 3,
+                    padding: EdgeInsets.all(0),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Container(
+                    padding: EdgeInsets.all(24),
+                    child: Row(
+                      children: [
+                        Icon(Icons.menu_book, size: 28),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Documentation',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                'You already hooked up with MONOscript? See the documentation!',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.arrow_forward, size: 24),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            
+            // Кнопка Get Started (правая верхняя)
+            Expanded(
+              child: Container(
+                margin: EdgeInsets.only(bottom: 16, left: 12),
+                child: ElevatedButton(
+                  onPressed: () {},
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF17285A),
+                    foregroundColor: Colors.white,
+                    elevation: 3,
+                    padding: EdgeInsets.all(0),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Container(
+                    padding: EdgeInsets.all(24),
+                    child: Row(
+                      children: [
+                        Icon(Icons.rocket_launch, size: 28),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Get Started',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                'New to MONOscript? Start your journey with our beginner guides!',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.arrow_forward, size: 24),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        
+        // Нижний ряд кнопок: Contribute и Blog
+        Row(
+          children: [
+            // Кнопка Contribute (левая нижняя)
+            Expanded(
+              child: Container(
+                margin: EdgeInsets.only(right: 12),
+                child: ElevatedButton(
+                  onPressed: () {
+                    js.context.callMethod('open', ['https://github.com/MONOPTICAL/MONOSCRIPT']);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF222940),
+                    foregroundColor: Colors.white,
+                    elevation: 3,
+                    padding: EdgeInsets.all(0),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Container(
+                    padding: EdgeInsets.all(24),
+                    child: Row(
+                      children: [
+                        Icon(Icons.code, size: 28),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Contribute',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                'Help us improve MONOscript by contributing to the project',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.arrow_forward, size: 24),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            
+            // Кнопка Blog (правая нижняя)
+            Expanded(
+              child: Container(
+                margin: EdgeInsets.only(left: 12),
+                child: ElevatedButton(
+                  onPressed: () {},
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF281D30),
+                    foregroundColor: Colors.white,
+                    elevation: 3,
+                    padding: EdgeInsets.all(0),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Container(
+                    padding: EdgeInsets.all(24),
+                    child: Row(
+                      children: [
+                        Icon(Icons.article, size: 28),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Blog',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                'Read the latest news and articles about MONOscript',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.arrow_forward, size: 24),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        
+        SizedBox(height: 12),
+        Text(
+          "Warning: using MONOscript may lead to uncontrollable urges to rewrite everything in a more secure way",
+          style: TextStyle(
+            fontSize: 12,
+            fontStyle: FontStyle.italic,
+            color: Colors.white70,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 Widget _footer() {
   return Container(
     width: double.infinity,
-    padding: EdgeInsets.fromLTRB(80, 40, 80, 40),
+    padding: EdgeInsets.fromLTRB(160, 40, 160, 40),
     color: Color(0xFF0A0E19),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -733,24 +1405,30 @@ Widget _footer() {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Text(
-                        'MONO',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                          height: 1.0,
-                        ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            'MONO',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                              height: 1.0,
+                            ),
+                          ),
+                          Text(
+                            'script',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.normal,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    Text(
-                      'script',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.normal,
-                        color: Colors.white,
-                      ),
-                    ),
+                    )
                   ],
                 ),
                 SizedBox(height: 8),
@@ -828,14 +1506,14 @@ Widget _footer() {
             SizedBox(width: 8),
             Icon(
               Icons.security,
-              color: Colors.orangeAccent,
+              color: Colors.white,
               size: 14,
             ),
             Spacer(),
             Text(
               'Version 0.1 Beta',
               style: TextStyle(
-                color: Colors.orangeAccent,
+                color: Colors.white,
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
               ),
@@ -919,7 +1597,7 @@ Widget _paradigmRow(String name, String description, bool isAlternate) {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Colors.orangeAccent,
+              color: Colors.white,
             ),
           ),
         ),
@@ -950,27 +1628,47 @@ Widget _buildTitle() {
           color: Colors.white,
         ),
       ),
-      Text(
-        'MONO',
-        style: TextStyle(
-          fontSize: 35,
-          fontWeight: FontWeight.bold,
-          color: Colors.orangeAccent,
-        ),
-      ),
-      Text(
-        'script',
-        style: TextStyle(
-          fontSize: 25,
-          fontWeight: FontWeight.normal,
-          color: Colors.white,
-        ),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  'MONO',
+                  style: TextStyle(
+                    fontSize: 35,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black,
+                    height: 1.0,
+                  ),
+                ),
+                Text(
+                  'script',
+                  style: TextStyle(
+                    fontSize: 25,
+                    fontWeight: FontWeight.normal,
+                    color: Colors.black,
+                  ),
+                ),
+              ],
+            ),
+          )
+        ],
       ),
       Text(
         ' Programming Language',
         style: TextStyle(
           fontSize: 35,
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.normal,
           color: Colors.white,
         ),
       ),
@@ -979,7 +1677,7 @@ Widget _buildTitle() {
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: Colors.orangeAccent,
+            color: Colors.white,
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
@@ -1047,8 +1745,9 @@ Widget _buildTitle() {
               selectedExample = example;
             });
           },
-          selectedColor: Colors.orangeAccent,
-          backgroundColor: Color(0xFF252525),
+          selectedColor: Colors.white,
+          backgroundColor: Color.fromARGB(255, 5, 1, 1),
+          checkmarkColor: Colors.black,
           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           labelStyle: TextStyle(
             color: selectedExample == example 
@@ -1062,7 +1761,71 @@ Widget _buildTitle() {
       }).toList(),
     );
   }
-  
+
+Widget _languageSelector() {
+  return Container(
+    decoration: BoxDecoration(
+      color: Color(0xFFF2F2F2),
+      borderRadius: BorderRadius.circular(4),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Английский язык
+        InkWell(
+          onTap: () {
+            final localeProvider = Provider.of<LocaleProvider>(context, listen: false);
+            localeProvider.setLocale(const Locale('en', ''));
+            setState(() {
+              _currentLanguage = 'EN';
+            });
+          },
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: _currentLanguage == 'EN' ? Color(0xFF333333) : Colors.transparent,
+              borderRadius: BorderRadius.horizontal(left: Radius.circular(4)),
+            ),
+            child: Text(
+              AppLocalizations.of(context)!.languageEN,
+              style: TextStyle(
+                color: _currentLanguage == 'EN' ? Colors.white : Color(0xFF333333),
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ),
+        // Русский язык
+        InkWell(
+          onTap: () {
+            final localeProvider = Provider.of<LocaleProvider>(context, listen: false);
+            localeProvider.setLocale(const Locale('ru', ''));
+            setState(() {
+              _currentLanguage = 'RU';
+            });
+          },
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: _currentLanguage == 'RU' ? Color(0xFF333333) : Colors.transparent,
+              borderRadius: BorderRadius.horizontal(right: Radius.circular(4)),
+            ),
+            child: Text(
+              AppLocalizations.of(context)!.languageRU,
+              style: TextStyle(
+                color: _currentLanguage == 'RU' ? Colors.white : Color(0xFF333333),
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 Widget _buildCodeFeatureSection() {
   List<Map<String, String>> features = [];
   
@@ -1205,7 +1968,7 @@ Widget _buildCodeFeatureSection() {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.check_circle, color: Colors.orangeAccent, size: 20),
+          Icon(Icons.check_circle, color: Colors.white, size: 20),
           SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1260,6 +2023,26 @@ Widget _navBarItem(String title, {bool isActive = false}) {
       firstPart = 'BLOG';
       secondPart = '';
       break;
+    case 'Обзор':
+      firstPart = 'ОБЗ';
+      secondPart = 'ор';
+      break;
+    case 'Начать':
+      firstPart = 'НАЧ';
+      secondPart = 'ать';
+      break;
+    case 'Документация':
+      firstPart = 'ДОК';
+      secondPart = 'ументация';
+      break;
+    case 'Сообщество':
+      firstPart = 'СОБ';
+      secondPart = 'щества';
+      break;
+    case 'Блог':
+      firstPart = 'БЛО';
+      secondPart = 'г';
+      break;
     default:
       firstPart = title;
       secondPart = '';
@@ -1281,7 +2064,24 @@ Widget _navBarItem(String title, {bool isActive = false}) {
           ),
         ),
         child: InkWell(
-          onTap: () {},
+          onTap: () {
+            switch (title) {
+              case 'Overview' || 'Обзор':
+                break;
+              case 'Get Started' || 'Начать':
+                break;
+              case 'Docs' || 'Документация':
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => DocumentationPage()),
+                );
+                break;
+              case 'Community' || 'Сообщество':
+                break;
+              case 'Blog' || 'Блог':
+                break;
+            }
+          },
           splashColor: Colors.transparent,
           hoverColor: Colors.transparent,
           highlightColor: Colors.transparent,
@@ -1408,7 +2208,7 @@ Widget _getConsoleOutput(CodeExample? example) {
       );
     default:
       return Text(
-        'Программа выполнена успешно.',
+        'Program exited with code 0',
         style: TextStyle(
           color: Colors.white,
           fontFamily: 'Fira Code',
