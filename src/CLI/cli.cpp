@@ -11,6 +11,7 @@ void printHelp(const char* programName) {
               << "  --symantic       🔍 Show symantic analysis\n"
               << "  --run, run       ▶️  Execute the program via LLVM\n"
               << "  --compile        🏗️  Compile to executable\n"
+              << "  --offOptimization 🛠️  Disable LLVM optimization\n"
               << "\n⌨️ If FILE is not specified, input is read from standard input.\n"
               << std::endl;
 }
@@ -39,6 +40,8 @@ CLIOptions parseArgs(int argc, char* argv[]) {
                 std::cerr << "Error: --compile requires an output file name." << std::endl;
                 exit(1);
             }
+        } else if (arg == "--offOptimization") {
+            options.offOptimization = true;
         } else if (arg[0] != '-') {
             options.inputFile = arg;
         } else {
