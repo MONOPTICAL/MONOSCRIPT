@@ -6,6 +6,7 @@ struct CLIOptions {
     bool showAST = false;
     bool showSymantic = false;
     bool runJIT = false; // LLVM JIT
+    bool offOptimization = false; // LLVM Optimization
     bool compileExecutable = false; // LLVM Compile
     std::string ExecutableFile;
     std::string inputFile;

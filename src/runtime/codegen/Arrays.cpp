@@ -8,43 +8,48 @@ namespace Arrays
         ASTGen codeGen(context);
         // Генерируем код для выражения
         node.expression->accept(codeGen);
-        llvm::Value* result = codeGen.getResult();
         
         codeGen.LogWarning("Инициализация массива через блок для " + node.name);
     
-        int arraySize = blockExpr->statements.size();
-        
-        if (!std::dynamic_pointer_cast<KeyValueNode>(blockExpr->statements[0])) {
-            codeGen.LogWarning("Инициализация массива");
-        } else {
-            // TODO: реализовать инициализацию map
+        // Проверяем, является ли первый элемент KeyValueNode (для map)
+        if (!blockExpr->statements.empty() && std::dynamic_pointer_cast<KeyValueNode>(blockExpr->statements[0])) {
             codeGen.LogWarning("Инициализация map не реализована");
-            result = nullptr;
             return nullptr;
         }
         
-        if (!varType->isArrayTy()) {
-            codeGen.LogWarning("Переменная " + node.name + " является массивом но динамический инициализированый");
-            auto TypeNode = std::make_shared<GenericTypeNode>("array");
-            TypeNode->typeParameters.push_back(context.getTypeByASTNode(blockExpr->statements[0]));
-            varType = context.getLLVMType(TypeNode, context.TheContext);
-            if (!varType) {
-                codeGen.LogWarning("Не удалось получить тип для массива " + node.name);
-                result = nullptr;
-                return nullptr;
+        // 1. Определяем тип элемента массива
+        llvm::Type* elementType = nullptr;
+        
+        // Пытаемся получить тип элемента из объявления переменной
+        if (auto genType = std::dynamic_pointer_cast<GenericTypeNode>(node.type)) {
+            if (genType->baseName == "array" && !genType->typeParameters.empty()) {
+                elementType = context.getLLVMType(genType->typeParameters[0], context.TheContext);
             }
-            codeGen.LogWarning("Тип массива " + TypeNode->toString());
         }
         
-        llvm::Type* elementType = varType->getArrayElementType();
+        // Если тип не указан явно, выводим из первого элемента
+        if (!elementType && !blockExpr->statements.empty()) {
+            auto firstElem = blockExpr->statements[0];
+            firstElem->accept(codeGen);
+            llvm::Value* firstValue = codeGen.getResult();
+            elementType = firstValue->getType();
+        }
         
-        // Создаем массив нужного размера
-        llvm::ArrayType* arrayType = llvm::ArrayType::get(elementType, arraySize);
-        llvm::AllocaInst* arrayAlloca = context.Builder.CreateAlloca(arrayType, nullptr, node.name);
-        context.NamedValues[node.name] = arrayAlloca;
+        if (!elementType) {
+            codeGen.LogWarning("Не удалось определить тип элементов массива " + node.name);
+            elementType = llvm::Type::getInt32Ty(context.TheContext); // Fallback
+        }
         
-        // Инициализируем каждый элемент массива
-        for (int i = 0; i < arraySize; ++i) {
+        // 2. Создаем структуру массива и выделяем память для данных
+        llvm::Value* sizeValue = llvm::ConstantInt::get(
+            llvm::Type::getInt32Ty(context.TheContext), 
+            blockExpr->statements.size()
+        );
+        
+        llvm::Value* arrayPtr = context.createArray(elementType, sizeValue);
+        
+        // 3. Заполняем элементы массива
+        for (size_t i = 0; i < blockExpr->statements.size(); i++) {
             if (!blockExpr->statements[i]) {
                 codeGen.LogWarning("Пропускаю нулевой элемент массива #" + std::to_string(i));
                 continue;
@@ -59,21 +64,18 @@ namespace Arrays
                 continue;
             }
             
-            // Создаем индексы для доступа к элементу массива
-            std::vector<llvm::Value*> indices = {
-                llvm::ConstantInt::get(context.TheContext, llvm::APInt(32, 0)),
-                llvm::ConstantInt::get(context.TheContext, llvm::APInt(32, i))
-            };
+            // Индекс текущего элемента
+            llvm::Value* index = llvm::ConstantInt::get(
+                llvm::Type::getInt32Ty(context.TheContext), i);
             
-            // Получаем указатель на i-й элемент массива
-            // %0 = getelementptr [1 x i32], ptr %four, i32 0, i32 0
-            llvm::Value* elementPtr = context.Builder.CreateGEP(arrayType, arrayAlloca, indices);
-            
-            // Сохраняем значение в элемент массива
-            // store i32 51, ptr %0, align 4
-            context.Builder.CreateStore(elementValue, elementPtr);
+            // Используем нашу функцию для установки элемента
+            context.setArrayElement(arrayPtr, index, elementValue);
         }
         
-        return arrayAlloca;
+        // 4. Сохраняем переменную в таблицу символов и тип элементов в таблицу типов
+        context.NamedValues[node.name] = arrayPtr;
+        context.arrayElementTypes[arrayPtr] = elementType;
+        
+        return arrayPtr;
     }
 }

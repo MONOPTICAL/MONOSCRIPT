@@ -47,6 +47,7 @@ void ASTGen::visit(ProgramNode& node) {
             // Результат последнего узла становится результатом программы
         }
     }
+    context.TheModule->print(llvm::outs(), nullptr);
 }
 
 void ASTGen::visit(FunctionNode& node) {
@@ -78,6 +79,8 @@ void ASTGen::visit(FunctionNode& node) {
     llvm::FunctionType* funcType = llvm::FunctionType::get(returnLLVMType, paramTypes, false);
     llvm::Function* func = llvm::Function::Create(
         funcType, llvm::Function::ExternalLinkage, node.name, context.TheModule.get());
+
+    
     
     // Создаем блок входа в функцию
     llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(
@@ -105,15 +108,15 @@ void ASTGen::visit(FunctionNode& node) {
 
     // Добавляем return, если его нет
     llvm::BasicBlock* currentInsertionBlock = context.Builder.GetInsertBlock();
-    if (!entryBlock->getTerminator()) {
+    if (!entryBlock->getTerminator()) { // Если текущий блок - это entryBlock
+        context.TheModule->print(llvm::outs(), nullptr);
         if (isMain) {
             // main всегда возвращает 0, если пользователь не указал return
             context.Builder.CreateRet(llvm::ConstantInt::get(returnLLVMType, 0));
         } else if (returnLLVMType->isVoidTy()) {
             context.Builder.CreateRetVoid();
-        } else {
-            context.Builder.CreateRet(llvm::Constant::getNullValue(returnLLVMType));
-        }
+        } 
+        // TODO: Добавить тут обработки если надо
     }
 
     // Новая проверка для текущего блока
@@ -123,10 +126,10 @@ void ASTGen::visit(FunctionNode& node) {
             context.Builder.CreateRet(llvm::ConstantInt::get(returnLLVMType, 0));
         } else if (returnLLVMType->isVoidTy()) {
             context.Builder.CreateRetVoid();
-        } else {
-            context.Builder.CreateRet(llvm::Constant::getNullValue(returnLLVMType));
         }
+        // TODO: Добавить тут обработки если надо
     }
+
     
     // Восстанавливаем старую таблицу символов
     context.NamedValues = oldNamedValues;
@@ -190,13 +193,18 @@ void ASTGen::visit(VariableAssignNode& node) {
     // Получаем тип переменной
     llvm::Type* varType;
 
+    std::cerr << "Имя " << node.name << std::endl;
+
     if (node.inferredType) 
         varType = context.getLLVMType(node.inferredType, context.TheContext);
-    else 
+    else if(node.type)
         varType = context.getLLVMType(node.type, context.TheContext);
+    else 
+        LogWarning("Не удалось получить тип для переменной " + node.name);
     
+    std::cerr << "Тип переменной " << node.name << " : " << node.type->toString() << std::endl;
 
-    LogWarning("Тип переменной " + node.name + " : " + node.type->toString());
+    LogWarning("Тип переменной поставлен");
     if (!varType) {
         LogWarning("Не удалось получить тип для переменной " + node.name);
         result = nullptr;
@@ -214,6 +222,7 @@ void ASTGen::visit(VariableAssignNode& node) {
     // Проверяем является ли выражение структурой данных (array или map)
     std::shared_ptr<BlockNode> blockExpr = std::dynamic_pointer_cast<BlockNode>(node.expression);
     if (blockExpr) {
+        std::cerr << "Обнаружено выражение блока для переменной " << node.name << std::endl;
         result = Arrays::handleArrayInitialization(context, node, varType, blockExpr);
         return;
     }
@@ -296,7 +305,55 @@ void ASTGen::visit(ForNode& node) {
 }
 
 void ASTGen::visit(WhileNode& node) {
-    LogWarning("visit не реализован для WhileNode");
+    LogWarning("visit для WhileNode");
+
+    llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
+
+    llvm::BasicBlock* loopCondBlock = llvm::BasicBlock::Create(context.TheContext, "loop.cond", function);
+    llvm::BasicBlock* loopBodyBlock = llvm::BasicBlock::Create(context.TheContext, "loop.body", function);
+    llvm::BasicBlock* loopEndBlock = llvm::BasicBlock::Create(context.TheContext, "loop.end", function);
+
+    // Сохраняем контекст цикла
+    context.pushLoopContext(loopCondBlock, loopEndBlock);
+
+    context.Builder.CreateBr(loopCondBlock);
+
+    context.Builder.SetInsertPoint(loopCondBlock);
+    node.condition->accept(*this);
+    llvm::Value* condValue = getResult();
+    if (!condValue) {
+        LogWarning("Ошибка: не удалось вычислить условие для WhileNode");
+        if (!context.Builder.GetInsertBlock()->getTerminator()) {
+            context.Builder.CreateBr(loopEndBlock);
+        }
+        context.popLoopContext(); // Не забываем очистить стек при ошибке
+        result = nullptr;
+        return;
+    }
+
+    if (!condValue->getType()->isIntegerTy(1)) {
+        condValue = context.Builder.CreateICmpNE(
+            condValue,
+            llvm::Constant::getNullValue(condValue->getType()),
+            "whilecond.tobool"
+        );
+    }
+    context.Builder.CreateCondBr(condValue, loopBodyBlock, loopEndBlock);
+
+    context.Builder.SetInsertPoint(loopBodyBlock);
+    if (node.body) {
+        node.body->accept(*this);
+    }
+    
+    if (!context.Builder.GetInsertBlock()->getTerminator()) {
+        context.Builder.CreateBr(loopCondBlock);
+    }
+
+    context.Builder.SetInsertPoint(loopEndBlock);
+
+    // Восстанавливаем/очищаем контекст цикла
+    context.popLoopContext();
+
     result = nullptr;
 }
 
@@ -548,13 +605,29 @@ void ASTGen::visit(KeyValueNode& node) {
 }
 
 void ASTGen::visit(BreakNode& node) {
-    LogWarning("visit не реализован для BreakNode");
-    result = nullptr;
+    LogWarning("visit для BreakNode");
+    llvm::BasicBlock* loopEnd = context.getCurrentLoopEndBlock();
+    if (loopEnd) {
+        if (!context.Builder.GetInsertBlock()->getTerminator()) {
+            context.Builder.CreateBr(loopEnd);
+        } else {
+            LogWarning("Break statement in a block that is already terminated.");
+        }
+    }
+    result = nullptr; // break не производит значения
 }
 
 void ASTGen::visit(ContinueNode& node) {
-    LogWarning("visit не реализован для ContinueNode");
-    result = nullptr;
+    LogWarning("visit для ContinueNode");
+    llvm::BasicBlock* loopCond = context.getCurrentLoopCondBlock();
+    if (loopCond) {
+        if (!context.Builder.GetInsertBlock()->getTerminator()) {
+            context.Builder.CreateBr(loopCond);
+        } else {
+            LogWarning("Continue statement in a block that is already terminated.");
+        }
+    }
+    result = nullptr; // continue не производит значения
 }
 
 void ASTGen::visit(AccessExpression& node) {
@@ -564,8 +637,10 @@ void ASTGen::visit(AccessExpression& node) {
 
 void ASTGen::visit(ImportNode &node)
 {
-    LogWarning("visit не реализован для ImportNode");
-    result = nullptr;
+    /*
+    Они уже убраны к хуям собачим из AST перед этапом семантики
+            Смысла реализовывать здесь что то нет
+    */
 }
 
 void ASTGen::visit(LambdaNode &node)

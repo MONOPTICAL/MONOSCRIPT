@@ -66,6 +66,8 @@ llvm::Value* TypeConversions::convertValueToType(CodeGenContext& context, llvm::
     }
 
     std::string castName = name.empty() ? "cast" : name;
+
+    std::cerr << "Warning: Применение convertValueToType к " << value->getName().str() << std::endl;
     
     // Целое в плавающую точку
     if (value->getType()->isIntegerTy() && targetType->isFloatingPointTy()) {
@@ -100,7 +102,7 @@ llvm::Value* TypeConversions::applyImplicitCast(CodeGenContext& context, llvm::V
     if (!targetTypeNode || !value) {
         return value;
     }
-    
+
     llvm::Type* targetType = context.getLLVMType(targetTypeNode, context.TheContext);
     if (!targetType) {
         return value;

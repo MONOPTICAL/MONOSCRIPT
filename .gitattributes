@@ -1,0 +1,5 @@
+*.h linguist-language=C++
+*.hpp linguist-language=C++
+*.cpp linguist-language=C++
+*.d linguist-language=D
+*.dart linguist-language=Dart
