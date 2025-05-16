@@ -1,302 +1,265 @@
-# MONOSCRIPT (В разработке)
+<div align="center">
+  <a href="https://github.com/MONOPTICAL/MONOSCRIPT">
+    <img src="https://github.com/MONOPTICAL/MONOSCRIPT/blob/main/MONOSCRIPT.png?raw=true" alt="Logo">
+  </a>
 
-**MONOSCRIPT** — это легкий, читаемый язык программирования, вдохновленный Python и C-подобным синтаксисом. Он предназначен для написания безопасных, модульных скриптов с фокусом на простоту, читаемость и поддержку плагинов. 
+<h3 align="center">MONOSCRIPT</h3>
 
----
+  <p align="center">
+    Convenient scripting language for creating plugins for MONOPTICAL
+    <br />
+  </p>
+  <hr>
+</div>
 
-## 🧠 Особенности языка
+**MONOSCRIPT** is an experimental programming language with both static and dynamic typing. It features a concise syntax inspired by **Python**, **C**, and functional ideas from **Elixir** and **F#**. Designed as an **embedded scripting language**, it emphasizes:
 
-### ✅ Объявление функций
-**Объявление функций** позволяет создавать именованные блоки кода с типами аргументов и возвращаемого значения.
+- safe execution,
+    
+- modularity,
+    
+- extensibility,
+    
+- ease of learning and code readability.
+    
 
-**Пример:**
-```cpp
-[void]main()
-|   echo("Привет, мир!")
-```
-- Тип функции указывается в квадратных скобках перед именем.
-- Аргументы указываются как `тип: имя` в круглых скобках.
-- Тело функции определяется отступами с помощью символа `|`.
+It was created to be used in closed environments, such as **security plugins**, **scanning systems**, **data analytics**, **automation**, and as part of the **MONOPTICAL** project.
 
----
+## 🧭 Paradigms
 
-### ✅ Вложенные функции
-**Вложенные функции** позволяют объявлять функции внутри других функций для инкапсуляции логики.
+MONOSCRIPT combines several programming paradigms:
 
-**Пример:**
-```cpp
-[void]main()
-|   [i32]sum(i32: a, i32: b)
-|   |   return a + b
-```
-- Вложенные функции видны только внутри родительской функции.
-- Используются для локализации вспомогательных вычислений.
+|Paradigm|Description|
+|---|---|
+|Imperative|Traditional constructs like `if`, `for`, `while`, mutability, and step-by-step execution.|
+|Functional|Lambdas, pure functions, pipe operators.|
+|Modular|Organized via `use`, modules, and namespaces.|
+|Structural|Custom `struct`s with methods and encapsulation support.|
 
----
+> About OOP The language is **not object-oriented** in the classic sense (no class inheritance), but **structs with methods** offer similar code organization.
 
-### ✅ Объявление переменных
-**Объявление переменных** поддерживает как статическую, так и динамическую инициализацию.
-
-**Пример:**
-```cpp
-i32 a = 5           // Статическая инициализация с явным типом
-b ^= "строка"       // Динамическая (auto) инициализация
-```
-- Для статической инициализации указывается тип.
-- Для динамической используется оператор `^=`, тип выводится автоматически.
+## 🔠 Data Types
 
 ---
 
-### ✅ Константы
-**Константы** позволяют объявлять значения, которые нельзя изменить после инициализации.
+**MONOSCRIPT** features a compact and expressive type system aimed at both strict static checks and flexible dynamic usage. It avoids common runtime errors like null dereferencing and type mismatches.
 
-**Пример:**
-```cpp
-const i32 max = 100      // Статическая константа
-final name ^= "Alice"    // Динамическая константа
+### 📃 Primitive Types
+
+- `i1`, `i8`, `i16`, `i32`, `i64` — integers with varying widths
+    
+- `float` — floating-point numbers
+    
+- `string` — text values
+    
+- `void` — absence of value (used for functions)
+    
+
+### 📦 Containers and Structs
+
+- `array<T>` — arrays of fixed or dynamic size
+    
+- `map<K, V>` — key-value mappings (dictionaries)
+    
+- `struct` — user-defined structures with fields and methods
+    
+
+### ⚙️ Typing
+
+MONOSCRIPT's type system adapts to the use case:
+
+|Characteristic|Details|
+|---|---|
+|Static|`type name = value` declares explicit type.|
+|Dynamic|`name ^= value` infers the type automatically.|
+|Hybrid|Both styles can be used within the same program.|
+|Null-safe|Variables are non-null by default; checked explicitly via `?x`.|
+
+> This safety reduces bugs and makes code behavior more predictable while remaining concise.
+
+## 📋 Syntax
+
+### 📌 Key Principles
+
+- **Readability over brevity**.
+    
+- **Blocks start with `|`** — makes structure visually clear.
+    
+- **Return types in square brackets** before function names:
+    
+
+```go
+[i32]sum(i32: a, i32: b)
 ```
-- `const` — тип и значение заданы явно.
-- `final` — значение присваивается один раз, тип выводится автоматически.
 
----
+### 🧱 Operators
 
-### ✅ Операции и выражения
-**Операции и выражения** поддерживают арифметику, сравнения и логику.
+|Operator|Meaning|
+|---|---|
+|`=`|Assignment (static type)|
+|`^=`|Assignment with inferred type|
+|`+ - * / %`|Arithmetic|
+|`== != > <`|Comparison|
+|`and or`|Logical operations|
+|`!expr`|Negation|
+|`:`|Start of multi-line lambda|
+|`->`|One-liner lambda body or Casting|
 
-**Пример:**
-```cpp
-result ^= !(x > 5 and y < 10)
-```
-- Поддерживаются все базовые арифметические и логические операторы.
-- Операции можно комбинировать в сложные выражения.
+### ⚖️ Control Structures
 
----
+- `if`, `else if`, `else`
+    
+- `for i in range(...)`
+    
+- `while ...`
+    
+- `break`, `continue`
+    
 
-### ✅ Циклы и условия
-**Циклы и условия** позволяют реализовывать ветвления и повторяющиеся действия.
+### 📍 Declarations
 
-**Пример (условие):**
-```cpp
-if x > 0
-|   echo("Положительное")
-else if x==0
-|   echo("Нейтральное")
-else
-|   echo("Отрицательное")
-```
+- `const` — constant with explicit type
+    
+- `final` — constant with inferred type
+    
+- `use |> module` — module import
+    
+- `struct`, `return`, `null`
+    
 
-**Пример (цикл):**
-```cpp
-for i in range(5)
-|   echo(i)
-```
-- Используются отступы для определения блоков.
-- Поддерживаются конструкции `if`, `else if`, `else`, `for`.
+### 🧪 Functions & Lambdas
 
----
+**Named functions:**
 
-### ✅ Массивы и словари
-**Массивы и словари** — встроенные структуры данных для хранения коллекций.
-
-**Пример:**
-```cpp
-array<i32> числа = [1, 2, 3]
-map<string, i32> очки = {"Alice": 10, "Bob": 8}
-```
-- Доступ к элементам через индекс или ключ: `массив[0]`, `словарь["ключ"]`.
-- Можно использовать любые поддерживаемые типы в качестве элементов.
-
----
-
-### ✅ Структуры и методы
-**Структуры** позволяют объединять данные и методы в единый тип.
-
-**Пример:**
-```cpp
-[struct]User
-|  map<string,string> User_Info
-|  [User]__init__(string: name, string: password, string: id)
-|  |  User_Info = {"name" : name, "password": password, "id" : id} 
-|
-|  [map<string,string>]GetUserInfo()
-|  |  return User_Info   
-```
-- Методы объявляются внутри структуры или с помощью синтаксиса `Struct::method`.
-- Структуры поддерживают инкапсуляцию и организацию кода.
-
----
-
-### ✅ Возврат значений
-**Возврат значений** осуществляется с помощью ключевого слова `return`.
-
-**Пример:**
-```cpp
+```go
 [i32]sum(i32: a, i32: b)
 |   return a + b
 ```
-- Используется для возврата результата из функции или лямбды.
 
----
+**One-liner lambda:**
 
-### ✅ Null safety
-
-**Null safety** — встроенная поддержка безопасной работы с отсутствующими значениями.  
-Можно явно проверять переменные на null с помощью специального синтаксиса.
-
-**Пример:**
-```cpp
-if (?x == 0)
-|   echo("x либо null, либо 0")
+```go
+[i8](i8: x) -> x * x
 ```
-- Оператор `?` перед переменной означает "безопасная проверка": если `x` равен `null`, выражение не вызовет ошибку.
-- Можно использовать с любыми выражениями и условиями.
-- Позволяет писать безопасный код без лишних проверок на null.
 
----
+**Block lambda:**
 
-### 🔗 Пайпы (`|>`)
-**Пайп-оператор** позволяет строить цепочки вычислений, передавая результат слева в функцию справа, как в функциональных языках (F#, Elixir, OCaml).
-
-**Пример:**
-```cpp
-x ^= [15, 5]
-    |> sumShit(x)
-    |> mapFunc(x, [i8](i8: a) -> a*a)
-    |> [array<i8>](array<i8>: a) :
-    |   for i in range(a)
-    |   |   a[i] = a[i] * a[i]
-```
-- Каждый следующий пайп получает результат предыдущего шага.
-- Пайпы могут быть многострочными и легко комбинируются с лямбдами и блоками.
-- Синтаксис пайпов делает код компактным и читаемым.
-
----
-
-### 📥 Импорты (`use`)
-**Импорт модулей и функций** осуществляется с помощью ключевого слова `use` и пайп-цепочек.
-
-**Пример:**
-```cpp
-use
-|> std
-|> math -> sum : sumShit
-```
-- Импортируется модуль `std`, затем из модуля `math` функция `sum` под псевдонимом `sumShit`.
-- Можно импортировать несколько модулей и функций в одной цепочке.
-
----
-
-### 📦 Лямбды (Анонимные функции)
-**Лямбда-выражения** позволяют создавать компактные анонимные функции прямо в выражениях и пайпах.
-
-**Пример:**
-```cpp
-[i8](i8: a) -> a*a
-```
-- `[i8]` — возвращаемый тип.
-- `(i8: a)` — параметры с типами.
-- `-> a*a` — тело лямбды (может быть выражением или блоком).
-
-**Лямбда с блоком:**
-```cpp
+```go
 [array<i8>](array<i8>: a) :
 |   for i in range(a)
-|   |   a[i] = a[i] * a[i]
+|   |   a[i] = a[i] * 2
 ```
-- После `:` идёт блок кода с отступами.
 
-**Лямбды можно передавать как аргументы в функции и использовать в пайпах:**
-```cpp
-x ^= [15,5]
-    |> mapFunc(x, [i8](i8: a) -> a*a)
+### 🔗 Pipes (`|>`) — Functional Chains
+
+```go
+x ^= [1,2,3]
+    |> map(x, [i32](i32: a) -> a + 1)
+    |> filter(x, [i32](i32: a) -> a > 2)
 ```
-### 🏷️ Метки
 
-**Метки** позволяют помечать функции, переменные или структуры специальными атрибутами, которые влияют на их поведение при компиляции или исполнении.
+- Each step gets the output of the previous.
+    
+- Enables readable, declarative chaining.
+    
 
-**Пример:**
+### 🧰 Structs & Methods
+
+```go
+[struct]User
+|  map<string,string> info
+|  [void]__init__(string: name, string: id)
+|  |  info = {"name": name, "id": id}
+|  [string]getName()
+|  |  return info["name"]
+```
+
+- Methods are regular functions inside structs.
+    
+- Encapsulation via internal fields.
+    
+- No inheritance.
+    
+
+### 📥 Imports (`use`)
+
 ```cpp
+use
+|> http_server
+|> math -> sqrt : sqrtAlias
+```
+**Importing modules and functions** is done using the `use` keyword and pipe chains.
+
+- The module `http_server` is imported, then from the module `math` the function `sqrt` under the alias `sqrtAlias`.
+- You can import multiple modules and functions in one chain.
+
+### 🏷️ Labels
+
+```go
 [i32]main() @entry @strict
-|   echo("Это точка входа в строгом режиме")
+|   echo("Hello World!")
 ```
-- Метки указываются после объявления через `@`.
-- Можно использовать несколько меток одновременно.
+**Labels** allow you to mark functions, variables, or structures with special attributes that affect their behavior during compilation or execution.
 
-**Стандартные метки:**
-- `@entry` — помечает функцию как точку входа программы.
-- `@strict` — включает строгий режим проверки типов и неявных преобразований.
-- `@test` — помечает функцию как тестовую (используется в автоматическом тестировании).
-- `@public` / `@private` — управление областью видимости (для структур и функций).
+- Labels are specified after the declaration using `@`.
+- Multiple labels can be used simultaneously.
 
-**Метки можно использовать для:**
-- Управления точкой входа (`@entry`)
-- Включения строгого режима (`@strict`)
-- Пометки тестовых функций (`@test`)
-- Управления доступностью (`@public`, `@private`)
-- Расширения поведения компилятора и плагинов
 
-**Пример с несколькими метками:**
-```cpp
-[void]init() @entry
-|   echo("Запуск программы...")
+### 🪜 Security
+
+- **Null safety** — checked explicitly with `?x`.
+    
+- **Sandboxing** — interpreter runs in isolated environments.
+    
+
+### ⚖️ Embeddability & Extensibility
+
+- MONOSCRIPT is embeddable in other apps.
+    
+- Core interpreter written in **C++**, **D** and **Zig**.
+    
+- Easily extended with native modules.
+    
+- Module system via `use` is supported.
+    
+
+## 📄 License
+
+MONOSCRIPT is an open-source project under the GNU LGPL v2.1:
+
+- You can use it freely.
+    
+- Engine changes must remain open.
+    
+- Embedding does not require disclosing your source.
+    
+
+## ❤️ Conclusion
+
+**MONOSCRIPT is not trying to compete with giants. It's about solving real problems in a simple, secure, and enjoyable way.**
+
+Perfect for:
+
+- scripting and logic in security systems,
+    
+- DevOps/Kubernetes automation,
+    
+- safe and readable mini-programs,
+    
+- educational and embedded projects.
+    
+
+```rust
+[i64]fibonacci(i64: n) @strict @pure
+|   if (n == 0)
+|   |   return 0
+|   else if (n == 1)
+|   |   return 1
+|   return fibonacci(n - 1) + fibonacci(n - 2)
+
+  
+
+[i32]main()
+|   echo(toString_long(fibonacci(47))) // 2971215073
+|   return 0
 ```
----
-### ✅ Передача параметров
-- Примитивы (`i1`, `i8`, `i32`, `i64`, `float`, `string`, `bool`) передаются **по значению**.
-- Структуры данных (`map`, `array`, `struct`) передаются **по ссылке**.
-- Поведение полностью аналогично **Python**.
-
----
-
-### 🔤 Ключевые слова
-```
-if, else, for, while, return, break, continue,
-true, false, null, none, import, const, 
-final, in, and, or, is, public, private, define
-```
-
-### 🔢 Встроенные типы
-```
-i1, i8, i32, i64, string, void, array, map, float, struct
-```
-
-## 🛠 Пример полной программы
-```cpp
-[void]bubbleSort(array<i32>: arr)
-|   n ^= len(arr)
-|   for i in range(0, n)
-|   |   for j in range(0, n - 1)
-|   |   |   if arr[j] > arr[j + 1]
-|   |   |   |   temp ^= arr[j]
-|   |   |   |   arr[j] = arr[j + 1]
-|   |   |   |   arr[j + 1] = temp
-
-[void]printArray(array<i32>: arr)
-|   for i in range(0, len(arr))
-|   |   echo(arr[i])
-
-[void]main()
-|   array<i32> nums = [5, 3, 1, 4, 2]
-|   echo("Before sort:")
-|   printArray(nums)
-|
-|   bubbleSort(nums)
-|
-|   echo("After sort:")
-|   printArray(nums)
-```
-
----
-
-## 🛡️ LGPL-2.1 — свободная лицензия
-
-Этот проект распространяется под лицензией **LGPL-2.1 (GNU Lesser General Public License)**. Это означает:
-
-- Вы можете **свободно использовать, модифицировать и распространять** MONOSCRIPT.
-- Изменения самого интерпретатора должны быть также открыты, если распространяются.
-- Встраивание MONOSCRIPT в другие приложения **не требует** открытия их исходников.
-
----
-
-Сделано с ❤️ для разработчиков.
-
