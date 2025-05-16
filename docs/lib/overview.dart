@@ -22,12 +22,21 @@ class MonoScriptPage extends StatefulWidget {
 }
 
 class _MonoScriptPageState extends State<MonoScriptPage> {
+  List<CodeExample> _pageExamples = [];
+  CodeExample? selectedExample;
+  Highlighter? highlighter;
+  String _currentLanguage = 'EN';
 
-final List<CodeExample> examples = [
-  CodeExample(
-    name: 'Fibonacci',
-    description: 'Classic Fibonacci number calculation algorithm',
-    code: '''[i64]fibonacci(i64: n) @strict @pure
+  void _initializeLocalizedExamples(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+
+    final String? currentSelectedExampleName = selectedExample?.name;
+
+    _pageExamples = [
+      CodeExample(
+        name: loc.exampleFibonacci, 
+        description: loc.exampleFibonacciDesc, 
+        code: '''[i64]fibonacci(i64: n) @strict @pure
 |   if (n == 0)
 |   |   return 0
 |   else if (n == 1)
@@ -37,17 +46,17 @@ final List<CodeExample> examples = [
 [i32]main()
 |   echo(toString_long(fibonacci(47))) // 2971215073
 |   return 0''',
-  ),
-  CodeExample(
-    name: 'Hello World',
-    description: 'Simple text output example',
-    code: '''[void]hello_world() @strict @entry
+      ),
+      CodeExample(
+        name: loc.exampleHelloWorld,
+        description: loc.exampleHelloWorldDesc,
+        code: '''[void]hello_world() @strict @entry
 |   echo("Hello World!!!")''',
-  ),
-  CodeExample(
-    name: 'Sort',
-    description: 'Implementation of bubble sort algorithm',
-    code: '''[void]bubbleSort(array<i32>: arr)
+      ),
+      CodeExample(
+        name: loc.exampleSort,
+        description: loc.exampleSortDesc,
+        code: '''[void]bubbleSort(array<i32>: arr)
 |   n ^= len(arr)
 |   for i in range(0, n)
 |   |   for j in range(0, n - 1)
@@ -69,11 +78,11 @@ final List<CodeExample> examples = [
 |   bubbleSort(nums)
 |
 |   echo("After sort:" + getArray(nums))''',
-  ),
-  CodeExample(
-    name: 'General Code',
-    description: 'Example of string manipulation and type conversion',
-    code: '''[string]hello_str() @strict
+      ),
+      CodeExample(
+        name: loc.exampleGeneralCode,
+        description: loc.exampleGeneralCodeDesc,
+        code: '''[string]hello_str() @strict
 |   string mark = " hz"
 |   mark = "x" + mark + toString_int(2)
 |   return "Hello" + mark
@@ -84,11 +93,11 @@ final List<CodeExample> examples = [
 |   i1 isTrue = ((3>2)!=true)==0 // 1
 |   i32 castedValue = -isTrue + 5 // -1 + 5
 |   return castedValue // 4''',
-  ),
-  CodeExample(
-    name: 'Modules',
-    description: 'Example of module usage',
-    code: '''// math.ms
+      ),
+      CodeExample(
+        name: loc.exampleModules,
+        description: loc.exampleModulesDesc,
+        code: '''// math.ms
 [i32]mySum(i32 : a, i32 : b)
 |   return a + b
 
@@ -109,25 +118,61 @@ use
 |   echo("a: " + toString_int(a) + ", b: " + toString_int(b))
 |   echo("Sum: " + toString_int(sum) + ", Mul: " + toString_int(mul))
 |   return 0'''
-  )
-];
-  
-  CodeExample? selectedExample;
-  Highlighter? highlighter;
-  String _currentLanguage = 'EN';
+      )
+    ];
+
+    if (currentSelectedExampleName != null) {
+      try {
+        selectedExample = _pageExamples.firstWhere((ex) => ex.name == currentSelectedExampleName);
+      } catch (e) {
+        if (_pageExamples.isNotEmpty) {
+          selectedExample = _pageExamples[0];
+        } else {
+          selectedExample = null;
+        }
+      }
+    } else if (_pageExamples.isNotEmpty) {
+      selectedExample = _pageExamples[0];
+    } else {
+      selectedExample = null;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    selectedExample = examples[0];
     _initializeHighlighter();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final localeProvider = Provider.of<LocaleProvider>(context, listen: false);
-      setState(() {
-        _currentLanguage = localeProvider.locale.languageCode == 'ru' ? 'RU' : 'EN';
-      });
+      if (mounted) 
+      {
+        final localeProvider = Provider.of<LocaleProvider>(context, listen: false);
+        setState(() {
+          _currentLanguage = localeProvider.locale.languageCode.toUpperCase();
+        });
+      }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final localeProvider = Provider.of<LocaleProvider>(context, listen: false);
+    final newLanguageCode = localeProvider.locale.languageCode.toUpperCase();
+    if (_currentLanguage != newLanguageCode) {
+      setState(() {
+        _currentLanguage = newLanguageCode;
+      });
+    }
+
+    _initializeLocalizedExamples(context);
+
+    if (selectedExample == null && _pageExamples.isNotEmpty) {
+       setState(() {
+           selectedExample = _pageExamples[0];
+       });
+    }
   }
   
   Future<void> _initializeHighlighter() async {
@@ -191,7 +236,7 @@ use
                   _navBarItem(AppLocalizations.of(context)!.navDocs),
                   _navBarItem(AppLocalizations.of(context)!.navCommunity),
                   _navBarItem(AppLocalizations.of(context)!.navBlog),
-                  // Добавляем разделитель и переключатель языка
+                  // Разделитель и переключатель языка
                   Padding(
                     padding: const EdgeInsets.only(left: 24.0),
                     child: Row(
@@ -266,7 +311,7 @@ Widget _welcomeContent() {
                             
                             SizedBox(height: 16),
                             Text(
-                              '"Secure, readable plugin language: Kubernetes, security, automation scripts"',
+                              AppLocalizations.of(context)!.welcomeSlogan,
                               style: TextStyle( 
                                 fontSize: 16,
                                 fontStyle: FontStyle.italic,
@@ -304,7 +349,7 @@ Widget _welcomeContent() {
                                               Icon(Icons.code, size: 24, color: Colors.white),
                                               SizedBox(width: 16),
                                               Text(
-                                                'Code Examples',
+                                                AppLocalizations.of(context)!.codeExamplesTitle,
                                                 style: TextStyle(
                                                   fontSize: 22,
                                                   fontWeight: FontWeight.bold,
@@ -319,7 +364,7 @@ Widget _welcomeContent() {
                                           ),
                                           // Описание секции
                                           Text(
-                                            'Explore different aspects of MONOscript through these practical examples. Select one to see the code and its output.',
+                                            AppLocalizations.of(context)!.codeExamplesDescription,
                                             style: TextStyle(
                                               fontSize: 16,
                                               color: Colors.white70,
@@ -367,7 +412,7 @@ Widget _welcomeContent() {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    'By ',
+                                    AppLocalizations.of(context)!.byLabel,
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w300,
@@ -380,7 +425,7 @@ Widget _welcomeContent() {
                                     children: [
                                       // Текст MONOPTICAL
                                       Text(
-                                        'MONOPTICAL',
+                                        AppLocalizations.of(context)!.companyName,
                                         style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
@@ -607,7 +652,7 @@ Widget _welcomeContent() {
 
                                     // Информация о производительности
                                     Text(
-                                      'Execution time: ${_getExecutionTime(selectedExample)} ms',
+                                      AppLocalizations.of(context)!.executionTime(_getExecutionTime(selectedExample)),
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: Colors.grey,
@@ -687,7 +732,7 @@ Widget _smallOverview() {
             Icon(Icons.subject, size: 28, color: Colors.white),
             SizedBox(width: 16),
             Text(
-              'MONOSCRIPT Language: Overview',
+              AppLocalizations.of(context)!.overviewSectionTitle,
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -704,7 +749,7 @@ Widget _smallOverview() {
         
         // Main description
         Text(
-          'MONOSCRIPT is a fast, intuitive programming language designed for secure code execution in various environments.',
+          AppLocalizations.of(context)!.overviewSectionDesc,
           style: TextStyle(
             fontSize: 16,
             color: Colors.white,
@@ -724,7 +769,7 @@ Widget _smallOverview() {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'High Performance',
+                    AppLocalizations.of(context)!.performanceTitle,
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -733,7 +778,7 @@ Widget _smallOverview() {
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'Thanks to LLVM Backend, compiler written in C++ and standard library written in D and Zig, MONOSCRIPT provides optimal execution speed.',
+                    AppLocalizations.of(context)!.performanceDesc,
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.white70,
@@ -758,7 +803,7 @@ Widget _smallOverview() {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Secure Execution',
+                    AppLocalizations.of(context)!.securityTitle,
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -767,7 +812,7 @@ Widget _smallOverview() {
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'Created with an emphasis on code execution security in various environments, including Kubernetes and containers.',
+                    AppLocalizations.of(context)!.securityDesc,
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.white70,
@@ -783,7 +828,7 @@ Widget _smallOverview() {
         
         // Supported paradigms
         Text(
-          'Supported Paradigms',
+          AppLocalizations.of(context)!.paradigmsTitle,
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -801,10 +846,10 @@ Widget _smallOverview() {
           ),
           child: Column(
             children: [
-              _paradigmRow('Imperative', 'Traditional constructs: if, for, while, mutability, and step-by-step execution', true),
-              _paradigmRow('Functional', 'Lambdas, pure functions, pattern matching', false),
-              _paradigmRow('Modular', 'Organization using use, modules and namespaces', true),
-              _paradigmRow('Structural', 'Custom structures with methods and encapsulation support', false),
+              _paradigmRow(AppLocalizations.of(context)!.paradigmImperative, AppLocalizations.of(context)!.paradigmImperativeDesc, true),
+              _paradigmRow(AppLocalizations.of(context)!.paradigmFunctional, AppLocalizations.of(context)!.paradigmFunctionalDesc, false),
+              _paradigmRow(AppLocalizations.of(context)!.paradigmModular, AppLocalizations.of(context)!.paradigmModularDesc, true),
+              _paradigmRow(AppLocalizations.of(context)!.paradigmStructural, AppLocalizations.of(context)!.paradigmStructuralDesc, false),
             ],
           ),
         ),
@@ -834,7 +879,7 @@ Widget _licenseSection() {
             Icon(Icons.gavel, size: 28, color: Colors.white),
             SizedBox(width: 16),
             Text(
-              'Open Source License',
+              AppLocalizations.of(context)!.licenseSectionTitle,
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -867,7 +912,7 @@ Widget _licenseSection() {
         
         // Main description
         Text(
-          'MONOscript is proudly licensed under the GNU Lesser General Public License v2.1, ensuring that the language remains free and open source.',
+          AppLocalizations.of(context)!.licenseDescription,
           style: TextStyle(
             fontSize: 16,
             color: Colors.white,
@@ -884,8 +929,8 @@ Widget _licenseSection() {
             Expanded(
               child: _licenseBenefitItem(
                 Icons.handshake, 
-                'Community Collaboration', 
-                'Join a growing community of developers who contribute to and improve the language'
+                AppLocalizations.of(context)!.benefitCollabTitle, 
+                AppLocalizations.of(context)!.benefitCollabDesc
               ),
             ),
             SizedBox(width: 16),
@@ -893,8 +938,8 @@ Widget _licenseSection() {
             Expanded(
               child: _licenseBenefitItem(
                 Icons.integration_instructions, 
-                'Commercial Integration', 
-                'Use MONOscript in proprietary software while keeping your code private'
+                AppLocalizations.of(context)!.benefitIntegrationTitle, 
+                AppLocalizations.of(context)!.benefitIntegrationDesc
               ),
             ),
             SizedBox(width: 16),
@@ -902,8 +947,8 @@ Widget _licenseSection() {
             Expanded(
               child: _licenseBenefitItem(
                 Icons.lock_open, 
-                'Freedom to Modify', 
-                'Adapt the language to your specific needs while sharing improvements'
+                AppLocalizations.of(context)!.benefitModifyTitle,
+                AppLocalizations.of(context)!.benefitModifyDesc
               ),
             ),
           ],
@@ -922,7 +967,7 @@ Widget _licenseSection() {
               SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'We believe in the power of open source software to drive innovation and create better technologies for everyone.',
+                  AppLocalizations.of(context)!.openSourceBelief,
                   style: TextStyle(
                     fontSize: 14,
                     fontStyle: FontStyle.italic,
@@ -990,7 +1035,7 @@ Widget _roadmapSection() {
             Icon(Icons.timeline, size: 28, color: Colors.white),
             SizedBox(width: 16),
             Text(
-              'Project Roadmap',
+              AppLocalizations.of(context)!.roadmapSectionTitle,
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -1005,7 +1050,7 @@ Widget _roadmapSection() {
                 borderRadius: BorderRadius.circular(30),
               ),
               child: Text(
-                'Active Development',
+                AppLocalizations.of(context)!.roadmapStatus,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -1022,7 +1067,7 @@ Widget _roadmapSection() {
         SizedBox(height: 16),
         
         Text(
-          'MONOscript is rapidly evolving, with new features and improvements coming not just daily, but hourly. Our dedicated team is committed to making this language powerful, secure, and accessible.',
+          AppLocalizations.of(context)!.roadmapDescription,
           style: TextStyle(
             fontSize: 16,
             color: Colors.white,
@@ -1035,10 +1080,10 @@ Widget _roadmapSection() {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _roadmapItem('Q2 2025', 'First Beta Release', 'Current', true),
-            _roadmapItem('Q3 2025', 'Ecosystem Extensions', 'Planned'),
-            _roadmapItem('Q4 2025', 'Full IDE Support', 'Planned'),
-            _roadmapItem('Q1 2026', 'v1.0 Stable', 'Planned'),
+            _roadmapItem(AppLocalizations.of(context)!.roadmapQ22025, AppLocalizations.of(context)!.roadmapQ22025Milestone, AppLocalizations.of(context)!.roadmapQ22025Status, true),
+            _roadmapItem(AppLocalizations.of(context)!.roadmapQ32025, AppLocalizations.of(context)!.roadmapQ32025Milestone, AppLocalizations.of(context)!.roadmapQ32025Status),
+            _roadmapItem(AppLocalizations.of(context)!.roadmapQ42025, AppLocalizations.of(context)!.roadmapQ42025Milestone, AppLocalizations.of(context)!.roadmapQ42025Status),
+            _roadmapItem(AppLocalizations.of(context)!.roadmapQ12026, AppLocalizations.of(context)!.roadmapQ12026Milestone, AppLocalizations.of(context)!.roadmapQ12026Status),
           ],
         ),
         
@@ -1055,7 +1100,7 @@ Widget _roadmapSection() {
               SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Have suggestions for our roadmap? We actively incorporate community feedback into our development priorities.',
+                  AppLocalizations.of(context)!.roadmapFeedback,
                   style: TextStyle(
                     fontSize: 14,
                     fontStyle: FontStyle.italic,
@@ -1180,7 +1225,7 @@ Widget _actionButtons() {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Documentation',
+                                AppLocalizations.of(context)!.actionDocsTitle,
                                 style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
@@ -1188,7 +1233,7 @@ Widget _actionButtons() {
                               ),
                               SizedBox(height: 6),
                               Text(
-                                'You already hooked up with MONOscript? See the documentation!',
+                                AppLocalizations.of(context)!.actionDocsDesc,
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.black87,
@@ -1231,7 +1276,7 @@ Widget _actionButtons() {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Get Started',
+                                AppLocalizations.of(context)!.actionGetStartedTitle,
                                 style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
@@ -1239,7 +1284,7 @@ Widget _actionButtons() {
                               ),
                               SizedBox(height: 6),
                               Text(
-                                'New to MONOscript? Start your journey with our beginner guides!',
+                                AppLocalizations.of(context)!.actionGetStartedDesc,
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.white70,
@@ -1289,7 +1334,7 @@ Widget _actionButtons() {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Contribute',
+                                AppLocalizations.of(context)!.actionContributeTitle,
                                 style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
@@ -1297,7 +1342,7 @@ Widget _actionButtons() {
                               ),
                               SizedBox(height: 6),
                               Text(
-                                'Help us improve MONOscript by contributing to the project',
+                                AppLocalizations.of(context)!.actionContributeDesc,
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.white70,
@@ -1340,7 +1385,7 @@ Widget _actionButtons() {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Blog',
+                                AppLocalizations.of(context)!.actionBlogTitle,
                                 style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
@@ -1348,7 +1393,7 @@ Widget _actionButtons() {
                               ),
                               SizedBox(height: 6),
                               Text(
-                                'Read the latest news and articles about MONOscript',
+                                AppLocalizations.of(context)!.actionBlogDesc,
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.white70,
@@ -1369,7 +1414,7 @@ Widget _actionButtons() {
         
         SizedBox(height: 12),
         Text(
-          "Warning: using MONOscript may lead to uncontrollable urges to rewrite everything in a more secure way",
+          AppLocalizations.of(context)!.actionWarning,
           style: TextStyle(
             fontSize: 12,
             fontStyle: FontStyle.italic,
@@ -1433,7 +1478,7 @@ Widget _footer() {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  "Secure, readable plugin language",
+                  AppLocalizations.of(context)!.footerSlogan,
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 14,
@@ -1447,18 +1492,18 @@ Widget _footer() {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _footerNavSection(
-                  'Documentation',
-                  ['Language Reference', 'Standard Library', 'Security', 'Installation'],
+                  AppLocalizations.of(context)!.footerDocumentationTitle,
+                  [AppLocalizations.of(context)!.footerDocLink1, AppLocalizations.of(context)!.footerDocLink2, AppLocalizations.of(context)!.footerDocLink3, AppLocalizations.of(context)!.footerDocLink4],
                 ),
                 SizedBox(width: 64),
                 _footerNavSection(
-                  'Community',
-                  ['GitHub', 'Discord', 'Twitter', 'Blog'],
+                  AppLocalizations.of(context)!.footerCommunityTitle,
+                  [AppLocalizations.of(context)!.footerCommunityLink1, AppLocalizations.of(context)!.footerCommunityLink2, AppLocalizations.of(context)!.footerCommunityLink3, AppLocalizations.of(context)!.footerCommunityLink4],
                 ),
                 SizedBox(width: 64),
                 _footerNavSection(
-                  'Resources',
-                  ['Tutorials', 'Examples', 'Use Cases', 'FAQ'],
+                  AppLocalizations.of(context)!.footerResourcesTitle,
+                  [AppLocalizations.of(context)!.footerResourcesLink1, AppLocalizations.of(context)!.footerResourcesLink2, AppLocalizations.of(context)!.footerResourcesLink3, AppLocalizations.of(context)!.footerResourcesLink4],
                 ),
               ],
             ),
@@ -1472,7 +1517,7 @@ Widget _footer() {
         Row(
           children: [
             Text(
-              '© 2025 MONOPTICAL Corp. All rights reserved',
+              AppLocalizations.of(context)!.footerCopyright,
               style: TextStyle(
                 color: Colors.white60,
                 fontSize: 14,
@@ -1487,7 +1532,7 @@ Widget _footer() {
                 SizedBox(width: 16),
                 _socialIcon(Icons.cloud, 'GitHub'),
                 SizedBox(width: 16),
-                _socialIcon(Icons.language, 'Website'),
+                _socialIcon(Icons.language, AppLocalizations.of(context)!.tooltipWebsite),
               ],
             ),
           ],
@@ -1497,7 +1542,7 @@ Widget _footer() {
         Row(
           children: [
             Text(
-              'Made with security in mind',
+              AppLocalizations.of(context)!.securityInMindText,
               style: TextStyle(
                 color: Colors.white38,
                 fontSize: 12,
@@ -1511,7 +1556,7 @@ Widget _footer() {
             ),
             Spacer(),
             Text(
-              'Version 0.1 Beta',
+              AppLocalizations.of(context)!.versionText,
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 12,
@@ -1620,58 +1665,108 @@ Widget _buildTitle() {
     crossAxisAlignment: CrossAxisAlignment.baseline,
     textBaseline: TextBaseline.alphabetic,
     children: [
-      Text(
-        'The ',
-        style: TextStyle(
-          fontSize: 35,
-          fontWeight: FontWeight.normal,
-          color: Colors.white,
+      if (_currentLanguage == 'EN')
+      ...[
+        Text(
+          'The ',
+          style: TextStyle(
+            fontSize: 35,
+            fontWeight: FontWeight.normal,
+            color: Colors.white,
+          ),
         ),
-      ),
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(
-                  'MONO',
-                  style: TextStyle(
-                    fontSize: 35,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.black,
-                    height: 1.0,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    'MONO',
+                    style: TextStyle(
+                      fontSize: 35,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black,
+                      height: 1.0,
+                    ),
                   ),
-                ),
-                Text(
-                  'script',
-                  style: TextStyle(
-                    fontSize: 25,
-                    fontWeight: FontWeight.normal,
-                    color: Colors.black,
+                  Text(
+                    'script',
+                    style: TextStyle(
+                      fontSize: 25,
+                      fontWeight: FontWeight.normal,
+                      color: Colors.black,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          )
-        ],
-      ),
-      Text(
-        ' Programming Language',
-        style: TextStyle(
-          fontSize: 35,
-          fontWeight: FontWeight.normal,
-          color: Colors.white,
+                ],
+              ),
+            )
+          ],
         ),
-      ),
+        Text(
+          ' Programming Language',
+          style: TextStyle(
+            fontSize: 35,
+            fontWeight: FontWeight.normal,
+            color: Colors.white,
+          ),
+        ),
+      ]
+      else
+      ...[
+        Text(
+          'Язык программирования ',
+          style: TextStyle(
+            fontSize: 35,
+            fontWeight: FontWeight.normal,
+            color: Colors.white,
+          ),
+        ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    'MONO',
+                    style: TextStyle(
+                      fontSize: 35,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black,
+                      height: 1.0,
+                    ),
+                  ),
+                  Text(
+                    'script',
+                    style: TextStyle(
+                      fontSize: 25,
+                      fontWeight: FontWeight.normal,
+                      color: Colors.black,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          ],
+        ),
+      ],
       Transform.translate(
         offset: Offset(5, -20), // Смещение вверх
         child: Container(
@@ -1681,7 +1776,7 @@ Widget _buildTitle() {
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
-            '0.1 Beta',
+            AppLocalizations.of(context)!.betaVersion,
             style: TextStyle(
               fontSize: 12, // Уменьшенный размер шрифта
               fontWeight: FontWeight.bold,
@@ -1699,7 +1794,7 @@ Widget _buildTitle() {
       children: <Widget>[
         ElevatedButton.icon(
           icon: Icon(Icons.code),
-          label: Text('github.com/MONOPTICAL/MONOSCRIPT'),
+          label: Text(AppLocalizations.of(context)!.githubButtonLabel),
           onPressed: () {
             js.context.callMethod('open', ['https://github.com/MONOPTICAL/MONOSCRIPT']);
           },
@@ -1716,7 +1811,7 @@ Widget _buildTitle() {
         SizedBox(width: 16),
         ElevatedButton.icon(
           icon: Icon(Icons.download_for_offline),
-          label: Text('Download for Linux'),
+          label: Text(AppLocalizations.of(context)!.downloadButtonLabel),
           onPressed: () {},
           style: ElevatedButton.styleFrom(
             backgroundColor: Color(0xFF17285A),
@@ -1736,7 +1831,7 @@ Widget _buildTitle() {
     return Wrap(
       spacing: 12,
       runSpacing: 12,
-      children: examples.map((example) {
+      children: _pageExamples.map((example) {
         return ChoiceChip(
           label: Text(example.name),
           selected: selectedExample == example,
@@ -1831,105 +1926,105 @@ Widget _buildCodeFeatureSection() {
   
   if (selectedExample != null) {
     switch (selectedExample!.name) {
-      case 'Fibonacci':
+      case 'Fibonacci' || 'Фибоначчи':
         features = [
           {
-            'title': 'Recursion',
-            'description': 'Function calls itself to calculate Fibonacci sequence'
+            'title': AppLocalizations.of(context)!.featureRecursionTitle,
+            'description': AppLocalizations.of(context)!.featureRecursionDesc
           },
           {
-            'title': 'Type Casting',
-            'description': 'Explicit casting using the "->" operator (n - 1->i64)'
+            'title': AppLocalizations.of(context)!.featureTypeCastingTitle,
+            'description': AppLocalizations.of(context)!.featureTypeCastingDesc
           },
           {
-            'title': '@pure Annotation',
-            'description': 'Functions marked as pure have no side effects'
+            'title': AppLocalizations.of(context)!.featurePureAnnotationTitle,
+            'description': AppLocalizations.of(context)!.featurePureAnnotationDesc
           },
           {
-            'title': '@strict Annotation',
-            'description': 'Ensures stricter type checking and memory safety'
+            'title': AppLocalizations.of(context)!.featureStrictAnnotationTitle,
+            'description': AppLocalizations.of(context)!.featureStrictAnnotationDesc
           },
         ];
         break;
       
-      case 'Hello World':
+      case 'Hello World' || 'Привет, мир':
         features = [
           {
-            'title': 'Entry Point Declaration',
-            'description': '@entry annotation marks the program\'s entry point'
+            'title': AppLocalizations.of(context)!.featureEntryPointTitle,
+            'description': AppLocalizations.of(context)!.featureEntryPointDesc
           },
           {
-            'title': 'void Return Type',
-            'description': 'Function doesn\'t return any value'
+            'title': AppLocalizations.of(context)!.featureVoidReturnTypeTitle,
+            'description': AppLocalizations.of(context)!.featureVoidReturnTypeDesc
           },
           {
-            'title': 'Echo Statement',
-            'description': 'Built-in echo function for console output'
+            'title': AppLocalizations.of(context)!.featureEchoStatementTitle,
+            'description': AppLocalizations.of(context)!.featureEchoStatementDesc
           },
           {
-            'title': 'String Literals',
-            'description': 'Direct usage of string literals with double quotes'
+            'title': AppLocalizations.of(context)!.featureStringLiteralsTitle,
+            'description': AppLocalizations.of(context)!.featureStringLiteralsDesc
           },
         ];
         break;
       
-      case 'Sort':
+      case 'Sort' || 'Сортировка':
         features = [
           {
-            'title': 'Array Manipulation',
-            'description': 'Creating and manipulating typed arrays (array<i32>)'
+            'title': AppLocalizations.of(context)!.featureArrayIndexingTitle,
+            'description': AppLocalizations.of(context)!.featureArrayIndexingDesc
           },
           {
-            'title': 'For-in Loop',
-            'description': 'Iterating over ranges using for-in syntax'
+            'title': AppLocalizations.of(context)!.featureForInLoopTitle,
+            'description': AppLocalizations.of(context)!.featureForInLoopDesc
           },
           {
-            'title': 'Initialize-Assign Operator',
-            'description': 'Uses ^= to initialize variables with their first value'
+            'title': AppLocalizations.of(context)!.featureInitAssignTitle,
+            'description': AppLocalizations.of(context)!.featureInitAssignDesc
           },
           {
-            'title': 'Array Indexing',
-            'description': 'Direct access to array elements with [] notation'
+            'title': AppLocalizations.of(context)!.featureArrayManipulationDesc,
+            'description': AppLocalizations.of(context)!.featureArrayManipulationDesc
           },
         ];
         break;
       
-      case 'General Code':
+      case 'General Code' || 'Общий код':
         features = [
           {
-            'title': 'String Concatenation',
-            'description': 'Joining strings with "+" operator'
+            'title': AppLocalizations.of(context)!.featureStringConcatTitle,
+            'description': AppLocalizations.of(context)!.featureStringConcatDesc
           },
           {
-            'title': 'Boolean Operations',
-            'description': 'Complex boolean conditions with comparison operators'
+            'title': AppLocalizations.of(context)!.featureBooleanOpsTitle,
+            'description': AppLocalizations.of(context)!.featureBooleanOpsDesc
           },
           {
-            'title': 'Type Conversion',
-            'description': 'Converting between data types using toString_int()'
+            'title': AppLocalizations.of(context)!.featureTypeConversionTitle,
+            'description': AppLocalizations.of(context)!.featureTypeConversionDesc
           },
           {
-            'title': 'Multiple Functions',
-            'description': 'Code organization with helper functions'
+            'title': AppLocalizations.of(context)!.featureMultipleFunctionsTitle,
+            'description': AppLocalizations.of(context)!.featureMultipleFunctionsDesc
           },
         ];
-      case 'Modules':
+      case 'Modules' || 'Модули':
         features = [
           {
-            'title': 'Module Declaration',
-            'description': 'Using "use" keyword to import modules'
+            'title': AppLocalizations.of(context)!.featureModuleDeclTitle,
+            'description': AppLocalizations.of(context)!.featureModuleDeclDesc
           },
           {
-            'title': 'Final Variables',
-            'description': 'Using "final" for constant values'
+            'title': AppLocalizations.of(context)!.featureFinalVarsTitle,
+            'description': AppLocalizations.of(context)!.featureFinalVarsDesc
           },
           {
-            'title': 'Module Testing',
-            'description': 'Testing module functions in a separate file'
+            'title': AppLocalizations.of(context)!.featureModuleTestingTitle,
+            'description': AppLocalizations.of(context)!.featureModuleTestingDesc
           },
           {
-            'title': 'Entry Point Declaration',
-            'description': '@entry annotation marks the program\'s entry point'
+            'title': AppLocalizations.of(context)!.featureEntryPointTitle,
+            'description': AppLocalizations.of(context)!.featureEntryPointDesc
           },
         ];
         break;
@@ -2040,8 +2135,8 @@ Widget _navBarItem(String title, {bool isActive = false}) {
       secondPart = 'щества';
       break;
     case 'Блог':
-      firstPart = 'БЛО';
-      secondPart = 'г';
+      firstPart = 'БЛОГ';
+      secondPart = '';
       break;
     default:
       firstPart = title;
@@ -2120,7 +2215,7 @@ Widget _getConsoleOutput(CodeExample? example) {
   if (example == null) return Text('No example selected', style: TextStyle(color: Colors.red));
   
   switch (example.name) {
-    case 'Fibonacci':
+    case 'Fibonacci' || 'Фибоначчи':
       return Text(
         '2971215073',
         style: TextStyle(
@@ -2128,7 +2223,7 @@ Widget _getConsoleOutput(CodeExample? example) {
           fontFamily: 'Fira Code',
         ),
       );
-    case 'Hello World':
+    case 'Hello World' || 'Привет, мир':
       return Text(
         'Hello World!!!',
         style: TextStyle(
@@ -2136,7 +2231,7 @@ Widget _getConsoleOutput(CodeExample? example) {
           fontFamily: 'Fira Code',
         ),
       );
-    case 'Sort':
+    case 'Sort' || 'Сортировка':
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2157,7 +2252,7 @@ Widget _getConsoleOutput(CodeExample? example) {
           ),
         ],
       );
-    case 'General Code':
+    case 'General Code' || 'Общий код':
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2178,7 +2273,7 @@ Widget _getConsoleOutput(CodeExample? example) {
           ),
         ],
       );
-    case 'Modules':
+    case 'Modules' || 'Модули':
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2221,16 +2316,16 @@ Widget _getConsoleOutput(CodeExample? example) {
     if (example == null) return '0';
     
     switch (example.name) {
-      case 'Fibonacci':
+      case 'Fibonacci' || 'Фибоначчи':
         return '6572';
-      case 'Hello World':
+      case 'Hello World' || 'Привет, мир':
         return '0.73';
-      case 'Sort':
+      case 'Sort' || 'Сортировка':
         return '0.45';
-      case 'General Code':
+      case 'General Code' || 'Общий код':
         return '0.83';
-      case 'Modules':
-        return '0.63';
+      case 'Modules' || 'Модули':
+        return '0.78';
       default:
         return '1.23';
     }
