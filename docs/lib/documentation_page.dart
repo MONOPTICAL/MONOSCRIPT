@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:syntax_highlight/syntax_highlight.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'overview.dart';
 import 'dart:js' as js;
 
@@ -112,7 +113,6 @@ class _DocumentationPageState extends State<DocumentationPage> {
             _headerSection(),
             _searchSection(),
             _mainDocsGridSection(),
-            _recentDocsSection(),
             _versionsSection(),
             _footer(),
           ],
@@ -161,10 +161,12 @@ class _DocumentationPageState extends State<DocumentationPage> {
           ),
           SizedBox(width: 40),
           Container(
-            width: MediaQuery.of(context).size.width * 0.2,
-            child: Image(
-              image: AssetImage('images/documentation_icon.png'),
-              fit: BoxFit.contain,
+            width: MediaQuery.of(context).size.width * 0.2, // Можно удалить или настроить, если иконка слишком мала/велика
+            alignment: Alignment.center, // Для центрирования иконки, если она меньше контейнера
+            child: Icon(
+              Icons.description, // Или Icons.article, Icons.menu_book и т.д.
+              size: 100, // Настройте размер иконки по желанию
+              color: Colors.white, // Настройте цвет иконки
             ),
           ),
         ],
@@ -355,54 +357,6 @@ Widget _mainDocsGridSection() {
 |   return 0""",
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _recentDocsSection() {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 80, vertical: 24),
-      decoration: BoxDecoration(
-        color: Color(0xFF0D1117).withOpacity(0.5),
-        border: Border(
-          top: BorderSide(color: Color(0xFF30363D), width: 1),
-          bottom: BorderSide(color: Color(0xFF30363D), width: 1),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.history, color: Colors.white),
-              SizedBox(width: 12),
-              Text(
-                'Недавно просмотренные',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              Spacer(),
-              TextButton(
-                onPressed: () {},
-                child: Text(
-                  'Очистить историю',
-                  style: TextStyle(color: Colors.white70),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 16),
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: _recentDocs
-                .map((doc) => _recentDocItem(doc))
-                .toList(),
           ),
         ],
       ),
@@ -758,34 +712,6 @@ Widget _docCard(String title, String description, IconData icon, Color color, {S
                   ),
                 ),
               ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _recentDocItem(String title) {
-    return InkWell(
-      onTap: () {},
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Color(0xFF1A2231),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Color(0xFF30363D), width: 1),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.description, color: Colors.white70, size: 16),
-            SizedBox(width: 8),
-            Text(
-              title,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-              ),
             ),
           ],
         ),
