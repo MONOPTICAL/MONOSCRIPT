@@ -1,6 +1,7 @@
 #include "../headers/CodeGenHandlers.h"
 #include "../headers/ASTVisitors.h"
 #include "../headers/TOMLstd.h"
+#include "../../loader/headers/loader.h"
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/BasicBlock.h>
@@ -13,11 +14,13 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
     left = TypeConversions::loadValueIfPointer(context, left, "left");
     right = TypeConversions::loadValueIfPointer(context, right, "right");
 
+#if DEBUG
     std::cerr << "Left operand type: ";
     left->getType()->print(llvm::errs());
     std::cerr << "\nRight operand type: ";
     right->getType()->print(llvm::errs());
     std::cerr << "\nOperation: " << node.op << "\n";
+#endif
 
     // Приведение типов
     if (node.left->implicitCastTo) {
@@ -157,9 +160,15 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
         }
     } 
     else if (node.op == "scat") {
+        std::string TOML_path = loader::findTomlPath();
+        if (TOML_path.empty()) {
+            std::cerr << "Warning: Не удалось найти путь к TOML-файлу" << std::endl;
+            return nullptr;
+        }
+
         // Конкатенация строк через вызов функции из стандартной библиотеки
         llvm::Function* concatFunc = declareFunctionFromTOML("scat", context.TheModule.get(), 
-                                                         context.TheContext, STDLIB_TOML_PATH);
+                                                         context.TheContext, TOML_path);
         if (!concatFunc) {
             std::cerr << "Warning: Функция scat не найдена в стандартной библиотеке" << std::endl;
             return nullptr;
@@ -281,7 +290,10 @@ llvm::Value* Expressions::handleUnaryOperation(CodeGenContext& context, UnaryOpN
             return nullptr;
         }
     }
-    
+
+#if DEBUG
     std::cerr << "Warning: Неизвестная унарная операция: " << node.op << std::endl;
+#endif
+
     return nullptr;
 }

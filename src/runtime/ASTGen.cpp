@@ -1,5 +1,6 @@
 #include "headers/ASTVisitors.h"
 #include "headers/CodeGenHandlers.h"
+#include "../loader/headers/loader.h"
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/BasicBlock.h>
@@ -47,7 +48,9 @@ void ASTGen::visit(ProgramNode& node) {
             // Результат последнего узла становится результатом программы
         }
     }
+#if DEBUG
     context.TheModule->print(llvm::outs(), nullptr);
+#endif
 }
 
 void ASTGen::visit(FunctionNode& node) {
@@ -102,14 +105,13 @@ void ASTGen::visit(FunctionNode& node) {
         node.body->accept(*this);
     }
 
-    if (currentBlock) {
-        context.Builder.SetInsertPoint(currentBlock);
-    }
-
     // Добавляем return, если его нет
     llvm::BasicBlock* currentInsertionBlock = context.Builder.GetInsertBlock();
+    LogWarning("Текущий блок не имеет терминирующей инструкции: " + currentInsertionBlock->getName().str());
     if (!entryBlock->getTerminator()) { // Если текущий блок - это entryBlock
+#if DEBUG
         context.TheModule->print(llvm::outs(), nullptr);
+#endif
         if (isMain) {
             // main всегда возвращает 0, если пользователь не указал return
             context.Builder.CreateRet(llvm::ConstantInt::get(returnLLVMType, 0));
@@ -151,8 +153,6 @@ void ASTGen::visit(BlockNode& node) {
     // Сохраняем точку вставки до генерации блока
     llvm::BasicBlock* prevBlock = context.Builder.GetInsertBlock();
 
-    llvm::BasicBlock* ifcont = nullptr;
-
     bool isInEntryBlock = (prevBlock && prevBlock->getName() == "entry");
 
     for (auto& stmt : node.statements) {
@@ -166,9 +166,10 @@ void ASTGen::visit(BlockNode& node) {
         }
         if (dynamic_cast<IfNode*>(stmt.get()) && prevBlock) {
             prevBlock = context.Builder.GetInsertBlock();
-            if(prevBlock->getName().str() == "ifcont") {
-                ifcont = prevBlock;
-            }
+            context.Builder.SetInsertPoint(prevBlock);
+        }
+        if (dynamic_cast<WhileNode*>(stmt.get()) && prevBlock) {
+            prevBlock = context.Builder.GetInsertBlock();
             context.Builder.SetInsertPoint(prevBlock);
         }
     }
@@ -193,7 +194,9 @@ void ASTGen::visit(VariableAssignNode& node) {
     // Получаем тип переменной
     llvm::Type* varType;
 
+#if DEBUG
     std::cerr << "Имя " << node.name << std::endl;
+#endif
 
     if (node.inferredType) 
         varType = context.getLLVMType(node.inferredType, context.TheContext);
@@ -202,7 +205,9 @@ void ASTGen::visit(VariableAssignNode& node) {
     else 
         LogWarning("Не удалось получить тип для переменной " + node.name);
     
+#if DEBUG
     std::cerr << "Тип переменной " << node.name << " : " << node.type->toString() << std::endl;
+#endif
 
     LogWarning("Тип переменной поставлен");
     if (!varType) {
@@ -222,7 +227,9 @@ void ASTGen::visit(VariableAssignNode& node) {
     // Проверяем является ли выражение структурой данных (array или map)
     std::shared_ptr<BlockNode> blockExpr = std::dynamic_pointer_cast<BlockNode>(node.expression);
     if (blockExpr) {
+#if DEBUG
         std::cerr << "Обнаружено выражение блока для переменной " << node.name << std::endl;
+#endif
         result = Arrays::handleArrayInitialization(context, node, varType, blockExpr);
         return;
     }
@@ -368,7 +375,14 @@ void ASTGen::visit(CallNode& node) {
 
     // Если не нашли пробуем объявить через TOML
     if (!calleeFunc) {
-        calleeFunc = declareFunctionFromTOML(node.callee, context.TheModule.get(), context.TheContext, STDLIB_TOML_PATH);
+        std::string TOML_path = loader::findTomlPath();
+        if (TOML_path.empty()) {
+            LogWarning("Не удалось найти TOML файл для функции " + node.callee);
+            result = nullptr;
+            return;
+        }
+        
+        calleeFunc = declareFunctionFromTOML(node.callee, context.TheModule.get(), context.TheContext, TOML_path);
     }
 
     if (!calleeFunc) {
