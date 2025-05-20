@@ -3,9 +3,11 @@
 
 #include "../../parser/headers/AST.h"
 #include "../../errors/headers/ErrorEngine.h"
+#include "../../loader/headers/loader.h"
 #include "../../includes/icecream.hpp"
 #include "Register.h"
 #include "BuiltIn.h"
+#include <fstream>
 
 struct Context {
     std::vector<std::string> labels;
@@ -130,8 +132,15 @@ public:
                                                                         // Инициализация встроенных типов
                                                                         registerBuiltInTypes(registry);
 
+                                                                        // Поиск файла TOML
+                                                                        std::string TOML_path = loader::findTomlPath();
+                                                                        if (TOML_path.empty()) {
+                                                                            std::cerr << "Warning: Не удалось найти путь к TOML-файлу" << std::endl;
+                                                                            exit(1);
+                                                                        }
+
                                                                         // Инициализация встроенных функций
-                                                                        registerBuiltInFunctions(registry, STDLIB_TOML_PATH);
+                                                                        registerBuiltInFunctions(registry, TOML_path);
                                                                     };
 
     void                                                            debugContexts();

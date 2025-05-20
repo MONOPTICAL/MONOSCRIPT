@@ -1,6 +1,7 @@
 #include "headers/runner.h"
 #include "../runtime/headers/CodeGenContext.h"
 #include "../runtime/headers/ASTVisitors.h"
+#include "../loader/headers/loader.h"
 #include <llvm/Support/FileSystem.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/Support/TargetSelect.h>
@@ -39,7 +40,14 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath, const s
         return false;
     }
 
-    std::string stdlibPath = STDLIB_SO_PATH;
+    std::string stdlibPath = loader::findLibraryPath();
+    if (stdlibPath.empty()) {
+        std::cerr << "Не удалось найти стандартную библиотеку" << std::endl;
+        return false;
+    }
+
+    std::cout << "Стандартная библиотека: " << stdlibPath << std::endl;
+
     std::string stdlibDir = "";
     size_t lastSlash = stdlibPath.find_last_of('/');
     if (lastSlash != std::string::npos) {
