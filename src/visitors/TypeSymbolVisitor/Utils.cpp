@@ -173,7 +173,7 @@ void TypeSymbolVisitor::castAllNumbersToType(const std::shared_ptr<ASTNode>& nod
         std::string fromType = num->inferredType ? num->inferredType->toString() : (num->type ? num->type->toString() : "");
         if (fromType != targetType) {
             num->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
-            IC(fromType, targetType, num->implicitCastTo->toString());
+            //IC(fromType, targetType, num->implicitCastTo->toString());
         }
         return;
     }

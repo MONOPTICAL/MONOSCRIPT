@@ -2,6 +2,7 @@
 #include "../runtime/headers/CodeGenContext.h"
 #include "../runtime/headers/ASTVisitors.h"
 #include "../includes/ASTDebugger.hpp"
+#include "../loader/headers/loader.h"
 #include <llvm/IR/Module.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/IRReader/IRReader.h>
@@ -29,9 +30,17 @@ int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimi
     llvm::ExitOnError ExitOnErr;
     ExitOnErr.setBanner("Error JIT: ");
 
-    void* handle = dlopen(STDLIB_SO_PATH, RTLD_NOW | RTLD_GLOBAL);
+    void* handle = nullptr;
+    std::string lib_path_primary_attempt = loader::findLibraryPath();
+    
+    if (!lib_path_primary_attempt.empty() && lib_path_primary_attempt != "libm_std.so") 
+        handle = dlopen(lib_path_primary_attempt.c_str(), RTLD_NOW | RTLD_GLOBAL);
+    
+    if (!handle) handle = dlopen("libm_std.so", RTLD_NOW | RTLD_GLOBAL);
+    
+    
     if (!handle) {
-        std::cerr << "Error loading libm_std.so: " << dlerror() << std::endl;
+        std::cerr << "Error loading standard library (libm_std.so): " << dlerror() << std::endl;
         return 1;
     }
 
