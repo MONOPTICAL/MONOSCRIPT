@@ -22,7 +22,6 @@ llvm::Value* TypeConversions::loadValueIfPointer(CodeGenContext& context, llvm::
 
     if (llvm::AllocaInst* allocaInst = llvm::dyn_cast<llvm::AllocaInst>(value)) {
         llvm::Type* loadedType = allocaInst->getAllocatedType();
-        std::cerr << "Hello from AllocaInst" << std::endl;
         if (loadedType->isArrayTy() && loadedType->getArrayElementType()->isIntegerTy(8)) {
             
             llvm::Value* zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(context.TheContext), 0);
@@ -37,23 +36,22 @@ llvm::Value* TypeConversions::loadValueIfPointer(CodeGenContext& context, llvm::
         return context.Builder.CreateLoad(loadedType, value, loadName);
     } 
     else if (llvm::GlobalVariable* globalVar = llvm::dyn_cast<llvm::GlobalVariable>(value)) {
-        std::cerr << "Hello from GlobalVariable" << std::endl;
         llvm::Type* valueType = globalVar->getValueType();
         // Специальная обработка для строк (массив i8)
         if (valueType->isArrayTy() && valueType->getArrayElementType()->isIntegerTy(8)) {
-            std::cerr << "Hello from GlobalVariable with array" << std::endl;
             llvm::Value* zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(context.TheContext), 0);
             auto* gep = context.Builder.CreateInBoundsGEP(
                 valueType, 
                 globalVar, 
                 {zero, zero}, 
                 name + "_gep");
+#if DEBUG
             llvm::errs() << "GEP создан: ";
             gep->print(llvm::errs());
             llvm::errs() << "\n";
+#endif
             return gep;
         }
-        std::cerr << "Hello from GlobalVariable" << std::endl;
         return context.Builder.CreateLoad(valueType, value, loadName);
     }
  
@@ -67,8 +65,10 @@ llvm::Value* TypeConversions::convertValueToType(CodeGenContext& context, llvm::
 
     std::string castName = name.empty() ? "cast" : name;
 
+#if DEBUG
     std::cerr << "Warning: Применение convertValueToType к " << value->getName().str() << std::endl;
-    
+#endif
+
     // Целое в плавающую точку
     if (value->getType()->isIntegerTy() && targetType->isFloatingPointTy()) {
         return context.Builder.CreateSIToFP(value, targetType, castName + "_int2fp");
@@ -93,8 +93,6 @@ llvm::Value* TypeConversions::convertValueToType(CodeGenContext& context, llvm::
         return context.Builder.CreateBitCast(value, targetType, castName + "_ptr2ptr");
     }
     
-    // Если не удалось преобразовать
-    std::cerr << "Warning: Невозможно преобразовать тип в целевой" << std::endl;
     return value;
 }
 
