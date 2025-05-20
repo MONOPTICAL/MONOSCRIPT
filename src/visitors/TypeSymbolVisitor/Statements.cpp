@@ -581,12 +581,15 @@ void TypeSymbolVisitor::visit(CallNode& node) {
                 if(auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.arguments[i]))
                 {
                     castNumbersInBinaryTree(node.arguments[i], paramType);
+                    std::cout << "Casting " << argType << " to " << paramType << std::endl;
                 }
                 else
                     node.arguments[i]->implicitCastTo = func->parameters[i].first;
             }
             else
                 LogError("Function " + node.callee + " expects argument of type " + paramType + ", got " + argType, node.arguments[i]);
+        else // Вроде работает, проверь эту хуйню
+            castAndValidate(node.arguments[i], paramType, this);
     }
 
     node.inferredType = func->returnType; // Устанавливаем тип функции
