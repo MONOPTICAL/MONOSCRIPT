@@ -5,6 +5,11 @@ extern(C) int sum(const int a, const int b) nothrow @nogc
     return a + b;
 }
 
+extern(C) int multiply(const int a, const int b) nothrow @nogc
+{
+    return a * b;
+}
+
 extern(C) void echo(const char* str) nothrow
 {
     import core.stdc.stdio : printf;

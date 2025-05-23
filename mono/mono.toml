@@ -4,6 +4,11 @@ ret = "i32"
 args = ["i32","i32"]
 
 [[function]]
+name = "multiply"
+ret = "i32"
+args = ["i32", "i32"]
+
+[[function]]
 name = "scat"
 ret = "string"
 args = ["string", "string"]
