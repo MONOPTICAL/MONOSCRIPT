@@ -9,6 +9,16 @@ ret = "i32"
 args = ["i32", "i32"]
 
 [[function]]
+name = "subtract"
+ret = "i32"
+args = ["i32", "i32"]
+
+[[function]]
+name = "divide"
+ret = "i32"
+args = ["i32", "i32"]
+
+[[function]]
 name = "scat"
 ret = "string"
 args = ["string", "string"]
