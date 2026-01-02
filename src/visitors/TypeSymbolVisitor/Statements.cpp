@@ -22,11 +22,40 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
 
     if(!node.associated.empty())
     {
-        if(registry.findStruct(node.associated) == nullptr) 
+        auto st = registry.findStruct(node.associated);
+        if(st == nullptr)
             LogError("Struct not found: " + node.associated);
 
         if(contexts.size() != 1)
             LogError("Function " + node.name + " cannot be defined in a non-global context");
+
+        // Есть ли в структуре метод с таким же именем(Надо потом сделать более подробную проверку)
+        const auto structHasMethodNamed = [](const std::shared_ptr<StructNode>& s,
+                                             const std::string& methodName) -> bool
+        {
+            if (!s || !s->body) return false;
+
+            for (const auto& stmt : std::dynamic_pointer_cast<BlockNode>(s->body)->statements)
+            {
+                auto fn = std::dynamic_pointer_cast<FunctionNode>(stmt);
+                if(fn)
+                {
+                    IC(fn->name);
+                    IC(fn->labels);
+                    IC(methodName);
+                }
+                if (fn && fn->name == methodName && fn->labels.end() != std::find(fn->labels.begin(), fn->labels.end(), "@decl"))
+                    return true;
+                
+            }
+            IC(methodName);
+            return false;
+        };
+
+        if(!structHasMethodNamed(st, node.name))
+            LogError("Method not declared or already implemented in struct '" + node.associated + "': " + node.associated + "::" + node.name);
+        
+        node.associated = st->name; // Нормализуем имя структуры
     }
 
     std::vector<std::string> labels = contexts.back().labels;
@@ -35,6 +64,9 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
     /*
     Пока что не проверяем, что функция является методом структуры
     */
+    if(registry.findStruct(contexts.back().currentFunctionName)) {
+        node.associated = contexts.back().currentFunctionName;
+    }
    
     std::unordered_map<std::string, std::shared_ptr<TypeNode>> args = {};
 
@@ -113,6 +145,17 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
 
     currentFunction.functions[node.name] = node.shared_from_this(); // Добавляем функцию в текущий контекст
     
+    const bool noDecl =
+        std::find(labels.begin(), labels.end(), "@decl") != labels.end();
+
+    if (noDecl)
+    {
+        node.inferredType = node.returnType;
+        IC(contexts.back().currentFunctionName);
+        IC();
+        return;
+    }
+
     // Добавляем функцию в реестр
     contexts.push_back(currentFunction);
 

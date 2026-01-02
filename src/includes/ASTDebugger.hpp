@@ -28,6 +28,15 @@ class ASTDebugger
                     std::cout << "\n";
                 }
 
+                if (func->associated.empty())
+                {
+                    printIndent(indent + 2); std::cout << "[Global Function]\n";
+                }
+                else 
+                {
+                    printIndent(indent + 2); std::cout << "[Method of " << func->associated << "]\n";
+                }
+
                 for (const auto& param : func->parameters) {
                     printIndent(indent + 2); std::cout << "Param: " << param.second << " "; 
                     debug(param.first, 1);
