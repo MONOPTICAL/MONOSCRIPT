@@ -343,7 +343,8 @@ TokenType Lexer::IsKeyword(const std::string &value) const
         "@entry",
         "@public",
         "@private",
-        "@test"
+        "@test",
+        "@decl"
     };
 
     std::string trimmedValue = ParsingFunctions::trim(value);

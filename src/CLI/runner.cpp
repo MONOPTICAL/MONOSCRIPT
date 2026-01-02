@@ -19,8 +19,6 @@
 
 #include <llvm/IR/PassManager.h>
 #include <llvm/Passes/PassBuilder.h>
-#include <llvm/Passes/PassPlugin.h>
-#include <llvm/IR/LegacyPassManager.h>
 
 int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimization) {
     llvm::InitializeNativeTarget();

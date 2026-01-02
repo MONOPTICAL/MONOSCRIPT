@@ -104,25 +104,38 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
         }
         
         int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока if
-        nextLine(); // Переходим к следующему токену
+        
+        const bool noDecl = // Проверяем наличие метки @decl
+            std::find(labels.begin(), labels.end(), "@decl") != labels.end();
 
-        std::shared_ptr<BlockNode> body = nullptr; // Создаём указатель на тело функции
+        std::shared_ptr<BlockNode> body = nullptr; 
+        // Если не помечено как @decl, тело не парсим
+        if (!noDecl)
+        {
+            const int declIndent = getIndentLevel(lines[lineIndex]);
+            const int expectedIndent = declIndent + 1;
 
-        if (getIndentLevel(lines[lineIndex]) == expectedIndent-1)
+            nextLine();
+
+            if (isEndOfFile())
+                throwError("Expected indentation after function declaration");
+
+            if (getIndentLevel(lines[lineIndex]) == expectedIndent)
+            {
+                body = parseBlock(expectedIndent);
+                lineIndex--; 
+            }
+            else
+            {
+                throwError("Expected indentation after function declaration");
+            }
+        }
+        else
         {
             body = std::make_shared<BlockNode>(); // Создаём тело функции
             body->line = lineIndex; body->column = tokenIndex; // Устанавливаем строку и колонку для узла
         }
-        else if (getIndentLevel(lines[lineIndex]) == expectedIndent)
-        {
-            body = parseBlock(expectedIndent); // Парсим тело функции
-        }
-        else
-        {
-            throwError("Expected indentation after function declaration");
-        }
 
-        lineIndex--; // Без этого он скипает 2 линии а не одну
 
         auto func = std::make_shared<FunctionNode>(functionName, association, returnType, parameters, labels, body); // Создаём узел функции
         func->line = line; func->column = token; // Устанавливаем строку и колонку для узла
