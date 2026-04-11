@@ -113,5 +113,5 @@ endif()
 
 target_link_libraries(ms PRIVATE ${llvm_libs})
 
-# Билд с дебагом : cmake -B build -DCMAKE_BUILD_TYPE=Debug
+# Билд с дебагом : cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build
 # Билд без дебага : cmake -B build -DCMAKE_BUILD_TYPE=Release
