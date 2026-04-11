@@ -617,17 +617,24 @@ void Parser::parseDotNotation(std::shared_ptr<AccessExpression> next)
     {
         throwError("Expected Identifier or Type after dot notation");
     }
-    
-    next->memberName = current().value;
 
+    next->baseName = current().value; // Сохраняем имя текущего члена
     if(peek().type == TokenType::LeftParen)
     {
         next->expression = parseCall();
     }
     else 
-        advance();
-    
-    next->notation = ".";
+        next->expression = std::make_shared<IdentifierNode>(current().value); // Изначально выражение - это идентификатор
+        if(!check(TokenType::LeftBracket)) advance();
+
+    if(check(TokenType::Dot))
+    {
+        next->notation = "."; // Устанавливаем нотацию для текущего узла
+    }
+    else if(check(TokenType::LeftBracket))
+    {
+        next->notation = "[]"; // Устанавливаем нотацию для текущего узла
+    }
 }
 
 void Parser::parseArrayNotation(std::shared_ptr<AccessExpression> next)
@@ -641,7 +648,6 @@ void Parser::parseArrayNotation(std::shared_ptr<AccessExpression> next)
     }
     
     next->expression = parseExpression();
-    next->notation = "[]";
     
     consume(TokenType::RightBracket, "Expected ']' after array notation");
 }
@@ -657,32 +663,37 @@ std::shared_ptr<ASTNode> Parser::parseMemberExpression()
         throwError("Expected type or identifier in member expression");
     }
     
-    root->memberName = current().value;
+    root->baseName= current().value;
+    root->expression = std::make_shared<IdentifierNode>(root->baseName); // Изначально выражение - это идентификатор
     advance();
     
     while (check(TokenType::Dot) || check(TokenType::LeftBracket) || 
-           (check(TokenType::LeftParen) && currentNode->memberName.size() > 0))
+           (check(TokenType::LeftParen) && currentNode->baseName.size() > 0))
     {
         auto next = std::make_shared<AccessExpression>();
         next->line = lineIndex; next->column = tokenIndex; // Устанавливаем строку и колонку для узла
-        next->memberName = currentNode->memberName;
         
         if (check(TokenType::Dot))
         {
             parseDotNotation(next);
+            if (root->notation.empty()) root->notation = "."; // Устанавливаем нотацию для корневого узла
         }
         else if (check(TokenType::LeftBracket))
         {
             parseArrayNotation(next);
+            if (root->notation.empty()) root->notation = "[]"; // Устанавливаем нотацию для корневого узла
         }
         else if (check(TokenType::LeftParen))
         {
             next->expression = parseCall();
-            next->notation = ".";
+            next->baseName = std::dynamic_pointer_cast<CallNode>(next->expression)->callee; // Получаем имя функции из узла вызова
+            root->notation = ".";
         }
         
+        if (currentNode->memberName.empty()) currentNode->memberName = next->baseName;
         currentNode->nextAccess = next;
         currentNode = next;
+
     }
     
     if (root->nextAccess == nullptr && !root->expression)
