@@ -257,12 +257,8 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
     {
         node.expression->accept(*this);
         auto expressionType = node.expression->inferredType->toString();
-        
-        if (isStrict)
-        {
-            
-        } 
-        else if (expressionType != "none" && expressionType != "string")
+
+        if (!isStrict && expressionType != "none" && expressionType != "string")
         {        
             castNumbersInBinaryTree(node.expression, isAuto ? "auto" : varType);
             if (varType != "i1" && varType != "auto")

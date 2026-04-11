@@ -425,6 +425,7 @@ class AccessExpression : public ASTNode {
         AccessExpression() = default;
         AccessExpression(std::string memberName, std::shared_ptr<ASTNode> expression)
             :   memberName(memberName), expression(expression) {};
+        std::string baseName;
         std::string memberName;
         std::string notation;
         std::shared_ptr<ASTNode> expression;
