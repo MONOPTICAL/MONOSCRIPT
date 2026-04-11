@@ -124,11 +124,18 @@ class ASTDebugger
                 debug(bin->left, indent + 2);
                 debug(bin->right, indent + 2);
             }
-            else if (auto access = std::dynamic_pointer_cast<AccessExpression>(node)) {
-                printIndent(indent); std::cout << "[Access Notation]: " << access->notation << " Member: " << access->memberName << "\n";
-                if(access->expression)
-                    debug(access->expression, indent + 2);
+            else if (auto access = std::dynamic_pointer_cast<AccessExpression>(node)) {        
                 
+                if(access->expression)
+                {
+                    printIndent(indent+1); std::cout << "[Access Expression]: \n";
+                    debug(access->expression, indent + 2);
+                }
+                printIndent(indent); std::cout << " [Base Name]: " << access->baseName << "\n";
+                printIndent(indent); std::cout << " [Member Name]: " << access->memberName << "\n";
+                printIndent(indent); std::cout << " [Inferred Type]: " << (access->inferredType ? access->inferredType->toString() : "unknown") << "\n";
+                printIndent(indent); std::cout << " [Implicit Cast To]: " << (access->implicitCastTo ? access->implicitCastTo->toString() : "none") << "\n";
+                printIndent(indent); std::cout << " [Access Notation To Next]: " << access->notation << "\n";
                 if(access->nextAccess)
                 {
                     printIndent(indent+1); std::cout << "[Next Access]: \n";
