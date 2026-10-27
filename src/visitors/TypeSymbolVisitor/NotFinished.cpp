@@ -18,7 +18,7 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
             } else {
                 currentStructDef = registry.findStruct(idNode->name);
             }
-        } else {
+        } else { 
             node.expression->accept(*this);
             currentType = node.expression->inferredType;
         }

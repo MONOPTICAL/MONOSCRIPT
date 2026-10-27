@@ -218,7 +218,7 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
     ) {
         LogError("Type cannot be " + varType, node.shared_from_this());
     }
-
+    
     if (isAuto) {
         if (auto block = std::dynamic_pointer_cast<BlockNode>(node.expression)) {
             std::shared_ptr<TypeNode> inferredType = infer_collection_type_revised(block);
@@ -246,44 +246,54 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
             varType = node.type->toString(); // Обновляем varType после вывода
         }
     }
-
     if (varType.starts_with("array")
         || varType.starts_with("map")
     ) {
         ASTDebugger::debug(node.expression);
         validateCollectionElements(node.type, node.expression, isAuto);
+        
     }
     else
     {
+        IC(node.expression->inferredType);
         node.expression->accept(*this);
-        auto expressionType = node.expression->inferredType->toString();
+        auto exprType = node.expression->implicitCastTo ? node.expression->implicitCastTo
+                                                        : node.expression->inferredType;
 
-        if (!isStrict && expressionType != "none" && expressionType != "string")
-        {        
-            castNumbersInBinaryTree(node.expression, isAuto ? "auto" : varType);
-            if (varType != "i1" && varType != "auto")
-            {
-                if (auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.expression))
+        if (std::dynamic_pointer_cast<GenericTypeNode>(exprType)) {
+            if (isAuto)
+                node.type = exprType;
+            else if (exprType->toString() != varType)
+                LogError("Type mismatch: expected " + varType + ", got " + exprType->toString(), node.expression);
+        }
+        else {
+            if (!isStrict && exprType->toString() != "none" && exprType->toString() != "string")
+            {        
+                castNumbersInBinaryTree(node.expression, isAuto ? "auto" : varType);
+                if (varType != "i1" && varType != "auto")
                 {
-                    if ((binaryOp->op == "and" || binaryOp->op == "or" || binaryOp->op.rfind("icmp_", 0) == 0 || binaryOp->op.rfind("fcmp_", 0) == 0))
+                    if (auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.expression))
                     {
-                        LogError("Type mismatch: expected i1, got " + expressionType);
+                        if ((binaryOp->op == "and" || binaryOp->op == "or" || binaryOp->op.rfind("icmp_", 0) == 0 || binaryOp->op.rfind("fcmp_", 0) == 0))
+                        {
+                            LogError("Type mismatch: expected i1, got " + exprType->toString());
+                        }
                     }
                 }
             }
-        }
 
-        if (expressionType == "string" && varType != "string" && varType != "auto")
+            if (exprType->toString() == "string" && varType != "string" && varType != "auto")
             LogError("Type mismatch: expected " + varType + ", got string"); 
 
-        if (isAuto)
-            if(node.expression->implicitCastTo)
-                node.type = std::make_shared<SimpleTypeNode>(getType(node.expression, node.expression->implicitCastTo->toString()));
-            else
-                node.type = std::make_shared<SimpleTypeNode>(getType(node.expression, node.expression->inferredType->toString()));
-        else if(varType == "i1")
-            if(getType(node.expression, varType) != "i1")
-                LogError("Type mismatch: expected i1, got " + expressionType);
+            if (isAuto)
+                if(node.expression->implicitCastTo)
+                    node.type = std::make_shared<SimpleTypeNode>(getType(node.expression, node.expression->implicitCastTo->toString()));
+                else
+                    node.type = std::make_shared<SimpleTypeNode>(getType(node.expression, node.expression->inferredType->toString()));
+            else if(varType == "i1")
+                if(getType(node.expression, varType) != "i1")
+                    LogError("Type mismatch: expected i1, got " + getType(node.expression, varType));
+        }
     }
 
     // Добавляем переменную в реестр
