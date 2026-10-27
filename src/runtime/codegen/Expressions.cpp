@@ -119,7 +119,7 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
 
             // Код в trap-блоке
             context.Builder.SetInsertPoint(trapBlock);
-            llvm::Function* trapFunc = llvm::Intrinsic::getOrInsertDeclaration(
+            llvm::Function* trapFunc = llvm::Intrinsic::getDeclaration(
                 context.TheModule.get(), llvm::Intrinsic::trap
             );
             context.Builder.CreateCall(trapFunc);

@@ -113,5 +113,8 @@ endif()
 
 target_link_libraries(ms PRIVATE ${llvm_libs})
 
+if(UNIX AND NOT APPLE)
+    target_link_options(ms PRIVATE -Wl,--export-dynamic)
+endif()
 # Билд с дебагом : cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build
 # Билд без дебага : cmake -B build -DCMAKE_BUILD_TYPE=Release

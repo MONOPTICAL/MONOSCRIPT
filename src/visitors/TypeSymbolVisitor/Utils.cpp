@@ -48,11 +48,10 @@ std::shared_ptr<TypeNode> TypeSymbolVisitor::checkForIdentifier(std::shared_ptr<
         return varAssign->expression->inferredType;
     }
     else if (auto varAssignNode = std::dynamic_pointer_cast<VariableAssignNode>(node)) {
-        if (varAssignNode->expression == nullptr) {
+        if (varAssignNode->expression == nullptr
+            || std::dynamic_pointer_cast<BlockNode>(varAssignNode->expression)) {
             if (!varAssignNode->inferredType)
                 LogError("Variable '" + varAssignNode->name + "' has no inferred type", node);
-            if (varAssignNode->expression && varAssignNode->expression->implicitCastTo)
-                std::cout << varAssignNode->implicitCastTo->toString() << std::endl;
             return varAssignNode->inferredType;
         }
 
@@ -293,7 +292,7 @@ void TypeSymbolVisitor::findMaxRank(const std::shared_ptr<ASTNode>& node, int& m
     }
     if (auto call = std::dynamic_pointer_cast<CallNode>(node)) {
         if (!checkLabels("@strict"))
-        {
+        {   
             for (const auto& arg : call->arguments) 
                 findMaxRank(arg, maxRank);
         }
@@ -314,6 +313,9 @@ void TypeSymbolVisitor::findMaxRank(const std::shared_ptr<ASTNode>& node, int& m
                 maxRank = std::max(maxRank, getTypeRank(func->returnType->toString()));
             }
         }
+    }
+    if (auto accessExpression = std::dynamic_pointer_cast<AccessExpression>(node)) {
+        maxRank = std::max(maxRank, getTypeRank(accessExpression->inferredType->toString()));
     }
 }
 
