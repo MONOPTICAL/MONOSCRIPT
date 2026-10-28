@@ -94,6 +94,84 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
 }
 
 void TypeSymbolVisitor::visit(ReassignMemberNode& node) {
+    auto access = std::dynamic_pointer_cast<AccessExpression>(node.accessExpression);
+    if (!access)
+        LogError("Left side of member assignment is not an access expression", node.shared_from_this());
+
+    // Шоб не могли нихуя вставлять в результат вызова x.sum() = 1
+    auto last = access;
+    while (auto next = std::dynamic_pointer_cast<AccessExpression>(last->nextAccess))
+        last = next;
+    if (std::dynamic_pointer_cast<CallNode>(last->expression))
+        LogError("Cannot assign to the result of a function call", node.accessExpression);
+
+    // Шоб не меняли константы а то совсем ахуели
+    if (auto baseId = std::dynamic_pointer_cast<IdentifierNode>(access->expression)) {
+        auto it = contexts.back().variables.find(baseId->name);
+        if (it != contexts.back().variables.end())
+            if (auto var = std::dynamic_pointer_cast<VariableAssignNode>(it->second); var && var->isConst)
+                LogError("Cannot modify member of constant variable: " + baseId->name, node.shared_from_this());
+    }
+
+    access->accept(*this);
+    auto targetType = access->inferredType;
+    if (!targetType)
+        LogError("Could not resolve type of assignment target", node.accessExpression);
+    std::string targetTypeStr = targetType->toString();
+
+    if (std::dynamic_pointer_cast<BlockNode>(node.expression)) {
+        node.expression->accept(*this);
+        validateCollectionElements(targetType, node.expression, false);
+        node.inferredType = targetType;
+        return;
+    }
+
+    node.expression->accept(*this);
+    auto exprType = node.expression->implicitCastTo ? node.expression->implicitCastTo
+                                                    : node.expression->inferredType;
+    if (!exprType)
+        LogError("Cannot infer expression type", node.expression);
+    std::string exprTypeStr = exprType->toString();
+
+    bool targetNumeric = getTypeRank(targetTypeStr) > 0;
+    bool exprNumeric   = getTypeRank(exprTypeStr) > 0;
+
+    if (!targetNumeric || !exprNumeric) {
+        if (exprTypeStr != targetTypeStr)
+        {
+            IC("ZDES");
+            LogError("Type mismatch: expected " + targetTypeStr + ", got " + exprTypeStr, node.expression);
+        }
+        node.inferredType = targetType;
+        return;
+    }
+
+    // Проверка на i1 шоб хуйни не подсовывали 
+    auto isBoolExpr = [](const std::shared_ptr<ASTNode>& e) {
+        if (auto bin = std::dynamic_pointer_cast<NumberNode>(e))
+            return bin->inferredType && bin->inferredType->toString() == "i1";
+        return std::dynamic_pointer_cast<UnaryOpNode>(e) != nullptr;
+    };
+
+    IC(node.expression);
+    if (isBoolExpr(node.expression) != (targetTypeStr == "i1"))
+        LogError("Type mismatch: expected " + targetTypeStr + ", got " +
+                 (isBoolExpr(node.expression) ? std::string("i1") : exprTypeStr), node.expression);
+
+    if (checkLabels("@strict")) {
+        if (exprTypeStr != targetTypeStr)
+            LogError("Type mismatch in strict mode: expected " + targetTypeStr + ", got " + exprTypeStr, node.expression);
+    }
+    else if (!isBoolExpr(node.expression)) {
+        castAndValidate(node.expression, targetTypeStr, this);
+
+        auto after = node.expression->implicitCastTo ? node.expression->implicitCastTo
+                                                     : node.expression->inferredType;
+        if (after->toString() != targetTypeStr)
+            node.expression->implicitCastTo = targetType;
+    }
+
+    node.inferredType = targetType;
 }
 
 void TypeSymbolVisitor::visit(ImportNode &node)
