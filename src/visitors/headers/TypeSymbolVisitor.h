@@ -33,8 +33,14 @@ private:
 
     std::string                                                     currentModuleName;
 
-    // Все функции верхнего уровня, собранные до проверки тел
+    // Все функции верхнего уровня по внутреннему имени, собранные до проверки тел
     std::unordered_map<std::string, std::shared_ptr<ASTNode>>       declaredFunctions;
+
+    // Что видно каждому модулю: имя в коде -> функция. Свои функции плюс импортированные
+    std::unordered_map<std::string,
+        std::unordered_map<std::string, std::shared_ptr<FunctionNode>>> moduleScopes;
+
+    void                                                            collectDeclarations(ProgramNode& node);
 
     /*
     Проверяет, существует ли переменная в реестре(если переданный node является идентификатором)

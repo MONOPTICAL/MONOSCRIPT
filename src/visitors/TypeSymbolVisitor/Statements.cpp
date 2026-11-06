@@ -1,16 +1,89 @@
 #include "../headers/TypeSymbolVisitor.h"
 #include "../../includes/ASTDebugger.hpp"
 #include <string_view>
+#include <filesystem>
+
+static std::string moduleNameOf(const std::string& path) {
+    return std::filesystem::path(path).stem().string();
+}
+
+static bool hasLabel(const std::shared_ptr<FunctionNode>& function, const std::string& label) {
+    return std::find(function->labels.begin(), function->labels.end(), label) != function->labels.end();
+}
+
+void TypeSymbolVisitor::collectDeclarations(ProgramNode &node)
+{
+    using Scope = std::unordered_map<std::string, std::shared_ptr<FunctionNode>>;
+
+    const std::string mainModule = moduleNameOf(node.moduleName);
+    std::string module = mainModule;
+    std::unordered_map<std::string, Scope> ownFunctions;
+    std::vector<std::pair<std::string, std::shared_ptr<ImportNode>>> imports;
+
+    for (const auto& statement : node.body) {
+        if (auto mark = std::dynamic_pointer_cast<ModuleMark>(statement))
+            module = moduleNameOf(mark->moduleName);
+        else if (auto import = std::dynamic_pointer_cast<ImportNode>(statement))
+            imports.push_back({module, import});
+        else if (auto function = std::dynamic_pointer_cast<FunctionNode>(statement); function && function->associated.empty()) {
+            ownFunctions[module].emplace(function->name, function);
+
+            // Внутреннее имя, чтобы одинаковые функции разных модулей не мешали друг другу
+            if (module != mainModule)
+                function->name = module + "::" + function->name;
+            declaredFunctions.emplace(function->name, function);
+        }
+    }
+
+    moduleScopes = ownFunctions;
+
+    for (const auto& [importer, import] : imports) {
+        this->currentModuleName = importer;
+        Scope& scope = moduleScopes[importer];
+
+        const auto addImport = [&](const std::string& name, const std::shared_ptr<FunctionNode>& function) {
+            auto existing = scope.find(name);
+            if (existing == scope.end()) {
+                scope[name] = function;
+                return;
+            }
+            if (existing->second == function) return;
+
+            auto own = ownFunctions[importer].find(name);
+            if (own != ownFunctions[importer].end() && hasLabel(own->second, "@overwrite")) return;
+
+            LogError("Imported function '" + name + "' conflicts with another function, import it with an alias or mark your function with @overwrite");
+        };
+
+        for (const auto& [path, alias] : import->paths) {
+            auto source = ownFunctions.find(path[0]);
+            if (source == ownFunctions.end()) continue;
+
+            if (path.size() > 1) {
+                auto symbol = source->second.find(path[1]);
+                if (symbol == source->second.end()) continue; // Не функция: переменная или структура
+
+                if (hasLabel(symbol->second, "@private"))
+                    LogError("Function '" + path[1] + "' is private in module '" + path[0] + "'");
+
+                addImport(alias.empty() ? path[1] : alias, symbol->second);
+            }
+            else {
+                for (const auto& [name, function] : source->second) {
+                    if (!hasLabel(function, "@private"))
+                        addImport(name, function);
+                }
+            }
+        }
+    }
+}
 
 void TypeSymbolVisitor::visit(ProgramNode &node)
 {
     this->program = std::make_shared<ProgramNode>(node);
 
     // Сначала собираем объявления, чтобы функцию можно было вызвать выше её определения
-    for (const auto& statement : node.body) {
-        if (auto function = std::dynamic_pointer_cast<FunctionNode>(statement); function && function->associated.empty())
-            declaredFunctions.emplace(function->name, function);
-    }
+    collectDeclarations(node);
 
     for (const auto& statement : node.body) {
         statement->accept(*this);
@@ -587,6 +660,14 @@ void TypeSymbolVisitor::visit(CallNode& node) {
             argTypes.push_back(node.arguments[i]->implicitCastTo);
         else
             argTypes.push_back(node.arguments[i]->inferredType);
+    }
+
+    // Имя в коде превращаем во внутреннее имя функции: свои и импортированные функции, алиасы
+    auto scope = moduleScopes.find(moduleNameOf(currentModuleName));
+    if (scope != moduleScopes.end()) {
+        auto visible = scope->second.find(node.callee);
+        if (visible != scope->second.end())
+            node.callee = visible->second->name;
     }
 
     // Проверяем, существует ли функция в реестре
