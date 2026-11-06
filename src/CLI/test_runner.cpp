@@ -8,6 +8,8 @@
 //   // expect-error: текст         в выводе должен быть этот текст
 //   // expect-error: 9: текст      ошибка на строке 9 (текст необязателен)
 //   // expect-parse: (- (- 10 3) 2) в разборе должно быть это S-выражение, семантика не запускается
+//   // expect-output: текст        программа при запуске печатает эту строку, директив может быть несколько,
+//                                  строки проверяются по порядку; без LLVM такой тест пропускается
 //   // expect-quiet                на успехе компилятор ничего не печатает
 //   // xfail: причина              известный баг: падение не ломает прогон
 //
@@ -140,7 +142,7 @@ int checkMain(int argc, char* argv[])
 
 #if defined(_WIN32) || defined(_WIN64)
 
-int runFrontendTests(const std::vector<std::string>&, const std::string&, bool, const std::string&)
+int runFrontendTests(const std::vector<std::string>&, const std::vector<std::string>&, const std::string&, bool, const std::string&)
 {
     std::cerr << "Error: tests are not supported on Windows yet." << std::endl;
     return 1;
@@ -151,10 +153,11 @@ int runFrontendTests(const std::vector<std::string>&, const std::string&, bool, 
 struct TestCase
 {
     fs::path path;
-    std::string expect;                   // ok, no-crash, error или parse
+    std::string expect;                   // ok, no-crash, error, parse или run
     int errorLine = 0;
     std::string errorText;
     std::vector<std::string> parseChecks;
+    std::vector<std::string> outputChecks;
     bool quiet = false;
     std::string xfail;
 };
@@ -229,6 +232,11 @@ static bool loadTest(const fs::path& path, TestCase& test)
             test.expect = "parse";
             test.parseChecks.push_back(trim(line.substr(17)));
         }
+        else if (startsWith(line, "// expect-output: "))
+        {
+            test.expect = "run";
+            test.outputChecks.push_back(trim(line.substr(18)));
+        }
         else if (line == "// expect-quiet")
             test.quiet = true;
         else if (startsWith(line, "// xfail: "))
@@ -237,11 +245,11 @@ static bool loadTest(const fs::path& path, TestCase& test)
     return !test.expect.empty();
 }
 
-static RunResult runCheck(const std::vector<std::string>& checkCommand, const TestCase& test)
+static RunResult runCheck(const std::vector<std::string>& command_, const TestCase& test)
 {
     // Запуск из папки теста: линкер ищет импортируемые модули рядом
     std::string command = "cd " + shellQuote(test.path.parent_path().string()) + " && timeout 10";
-    for (const auto& part : checkCommand) command += " " + shellQuote(part);
+    for (const auto& part : command_) command += " " + shellQuote(part);
     if (test.expect == "parse") command += " --parse-only";
     command += " " + shellQuote(test.path.filename().string()) + " 2>&1";
 
@@ -291,9 +299,18 @@ static std::string evaluate(const TestCase& test, const RunResult& run)
         if (run.output.find(check) == std::string::npos)
             return "в разборе нет: " + check;
 
+    // Строки вывода ищем по порядку: между ними может быть отладочный вывод
+    std::istringstream outputStream(run.output);
+    std::string outputLine;
+    size_t nextCheck = 0;
+    while (nextCheck < test.outputChecks.size() && std::getline(outputStream, outputLine))
+        if (trim(outputLine) == test.outputChecks[nextCheck]) ++nextCheck;
+    if (nextCheck < test.outputChecks.size())
+        return "в выводе нет строки: " + test.outputChecks[nextCheck];
+
     // В Debug-сборке отладочный вывод разрешён
     if (!DEBUG && test.quiet && !trim(run.output).empty()) return "на успехе компилятор что-то напечатал";
-    if (test.expect != "ok" && test.expect != "parse") return "неизвестная директива expect: " + test.expect;
+    if (test.expect != "ok" && test.expect != "parse" && test.expect != "run") return "неизвестная директива expect: " + test.expect;
     return "";
 }
 
@@ -308,7 +325,7 @@ static void printOutput(const std::string& output)
 
 // --- Отчёт ---
 
-enum class TestStatus { Passed, KnownBug, Fixed, Failed };
+enum class TestStatus { Passed, KnownBug, Fixed, Failed, Skipped };
 
 struct ReportEntry
 {
@@ -357,6 +374,7 @@ static std::string groupTitle(const std::string& group)
         {"modules", "Модули"},
         {"diagnostics", "Диагностика"},
         {"ok", "Контроль: уже работает"},
+        {"run", "Запуск программ"},
     };
     auto it = titles.find(group);
     if (it != titles.end()) return it->second;
@@ -366,15 +384,23 @@ static std::string groupTitle(const std::string& group)
 static void printGroup(const std::string& group, const std::vector<ReportEntry>& entries, bool verbose)
 {
     size_t nameWidth = 0, locationWidth = 0;
-    int passed = 0;
+    int passed = 0, skipped = 0;
     for (const auto& entry : entries)
     {
+        if (entry.status == TestStatus::Skipped) { ++skipped; continue; }
         if (entry.status == TestStatus::Passed) { ++passed; if (!verbose) continue; }
         nameWidth = std::max(nameWidth, displayWidth(entry.name));
         locationWidth = std::max(locationWidth, displayWidth(entry.location));
     }
 
-    const bool allPassed = passed == static_cast<int>(entries.size());
+    if (skipped == static_cast<int>(entries.size()))
+    {
+        std::cout << "\n" << termcolor::grey << "- " << groupTitle(group) << "  " << skipped
+                  << " пропущено: нужна сборка с LLVM, запусти ./ms --run_tests" << termcolor::reset << "\n";
+        return;
+    }
+
+    const bool allPassed = passed + skipped == static_cast<int>(entries.size());
     std::cout << "\n";
     if (allPassed) std::cout << termcolor::green << "✓ ";
     else std::cout << termcolor::yellow << "▲ ";
@@ -385,6 +411,8 @@ static void printGroup(const std::string& group, const std::vector<ReportEntry>&
     {
         switch (entry.status)
         {
+            case TestStatus::Skipped:
+                continue;
             case TestStatus::Passed:
                 if (!verbose) continue;
                 std::cout << "  " << termcolor::green << "✓ " << termcolor::reset << entry.name << "\n";
@@ -413,7 +441,7 @@ static void printGroup(const std::string& group, const std::vector<ReportEntry>&
     }
 }
 
-static void printSummary(int total, int passed, int knownBugs, int failed, int fixed)
+static void printSummary(int total, int passed, int knownBugs, int failed, int fixed, int skipped)
 {
     const int barWidth = 40;
     const int filled = total > 0 ? passed * barWidth / total : 0;
@@ -427,6 +455,7 @@ static void printSummary(int total, int passed, int knownBugs, int failed, int f
 
     std::cout << "  " << termcolor::green << "Прошло:          " << passed << termcolor::reset << "\n";
     std::cout << "  " << termcolor::yellow << "Известных багов: " << knownBugs << termcolor::reset << "\n";
+    if (skipped > 0) std::cout << "  " << termcolor::grey << "Пропущено:       " << skipped << " (нужна сборка с LLVM)" << termcolor::reset << "\n";
     if (fixed > 0) std::cout << "  " << termcolor::green << "Починено:        " << fixed << " (убери xfail)" << termcolor::reset << "\n";
     if (failed > 0) std::cout << "  " << termcolor::red << "Провалено:       " << failed << termcolor::reset << "\n";
 
@@ -437,7 +466,7 @@ static void printSummary(int total, int passed, int knownBugs, int failed, int f
     std::cout << termcolor::reset << std::endl;
 }
 
-int runFrontendTests(const std::vector<std::string>& checkCommand, const std::string& testsDirPath, bool verbose, const std::string& filter)
+int runFrontendTests(const std::vector<std::string>& checkCommand, const std::vector<std::string>& runCommand, const std::string& testsDirPath, bool verbose, const std::string& filter)
 {
     const fs::path testsDir = fs::absolute(testsDirPath);
     if (!fs::is_directory(testsDir))
@@ -458,15 +487,25 @@ int runFrontendTests(const std::vector<std::string>& checkCommand, const std::st
     std::sort(tests.begin(), tests.end(), [](const TestCase& a, const TestCase& b) { return a.path < b.path; });
 
     std::map<std::string, std::vector<ReportEntry>> groups;
-    int passed = 0, knownBugs = 0, failed = 0, fixed = 0;
+    int passed = 0, knownBugs = 0, failed = 0, fixed = 0, skipped = 0;
 
     for (const auto& test : tests)
     {
         const fs::path relative = fs::relative(test.path, testsDir);
-        const RunResult run = runCheck(checkCommand, test);
+        const std::string group = relative.has_parent_path() ? relative.begin()->string() : "";
 
         ReportEntry entry;
         entry.name = relative.stem().string();
+
+        if (test.expect == "run" && runCommand.empty())
+        {
+            entry.status = TestStatus::Skipped;
+            ++skipped;
+            groups[group].push_back(entry);
+            continue;
+        }
+
+        const RunResult run = runCheck(test.expect == "run" ? runCommand : checkCommand, test);
         entry.failure = evaluate(test, run);
         entry.output = run.output;
         splitReason(test.xfail, entry.reason, entry.location);
@@ -476,7 +515,6 @@ int runFrontendTests(const std::vector<std::string>& checkCommand, const std::st
         else if (!test.xfail.empty()) { entry.status = TestStatus::KnownBug; ++knownBugs; }
         else { entry.status = TestStatus::Failed; ++failed; }
 
-        const std::string group = relative.has_parent_path() ? relative.begin()->string() : "";
         groups[group].push_back(entry);
     }
 
@@ -493,7 +531,7 @@ int runFrontendTests(const std::vector<std::string>& checkCommand, const std::st
         if (it != groups.end()) printGroup(group, it->second, verbose);
     }
 
-    printSummary(static_cast<int>(tests.size()), passed, knownBugs, failed, fixed);
+    printSummary(static_cast<int>(tests.size()), passed, knownBugs, failed, fixed, skipped);
 
     return (failed == 0 && fixed == 0 && !tests.empty()) ? 0 : 1;
 }

@@ -20,5 +20,5 @@ int main(int argc, char* argv[])
         else filter = argv[i];
     }
 
-    return runFrontendTests({std::filesystem::absolute(argv[1]).string()}, argv[2], verbose, filter);
+    return runFrontendTests({std::filesystem::absolute(argv[1]).string()}, {}, argv[2], verbose, filter);
 }
