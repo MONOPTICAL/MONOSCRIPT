@@ -758,7 +758,9 @@ void TypeSymbolVisitor::visit(CallNode& node) {
             contexts.back().functions[node.callee] = declared->second;
 
         // Точное совпадение типов аргументов
-        else if (registry.findFunction(node.callee, argTypes) != nullptr)
+        // У литерала коллекции типа нет, по типам аргументов такую функцию не найти
+        else if (std::find(argTypes.begin(), argTypes.end(), nullptr) == argTypes.end()
+                 && registry.findFunction(node.callee, argTypes) != nullptr)
             contexts.back().functions[node.callee] = registry.findFunction(node.callee, argTypes);
 
         // Поиск функции с совпадением по имени
@@ -784,6 +786,17 @@ void TypeSymbolVisitor::visit(CallNode& node) {
     // Проверяем типы аргументов
     for (size_t i = 0; i < argTypes.size(); ++i) {
         std::string paramType = func->parameters[i].first->toString();
+
+        // Литерал сам не знает свой тип, его задаёт параметр
+        if (std::dynamic_pointer_cast<BlockNode>(node.arguments[i])) {
+            validateCollectionElements(func->parameters[i].first, node.arguments[i], false);
+            node.arguments[i]->inferredType = func->parameters[i].first;
+            continue;
+        }
+        if (auto none = std::dynamic_pointer_cast<NoneNode>(node.arguments[i]);
+            none && none->isEmptyLiteral && (paramType.starts_with("array") || paramType.starts_with("map")))
+            node.arguments[i]->inferredType = func->parameters[i].first;
+
         checkConversion(node.arguments[i], paramType, "Function " + node.callee + ", argument " + std::to_string(i + 1) + ": ");
     }
 

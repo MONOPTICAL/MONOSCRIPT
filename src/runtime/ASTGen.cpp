@@ -512,9 +512,6 @@ void ASTGen::visit(WhileNode& node) {
 }
 
 void ASTGen::visit(ReturnNode& node) {
-    if (std::dynamic_pointer_cast<NoneNode>(node.expression))
-        throw std::runtime_error("Codegen Error: return пустого литерала [] или {} пока не реализован");
-
     result = Statements::handleReturnStatement(context, node);
 }
 
@@ -563,10 +560,13 @@ void ASTGen::visit(CallNode& node) {
             result = nullptr;
             return;
         }
-        if (std::dynamic_pointer_cast<NoneNode>(node.arguments[i]))
-            throw std::runtime_error("Codegen Error: передача пустого литерала [] или {} в функцию " + node.callee + " пока не реализована");
-        node.arguments[i]->accept(*this);
-        llvm::Value* argVal = getResult();
+        llvm::Value* argVal = nullptr;
+        if (Arrays::isLiteral(node.arguments[i])) {
+            argVal = Arrays::emitLiteral(context, node.arguments[i], node.arguments[i]->inferredType);
+        } else {
+            node.arguments[i]->accept(*this);
+            argVal = getResult();
+        }
         if (!argVal) {
             LogWarning("Не удалось сгенерировать аргумент " + std::to_string(i) + " для функции " + node.callee);
             result = nullptr;
