@@ -176,6 +176,12 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
         std::vector<llvm::Value*> args = {left, right};
         return context.Builder.CreateCall(concatFunc, args, "concat_result");
     }
+    else if (node.op == "and") {
+        return context.Builder.CreateAnd(left, right, "andtmp");
+    }
+    else if (node.op == "or") {
+        return context.Builder.CreateOr(left, right, "ortmp");
+    }
     else if (node.op.starts_with("strcmp_")) {
         // Сравнение строк: strcmp из libc, результат сравниваем с нулём
         llvm::Type* i32Type = llvm::Type::getInt32Ty(context.TheContext);

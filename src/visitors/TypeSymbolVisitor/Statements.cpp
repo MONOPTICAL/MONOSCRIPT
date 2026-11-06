@@ -196,8 +196,8 @@ static std::string getType(std::shared_ptr<ASTNode> expression, std::string type
             return "i1";
         else
             return type;
-    else if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(expression)) 
-        return "i1";
+    else if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(expression))
+        return (unary->op == "neg") ? type : "i1";
     else
         return type;
 };
@@ -280,33 +280,18 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
             else if (exprType->toString() != varType)
                 LogError("Type mismatch: expected " + varType + ", got " + exprType->toString(), node.expression);
         }
+        else if (!isAuto) {
+            if (exprType->toString() != "none")
+                checkConversion(node.expression, varType);
+        }
         else {
-            if (!isStrict && exprType->toString() != "none" && exprType->toString() != "string")
-            {        
-                castNumbersInBinaryTree(node.expression, isAuto ? "auto" : varType);
-                if (varType != "i1" && varType != "auto")
-                {
-                    if (auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.expression))
-                    {
-                        if ((binaryOp->op == "and" || binaryOp->op == "or" || binaryOp->op.rfind("icmp_", 0) == 0 || binaryOp->op.rfind("fcmp_", 0) == 0))
-                        {
-                            LogError("Type mismatch: expected i1, got " + exprType->toString());
-                        }
-                    }
-                }
-            }
+            if (exprType->toString() != "none" && exprType->toString() != "string")
+                castNumbersInBinaryTree(node.expression, "auto");
 
-            if (exprType->toString() == "string" && varType != "string" && varType != "auto")
-            LogError("Type mismatch: expected " + varType + ", got string"); 
-
-            if (isAuto)
-                if(node.expression->implicitCastTo)
-                    node.type = std::make_shared<SimpleTypeNode>(getType(node.expression, node.expression->implicitCastTo->toString()));
-                else
-                    node.type = std::make_shared<SimpleTypeNode>(getType(node.expression, node.expression->inferredType->toString()));
-            else if(varType == "i1")
-                if(getType(node.expression, varType) != "i1")
-                    LogError("Type mismatch: expected i1, got " + getType(node.expression, varType));
+            if(node.expression->implicitCastTo)
+                node.type = std::make_shared<SimpleTypeNode>(getType(node.expression, node.expression->implicitCastTo->toString()));
+            else
+                node.type = std::make_shared<SimpleTypeNode>(getType(node.expression, node.expression->inferredType->toString()));
         }
     }
 
@@ -341,25 +326,9 @@ void TypeSymbolVisitor::visit(ReturnNode &node)
         {
             node.expression->accept(*this);
             std::string expectedType = contexts.back().returnType->toString();
-            auto compare = std::dynamic_pointer_cast<BinaryOpNode>(node.expression);
-            if (compare && isCompareOperator(compare->op) && expectedType == "i1") {
-                // Операнды сравнения приводим друг к другу, а не к i1
-                castNumbersInBinaryTree(node.expression, "auto");
-                compare->inferredType = registry.findType("i1");
-            }
-            else
-                castAndValidate(node.expression, expectedType, this);
-            std::string actualType;
-
-            if (node.expression->implicitCastTo)
-                actualType = node.expression->implicitCastTo->toString();
-            else
-                actualType = node.expression->inferredType->toString();
-
-            if (actualType != expectedType) {
-                if (!(actualType == "null" && expectedType == "void"))
-                    LogError("Return type mismatch: expected " + contexts.back().returnType->toString() + ", got " + node.expression->inferredType->toString(), node.shared_from_this());
-            }
+            const bool bareReturn = node.expression->inferredType && node.expression->inferredType->toString() == "null";
+            if (!(bareReturn && expectedType == "void"))
+                checkConversion(node.expression, expectedType, "Return: ");
         }
     }
 
@@ -423,25 +392,8 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
     else
     {
         node.expression->accept(*this);
-        expressionType = node.expression->inferredType->toString();
-        if (expressionType != "none" && expressionType != "string") {
-            castNumbersInBinaryTree(node.expression, varTypeStr);
-
-            if (node.expression->implicitCastTo)
-                expressionType = node.expression->implicitCastTo->toString();
-            else
-                expressionType = node.expression->inferredType->toString();
-
-            expressionType = getType(node.expression, expressionType);
-
-            if (varTypeStr != "i1") {
-                if (auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.expression)) {
-                    if ((binaryOp->op == "and" || binaryOp->op == "or" || binaryOp->op.rfind("icmp_", 0) == 0 || binaryOp->op.rfind("fcmp_", 0) == 0)) {
-                        LogError("Type mismatch: expected i1, got " + expressionType, node.expression);
-                    }
-                }
-            }
-        }
+        checkConversion(node.expression, varTypeStr);
+        expressionType = varTypeStr;
     }
 
     if (expressionType != varTypeStr) 
@@ -642,32 +594,10 @@ void TypeSymbolVisitor::visit(CallNode& node) {
         LogError("Function " + node.callee + " expects " + std::to_string(func->parameters.size()) + " arguments, got " + std::to_string(argTypes.size()), node.shared_from_this());
     }
 
-    auto isNumeric = [](const std::shared_ptr<TypeNode>& type) {
-        return type->toString() == "i1" || type->toString() == "i8" || type->toString() == "i16" || type->toString() == "i32" || type->toString() == "i64";
-    };
-
     // Проверяем типы аргументов
     for (size_t i = 0; i < argTypes.size(); ++i) {
-        std::string argType = argTypes[i]->toString();
         std::string paramType = func->parameters[i].first->toString();
-
-        if (argType != paramType)
-            if (isNumeric(argTypes[i]) && isNumeric(func->parameters[i].first))
-            {
-                if(auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.arguments[i]))
-                {
-                    castNumbersInBinaryTree(node.arguments[i], paramType);
-#if DEBUG
-                    std::cout << "Casting " << argType << " to " << paramType << std::endl;
-#endif
-                }
-                else
-                    node.arguments[i]->implicitCastTo = func->parameters[i].first;
-            }
-            else
-                LogError("Function " + node.callee + " expects argument of type " + paramType + ", got " + argType, node.arguments[i]);
-        else // Вроде работает, проверь эту хуйню
-            castAndValidate(node.arguments[i], paramType, this);
+        checkConversion(node.arguments[i], paramType, "Function " + node.callee + ", argument " + std::to_string(i + 1) + ": ");
     }
 
     node.inferredType = func->returnType; // Устанавливаем тип функции

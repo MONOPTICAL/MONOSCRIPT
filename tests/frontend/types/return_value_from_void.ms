@@ -1,5 +1,4 @@
 // expect-error:
-// xfail: число кастуется в void, Statements.cpp:325
 [void]f()
 |   return 5
 

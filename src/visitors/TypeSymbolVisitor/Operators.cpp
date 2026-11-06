@@ -91,7 +91,7 @@ void TypeSymbolVisitor::handlePlusOperator(std::shared_ptr<BinaryOpNode>& node, 
         if (right != "string") {
             node->right = toStringHandler(node->right, *this);
         }
-        node = std::make_shared<BinaryOpNode>(node->left, "scat", node->right);
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "scat", node->right); node->implicitCastTo = cast; }
         node->inferredType = registry.findType("string");
         return;
     }
@@ -111,14 +111,14 @@ void TypeSymbolVisitor::handlePlusOperator(std::shared_ptr<BinaryOpNode>& node, 
         if (right != "float") {
             node->right->implicitCastTo = registry.findType("float");
         }
-        node = std::make_shared<BinaryOpNode>(node->left, "fadd", node->right);
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "fadd", node->right); node->implicitCastTo = cast; }
         node->inferredType = registry.findType("float");
         return;
     }
 
     // int(i32, i64, i8, i1)
     if (isIntType(left) && isIntType(right)) {
-        node = std::make_shared<BinaryOpNode>(node->left, "add", node->right);
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "add", node->right); node->implicitCastTo = cast; }
         node->inferredType = leftType;
         return;
     }
@@ -157,14 +157,14 @@ void TypeSymbolVisitor::handleMinusOperator(std::shared_ptr<BinaryOpNode>& node,
         if (right != "float") {
             node->right->implicitCastTo = registry.findType("float");
         }
-        node = std::make_shared<BinaryOpNode>(node->left, "fsub", node->right);
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "fsub", node->right); node->implicitCastTo = cast; }
         node->inferredType = registry.findType("float");
         return;
     }
 
     // int(i32, i64, i8, i1)
     if (isIntType(left) && isIntType(right)) {
-        node = std::make_shared<BinaryOpNode>(node->left, "sub", node->right);
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "sub", node->right); node->implicitCastTo = cast; }
         node->inferredType = leftType;
         return;
     }
@@ -202,14 +202,14 @@ void TypeSymbolVisitor::handleMulOperator(std::shared_ptr<BinaryOpNode>& node, s
         if (right != "float") {
             node->right->implicitCastTo = registry.findType("float");
         }
-        node = std::make_shared<BinaryOpNode>(node->left, "fmul", node->right);
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "fmul", node->right); node->implicitCastTo = cast; }
         node->inferredType = registry.findType("float");
         return;
     }
 
     // int(i32, i64, i8, i1)
     if (isIntType(left) && isIntType(right)) {
-        node = std::make_shared<BinaryOpNode>(node->left, "mul", node->right);
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "mul", node->right); node->implicitCastTo = cast; }
         node->inferredType = leftType;
         return;
     }
@@ -245,13 +245,13 @@ void TypeSymbolVisitor::handleDivOperator(std::shared_ptr<BinaryOpNode>& node, s
         if (right != "float") {
             node->right->implicitCastTo = registry.findType("float");
         }
-        node = std::make_shared<BinaryOpNode>(node->left, "fdiv", node->right);
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "fdiv", node->right); node->implicitCastTo = cast; }
         node->inferredType = registry.findType("float");
         return;
     }
 
     if (isIntType(left) && isIntType(right)) {
-        node = std::make_shared<BinaryOpNode>(node->left, "sdiv", node->right);
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "sdiv", node->right); node->implicitCastTo = cast; }
         node->inferredType = leftType;
         return;
     }
@@ -287,13 +287,13 @@ void TypeSymbolVisitor::handleModOperator(std::shared_ptr<BinaryOpNode>& node, s
         if (right != "float") {
             node->right->implicitCastTo = registry.findType("float");
         }
-        node = std::make_shared<BinaryOpNode>(node->left, "frem", node->right);
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "frem", node->right); node->implicitCastTo = cast; }
         node->inferredType = registry.findType("float");
         return;
     }
 
     if (isIntType(left) && isIntType(right)) {
-        node = std::make_shared<BinaryOpNode>(node->left, "srem", node->right);
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "srem", node->right); node->implicitCastTo = cast; }
         node->inferredType = leftType;
         return;
     }
@@ -336,7 +336,7 @@ void TypeSymbolVisitor::handleCompareOperator(std::shared_ptr<BinaryOpNode>& nod
             node->right = std::make_shared<CallNode>("toString_int", std::vector{node->right});
             node->right->accept(*this);
         }
-        node = std::make_shared<BinaryOpNode>(node->left, "strcmp_" + cmpOp, node->right);
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "strcmp_" + cmpOp, node->right); node->implicitCastTo = cast; }
         node->inferredType = registry.findType("i1");
         return;
     }
@@ -352,14 +352,14 @@ void TypeSymbolVisitor::handleCompareOperator(std::shared_ptr<BinaryOpNode>& nod
 
         if (left != "float") node->left->implicitCastTo = registry.findType("float");
         if (right != "float") node->right->implicitCastTo = registry.findType("float");
-        node = std::make_shared<BinaryOpNode>(node->left, "fcmp_" + cmpOp, node->right);
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "fcmp_" + cmpOp, node->right); node->implicitCastTo = cast; }
         node->inferredType = registry.findType("i1");
         return;
     }
 
     // int(i32, i64, i8, i1)
     if (isIntType(left) && isIntType(right)) {
-        node = std::make_shared<BinaryOpNode>(node->left, "icmp_" + cmpOp, node->right);
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "icmp_" + cmpOp, node->right); node->implicitCastTo = cast; }
         node->inferredType = registry.findType("i1");
         return;
     }
@@ -386,7 +386,7 @@ void TypeSymbolVisitor::handleLogicalOperator(std::shared_ptr<BinaryOpNode>& nod
         return;
     }
 
-    node = std::make_shared<BinaryOpNode>(node->left, op, node->right);
+    { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, op, node->right); node->implicitCastTo = cast; }
     node->inferredType = registry.findType("i1");
     node->implicitCastTo = registry.findType("i1");
 }

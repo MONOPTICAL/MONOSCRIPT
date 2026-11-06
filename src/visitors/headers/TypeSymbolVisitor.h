@@ -94,6 +94,16 @@ private:
                                                                             const std::string& targetType, 
                                                                             TypeSymbolVisitor* visitor);
 
+    // Настоящий тип выражения; пустая строка - выражение только из литералов
+    std::string                                                     resolveExprType(
+                                                                            const std::shared_ptr<ASTNode>& node);
+
+    // Единые правила приведения: ставит нужные касты или выдаёт ошибку
+    void                                                            checkConversion(
+                                                                            const std::shared_ptr<ASTNode>& node,
+                                                                            const std::string& targetType,
+                                                                            const std::string& errorPrefix = "");
+
     bool                                                            checkLabels(
                                                                             const std::string& label);
 
