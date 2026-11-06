@@ -22,9 +22,9 @@ public:
     llvm::IRBuilder<>                   Builder; // IRBuilder - это класс, который помогает создавать IR-код
     std::unique_ptr<llvm::Module>       TheModule; // Модуль - это контейнер для IR-кода
     std::map<std::string, llvm::Value*> NamedValues; // Простая таблица символов для переменных/параметров
-    std::map<llvm::Value*, llvm::Type*> arrayElementTypes;
 
     llvm::Function*                     StartFunction = nullptr; // Точка входа программы: инициализирует рантайм и глобальные переменные
+    std::shared_ptr<TypeNode>           CurrentReturnType; // Что возвращает функция, которая генерируется сейчас
 
     std::vector<llvm::BasicBlock*> loopEndBlocks;    // Стек для блоков выхода из цикла (для break)
     std::vector<llvm::BasicBlock*> loopCondBlocks;   // Стек для блоков условия цикла (для continue)
@@ -91,11 +91,14 @@ public:
     void LogError(const std::string& message);
     void LogWarning(const std::string& message);
 
-    // В класс CodeGenContext добавьте:
-    llvm::Value* createArray(llvm::Type* elementType, llvm::Value* size);
-    llvm::Value* getArrayElement(llvm::Value* array, llvm::Value* index);
-    void setArrayElement(llvm::Value* array, llvm::Value* index, llvm::Value* value);
-    void freeArray(llvm::Value* array);
+    // Массив это объект в куче: заголовок { ptr data, i32 length, i32 capacity } и отдельный блок данных.
+    // Переменная хранит ссылку на заголовок, тип элементов известен только из типов в AST
+    llvm::StructType*                   getArrayStruct();
+    llvm::Value*                        createArray(llvm::Type* elementType, llvm::Value* size);
+    llvm::Value*                        getArrayData(llvm::Value* array);
+    llvm::Value*                        getArrayLength(llvm::Value* array);
+    // Адрес элемента с проверкой границ, line для сообщения об ошибке
+    llvm::Value*                        getArrayElementPtr(llvm::Value* array, llvm::Type* elementType, llvm::Value* index, int line);
 
 
     CodeGenContext(const std::string& moduleName = "ms_module") : Builder(TheContext) {

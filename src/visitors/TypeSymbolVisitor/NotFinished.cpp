@@ -94,8 +94,12 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
                 const std::string indexTypeStr = indexType->toString();
                 if (genericType->baseName == "array") {
                     const int rank = getTypeRank(indexTypeStr);
-                    if (rank == 0 || indexTypeStr == "float")
+                    const bool literalOnly = resolveExprType(indexNode->expression).empty();
+                    if (rank == 0 || indexTypeStr == "float" || (indexTypeStr == "i1" && !literalOnly))
                         LogError("Array index must be an integer, got " + indexTypeStr, indexNode->expression);
+                    // Литерал 1 имеет тип i1, а -1 в i1 это снова 1
+                    if (literalOnly)
+                        castAllNumbersToType(indexNode->expression, "i64");
                 } else {
                     const std::string keyTypeStr = genericType->typeParameters[0]->toString();
                     const bool bothIntegers = getTypeRank(indexTypeStr) > 0 && indexTypeStr != "float" &&
@@ -106,6 +110,8 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
             }
 
             currentType =(genericType->baseName == "array") ? genericType->typeParameters[0] : genericType->typeParameters[1];
+            // Кодгену нужен тип на каждом звене: сам он типы не выводит
+            if (indexNode) indexNode->inferredType = currentType;
             currentStructDef = registry.findStruct(currentType->toString());
         }
         
@@ -145,10 +151,14 @@ void TypeSymbolVisitor::visit(ReassignMemberNode& node) {
         LogError("Left side of member assignment is not an access expression", node.shared_from_this());
 
     // Шоб не могли нихуя вставлять в результат вызова x.sum() = 1
+    // В a[f()] = 1 вызов это индекс, а не цель присваивания
     auto last = access;
-    while (auto next = std::dynamic_pointer_cast<AccessExpression>(last->nextAccess))
+    bool lastIsIndex = false;
+    while (auto next = std::dynamic_pointer_cast<AccessExpression>(last->nextAccess)) {
+        lastIsIndex = last->notation == "[]";
         last = next;
-    if (std::dynamic_pointer_cast<CallNode>(last->expression))
+    }
+    if (!lastIsIndex && std::dynamic_pointer_cast<CallNode>(last->expression))
         LogError("Cannot assign to the result of a function call", node.accessExpression);
 
     // Шоб не меняли константы а то совсем ахуели
@@ -179,50 +189,7 @@ void TypeSymbolVisitor::visit(ReassignMemberNode& node) {
 
     node.expression->accept(*this);
     checkPureAlias(node.expression);
-    auto exprType = node.expression->implicitCastTo ? node.expression->implicitCastTo
-                                                    : node.expression->inferredType;
-    if (!exprType)
-        LogError("Cannot infer expression type", node.expression);
-    std::string exprTypeStr = exprType->toString();
-
-    bool targetNumeric = getTypeRank(targetTypeStr) > 0;
-    bool exprNumeric   = getTypeRank(exprTypeStr) > 0;
-
-    if (!targetNumeric || !exprNumeric) {
-        if (exprTypeStr != targetTypeStr)
-        {
-            LogError("Type mismatch: expected " + targetTypeStr + ", got " + exprTypeStr, node.expression);
-        }
-        node.inferredType = targetType;
-        return;
-    }
-
-    // Проверка на i1 шоб хуйни не подсовывали 
-    auto isBoolExpr = [](const std::shared_ptr<ASTNode>& e) {
-        if (auto bin = std::dynamic_pointer_cast<NumberNode>(e))
-            return bin->inferredType && bin->inferredType->toString() == "i1";
-        return std::dynamic_pointer_cast<UnaryOpNode>(e) != nullptr;
-    };
-
-#if DEBUG
-    IC(node.expression);
-#endif
-    if (isBoolExpr(node.expression) != (targetTypeStr == "i1"))
-        LogError("Type mismatch: expected " + targetTypeStr + ", got " +
-                 (isBoolExpr(node.expression) ? std::string("i1") : exprTypeStr), node.expression);
-
-    if (checkLabels("@strict")) {
-        if (exprTypeStr != targetTypeStr)
-            LogError("Type mismatch in strict mode: expected " + targetTypeStr + ", got " + exprTypeStr, node.expression);
-    }
-    else if (!isBoolExpr(node.expression)) {
-        castAndValidate(node.expression, targetTypeStr, this);
-
-        auto after = node.expression->implicitCastTo ? node.expression->implicitCastTo
-                                                     : node.expression->inferredType;
-        if (after->toString() != targetTypeStr)
-            node.expression->implicitCastTo = targetType;
-    }
+    checkConversion(node.expression, targetTypeStr);
 
     node.inferredType = targetType;
 }

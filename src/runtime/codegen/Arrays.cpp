@@ -3,78 +3,96 @@
 
 namespace Arrays
 {
-    llvm::Value* handleArrayInitialization(CodeGenContext& context, VariableAssignNode& node, llvm::Type* varType, std::shared_ptr<BlockNode> blockExpr)
+    bool isLiteral(const std::shared_ptr<ASTNode>& expression)
+    {
+        if (std::dynamic_pointer_cast<BlockNode>(expression)) return true;
+        auto none = std::dynamic_pointer_cast<NoneNode>(expression);
+        return none && none->isEmptyLiteral;
+    }
+
+    // Значение выражения, приведённое к нужному типу
+    static llvm::Value* emitValue(CodeGenContext& context, const std::shared_ptr<ASTNode>& expression, const std::shared_ptr<TypeNode>& type)
+    {
+        if (isLiteral(expression))
+            return emitLiteral(context, expression, type);
+
+        ASTGen codeGen(context);
+        expression->accept(codeGen);
+        llvm::Value* value = codeGen.getResult();
+        if (!value)
+            throw std::runtime_error("Codegen Error: не удалось сгенерировать элемент массива");
+
+        value = TypeConversions::loadValueIfPointer(context, value);
+        return TypeConversions::convertValueToType(context, value, context.getLLVMType(type, context.TheContext));
+    }
+
+    llvm::Value* emitLiteral(CodeGenContext& context, const std::shared_ptr<ASTNode>& literal, const std::shared_ptr<TypeNode>& arrayType)
+    {
+        auto generic = std::dynamic_pointer_cast<GenericTypeNode>(arrayType);
+        if (generic && generic->baseName == "map")
+            throw std::runtime_error("Codegen Error: map пока не реализован");
+        if (!generic || generic->baseName != "array")
+            throw std::runtime_error("Codegen Error: литерал массива для типа " + (arrayType ? arrayType->toString() : std::string("?")));
+
+        const std::shared_ptr<TypeNode>& elementTypeNode = generic->typeParameters[0];
+        llvm::Type* elementType = context.getLLVMType(elementTypeNode, context.TheContext);
+
+        // Пустой литерал это NoneNode, у него нет элементов
+        static const std::vector<std::shared_ptr<ASTNode>> noElements;
+        auto block = std::dynamic_pointer_cast<BlockNode>(literal);
+        const auto& elements = block ? block->statements : noElements;
+
+        llvm::Value* array = context.createArray(elementType, context.Builder.getInt32(elements.size()));
+        llvm::Value* data = context.getArrayData(array);
+
+        for (size_t i = 0; i < elements.size(); i++) {
+            llvm::Value* value = emitValue(context, elements[i], elementTypeNode);
+            context.Builder.CreateStore(value, context.Builder.CreateConstGEP1_64(elementType, data, i, "element_ptr"));
+        }
+
+        return array;
+    }
+
+    llvm::Value* handleArrayInitialization(CodeGenContext& context, VariableAssignNode& node, llvm::Type* varType, const std::shared_ptr<TypeNode>& arrayType)
+    {
+        llvm::Value* array = emitLiteral(context, node.expression, arrayType);
+
+        llvm::AllocaInst* variable = context.createEntryAlloca(varType, node.name);
+        context.Builder.CreateStore(array, variable);
+        context.NamedValues[node.name] = variable;
+        return variable;
+    }
+
+    llvm::Value* emitElementPtr(CodeGenContext& context, AccessExpression& root, llvm::Type*& elementType)
     {
         ASTGen codeGen(context);
+        root.expression->accept(codeGen);
+        if (!codeGen.getResult())
+            throw std::runtime_error("Codegen Error: доступ через [] и . пока не реализован: " + root.baseName);
+        llvm::Value* base = TypeConversions::loadValueIfPointer(context, codeGen.getResult());
 
-        // Проверяем, является ли первый элемент KeyValueNode (для map)
-        if (!blockExpr->statements.empty() && std::dynamic_pointer_cast<KeyValueNode>(blockExpr->statements[0]))
-            throw std::runtime_error("Codegen Error: map пока не реализован: " + node.name);
+        // Звено хранит индекс, а то, что было перед ним, говорит о своей нотации, что идёт дальше
+        AccessExpression* link = &root;
+        llvm::Value* elementPtr = nullptr;
+        while (auto next = std::dynamic_pointer_cast<AccessExpression>(link->nextAccess)) {
+            if (link->notation != "[]" || !next->inferredType)
+                throw std::runtime_error("Codegen Error: доступ через . пока не реализован: " + root.baseName);
 
-        // Генерируем код для выражения
-        node.expression->accept(codeGen);
-        
-        codeGen.LogWarning("Инициализация массива через блок для " + node.name);
-        
-        // 1. Определяем тип элемента массива
-        llvm::Type* elementType = nullptr;
-        
-        // Пытаемся получить тип элемента из объявления переменной
-        if (auto genType = std::dynamic_pointer_cast<GenericTypeNode>(node.type)) {
-            if (genType->baseName == "array" && !genType->typeParameters.empty()) {
-                elementType = context.getLLVMType(genType->typeParameters[0], context.TheContext);
-            }
+            // Уже не последнее звено: то, что лежит в элементе, это следующий массив
+            if (elementPtr)
+                base = context.Builder.CreateLoad(context.Builder.getPtrTy(), elementPtr, "nested_array");
+
+            next->expression->accept(codeGen);
+            llvm::Value* index = TypeConversions::loadValueIfPointer(context, codeGen.getResult());
+            index = TypeConversions::applyImplicitCast(context, index, next->expression->implicitCastTo);
+
+            elementType = context.getLLVMType(next->inferredType, context.TheContext);
+            elementPtr = context.getArrayElementPtr(base, elementType, index, next->line);
+            link = next.get();
         }
-        
-        // Если тип не указан явно, выводим из первого элемента
-        if (!elementType && !blockExpr->statements.empty()) {
-            auto firstElem = blockExpr->statements[0];
-            firstElem->accept(codeGen);
-            llvm::Value* firstValue = codeGen.getResult();
-            elementType = firstValue->getType();
-        }
-        
-        if (!elementType) {
-            codeGen.LogWarning("Не удалось определить тип элементов массива " + node.name);
-            elementType = llvm::Type::getInt32Ty(context.TheContext); // Fallback
-        }
-        
-        // 2. Создаем структуру массива и выделяем память для данных
-        llvm::Value* sizeValue = llvm::ConstantInt::get(
-            llvm::Type::getInt32Ty(context.TheContext), 
-            blockExpr->statements.size()
-        );
-        
-        llvm::Value* arrayPtr = context.createArray(elementType, sizeValue);
-        
-        // 3. Заполняем элементы массива
-        for (size_t i = 0; i < blockExpr->statements.size(); i++) {
-            if (!blockExpr->statements[i]) {
-                codeGen.LogWarning("Пропускаю нулевой элемент массива #" + std::to_string(i));
-                continue;
-            }
-            
-            // Генерируем код для элемента массива
-            blockExpr->statements[i]->accept(codeGen);
-            llvm::Value* elementValue = codeGen.getResult();
-            
-            if (!elementValue) {
-                codeGen.LogWarning("Не удалось сгенерировать код для элемента массива #" + std::to_string(i));
-                continue;
-            }
-            
-            // Индекс текущего элемента
-            llvm::Value* index = llvm::ConstantInt::get(
-                llvm::Type::getInt32Ty(context.TheContext), i);
-            
-            // Используем нашу функцию для установки элемента
-            context.setArrayElement(arrayPtr, index, elementValue);
-        }
-        
-        // 4. Сохраняем переменную в таблицу символов и тип элементов в таблицу типов
-        context.NamedValues[node.name] = arrayPtr;
-        context.arrayElementTypes[arrayPtr] = elementType;
-        
-        return arrayPtr;
+
+        if (!elementPtr)
+            throw std::runtime_error("Codegen Error: доступ через . пока не реализован: " + root.baseName);
+        return elementPtr;
     }
 }

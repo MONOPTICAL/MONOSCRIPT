@@ -149,6 +149,8 @@ void ASTGen::visit(FunctionNode& node) {
     // Создаем минимальную заглушку функции
     llvm::Function* func = declareUserFunction(context, node);
     llvm::Type* returnLLVMType = func->getReturnType();
+    auto outerReturnType = context.CurrentReturnType;
+    context.CurrentReturnType = node.returnType;
 
 
     // Создаем блок входа в функцию
@@ -206,6 +208,7 @@ void ASTGen::visit(FunctionNode& node) {
 
     // Восстанавливаем старую таблицу символов
     context.NamedValues = oldNamedValues;
+    context.CurrentReturnType = outerReturnType;
     
     result = func;
 
@@ -296,13 +299,8 @@ void ASTGen::visit(VariableAssignNode& node) {
         return;
     }
     
-    // Проверяем является ли выражение структурой данных (array или map)
-    std::shared_ptr<BlockNode> blockExpr = std::dynamic_pointer_cast<BlockNode>(node.expression);
-    if (blockExpr) {
-#if DEBUG
-        std::cerr << "Обнаружено выражение блока для переменной " << node.name << std::endl;
-#endif
-        result = Arrays::handleArrayInitialization(context, node, varType, blockExpr);
+    if (Arrays::isLiteral(node.expression)) {
+        result = Arrays::handleArrayInitialization(context, node, varType, declaredType);
         return;
     }
     
@@ -311,14 +309,27 @@ void ASTGen::visit(VariableAssignNode& node) {
 }
 
 void ASTGen::visit(ReassignMemberNode& node) {
-    throw std::runtime_error("Codegen Error: присваивание через [] и . пока не реализовано");
+    auto access = std::dynamic_pointer_cast<AccessExpression>(node.accessExpression);
+    if (!access)
+        throw std::runtime_error("Codegen Error: присваивание не в элемент массива");
+
+    // Как в Python: сначала значение, потом место, куда оно запишется
+    llvm::Value* value = nullptr;
+    if (Arrays::isLiteral(node.expression)) {
+        value = Arrays::emitLiteral(context, node.expression, node.inferredType);
+    } else {
+        node.expression->accept(*this);
+        value = TypeConversions::loadValueIfPointer(context, getResult());
+    }
+
+    llvm::Type* elementType = nullptr;
+    llvm::Value* elementPtr = Arrays::emitElementPtr(context, *access, elementType);
+    context.Builder.CreateStore(TypeConversions::convertValueToType(context, value, elementType), elementPtr);
+    result = nullptr;
 }
 
 void ASTGen::visit(VariableReassignNode& node) {
     LogWarning("visit не реализован для VariableReassignNode: " + node.name);
-
-    if (std::dynamic_pointer_cast<NoneNode>(node.expression))
-        throw std::runtime_error("Codegen Error: присваивание пустого литерала [] или {} пока не реализовано");
 
     // Тип значения в переменной, а не её адреса
     llvm::Value* variable = context.NamedValues[node.name];
@@ -511,6 +522,13 @@ void ASTGen::visit(CallNode& node) {
     LogWarning("visit не реализован для CallNode: " + node.callee);
     // Сначала в модуле ищем хуйню
     llvm::Function* calleeFunc = context.TheModule->getFunction(node.callee);
+
+    // Встроенная len(a). Функция с таким же именем важнее, семантика решила так же
+    if (!calleeFunc && node.callee == "len") {
+        node.arguments[0]->accept(*this);
+        result = context.getArrayLength(TypeConversions::loadValueIfPointer(context, getResult()));
+        return;
+    }
 
     // Если не нашли пробуем объявить через TOML
     if (!calleeFunc) {
@@ -788,7 +806,9 @@ void ASTGen::visit(ContinueNode& node) {
 }
 
 void ASTGen::visit(AccessExpression& node) {
-    throw std::runtime_error("Codegen Error: доступ через [] и . пока не реализован: " + node.baseName);
+    llvm::Type* elementType = nullptr;
+    llvm::Value* elementPtr = Arrays::emitElementPtr(context, node, elementType);
+    result = context.Builder.CreateLoad(elementType, elementPtr, "element");
 }
 
 void ASTGen::visit(ImportNode &node)

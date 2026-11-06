@@ -27,52 +27,8 @@ llvm::Type* CodeGenContext::getLLVMType(std::shared_ptr<TypeNode> typeNode, llvm
         if (simpleType->name == "auto") return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0); // auto как указатель на i8
     }
     else if (auto genericType = std::dynamic_pointer_cast<GenericTypeNode>(typeNode)) {
-        // Обработка параметризованных типов
-        if (genericType->baseName == "array") {
-            // Создаём структуру для представления массива с метаданными
-            llvm::Type* elementType = getLLVMType(genericType->typeParameters[0], ctx);
-            
-            // Структура Array { 
-            //    T* data;       // Указатель на данные
-            //    i32 length;    // Текущая длина
-            //    i32 capacity;  // Выделенная емкость
-            // }
-            llvm::StructType* arrayStruct = llvm::StructType::create(ctx, {
-                llvm::PointerType::get(elementType, 0),    // T* data
-                llvm::Type::getInt32Ty(ctx),               // i32 length
-                llvm::Type::getInt32Ty(ctx)                // i32 capacity
-            }, "array_" + getTypeString(genericType->typeParameters[0]));
-            
-            // Возвращаем указатель на эту структуру
-            return llvm::PointerType::get(arrayStruct, 0);
-        }
-        else if (genericType->baseName == "map") {
-            llvm::Type* keyType = getLLVMType(genericType->typeParameters[0], ctx);
-            llvm::Type* valueType = getLLVMType(genericType->typeParameters[1], ctx);
-            
-            // KV структура для пар ключ-значение
-            llvm::StructType* kvPairType = llvm::StructType::create(ctx, {
-                keyType,
-                valueType
-            }, "kvpair_" + getTypeString(genericType->typeParameters[0]) + 
-                "_" + getTypeString(genericType->typeParameters[1]));
-            
-            // Структура Map { 
-            //    KVPair* entries;  // Указатель на пары ключ-значение
-            //    i32 count;        // Количество элементов
-            //    i32 capacity;     // Выделенная емкость
-            //    i32* hashTable;   // Хеш-таблица для быстрого поиска (опционально)
-            // }
-            llvm::StructType* mapStruct = llvm::StructType::create(ctx, {
-                llvm::PointerType::get(kvPairType, 0),     // KVPair* entries
-                llvm::Type::getInt32Ty(ctx),               // i32 count
-                llvm::Type::getInt32Ty(ctx),               // i32 capacity
-                llvm::PointerType::get(llvm::Type::getInt32Ty(ctx), 0) // i32* hashTable
-            }, "map_" + getTypeString(genericType->typeParameters[0]) + 
-                "_" + getTypeString(genericType->typeParameters[1]));
-            
-            return llvm::PointerType::get(mapStruct, 0);
-        }
+        // Коллекции это объекты в куче, переменная хранит на них ссылку
+        return llvm::PointerType::getUnqual(ctx);
     }
     
     return llvm::PointerType::getUnqual(ctx);
@@ -97,165 +53,82 @@ std::shared_ptr<TypeNode> CodeGenContext::getTypeByASTNode(std::shared_ptr<ASTNo
     throw std::runtime_error("Unknown ASTNode type for type inference : " + std::to_string(node->line) + ":" + std::to_string(node->column));
 }
 
-// Создание нового массива заданного размера и типа
-// Создание нового массива заданного размера и типа
+llvm::StructType* CodeGenContext::getArrayStruct() {
+    if (llvm::StructType* existing = llvm::StructType::getTypeByName(TheContext, "ms_array"))
+        return existing;
+
+    return llvm::StructType::create(
+        TheContext,
+        {
+            llvm::PointerType::get(TheContext, 0), // data
+            llvm::Type::getInt32Ty(TheContext),    // length
+            llvm::Type::getInt32Ty(TheContext)     // capacity
+        },
+        "ms_array"
+    );
+}
+
 llvm::Value* CodeGenContext::createArray(llvm::Type* elementType, llvm::Value* size) {
-    // 1. Создаем структурный тип массива, если еще не создан
-    std::string typeName = "array_struct";
-    llvm::StructType* arrayStruct = llvm::StructType::getTypeByName(TheContext, typeName);
-    
-    if (!arrayStruct) {
-        // Создаем новый тип структуры
-        arrayStruct = llvm::StructType::create(
-            TheContext,
-            {
-                llvm::PointerType::get(TheContext, 0),      // data: ptr (opaque pointer)
-                llvm::Type::getInt32Ty(TheContext),         // length: i32
-                llvm::Type::getInt32Ty(TheContext)          // capacity: i32
-            },
-            typeName
-        );
-    }
-    
-    // 2. Выделяем память для структуры массива
-    llvm::Value* arrayPtr = Builder.CreateAlloca(arrayStruct, nullptr, "array_struct_ptr");
-    
-    // 3. Выделяем память для элементов массива
-    llvm::Value* elemSize = Builder.getInt32(
-        TheModule->getDataLayout().getTypeAllocSize(elementType)
+    llvm::Type* ptrType = llvm::PointerType::get(TheContext, 0);
+    llvm::Type* i64Type = llvm::Type::getInt64Ty(TheContext);
+    llvm::FunctionType* allocType = llvm::FunctionType::get(ptrType, {i64Type}, false);
+
+    // Данные без ссылок сборщику просматривать незачем. Такая память не обнулена, вызывающий заполняет её сам
+    llvm::Function* allocScanned = getOrDeclareFunction("GC_malloc", allocType);
+    llvm::Function* allocData = elementType->isPointerTy() ? allocScanned : getOrDeclareFunction("GC_malloc_atomic", allocType);
+
+    llvm::StructType* arrayStruct = getArrayStruct();
+    const llvm::DataLayout& layout = TheModule->getDataLayout();
+
+    llvm::Value* header = Builder.CreateCall(allocScanned, {Builder.getInt64(layout.getTypeAllocSize(arrayStruct))}, "array");
+
+    llvm::Value* bytes = Builder.CreateMul(
+        Builder.CreateZExt(size, i64Type),
+        Builder.getInt64(layout.getTypeAllocSize(elementType)),
+        "array_bytes"
     );
-    llvm::Value* bytesToAllocate = Builder.CreateMul(size, elemSize, "bytes_to_alloc");
-    
-    // 4. Вызываем malloc для выделения памяти
-    llvm::Function* mallocFunc = getOrDeclareFunction("malloc",
-        llvm::FunctionType::get(
-            llvm::PointerType::get(TheContext, 0),  // void* return
-            llvm::Type::getInt32Ty(TheContext),     // size_t arg
-            false
-        )
-    );
-    
-    llvm::Value* dataPtr = Builder.CreateCall(mallocFunc, bytesToAllocate, "data_ptr");
-    
-    // 5. Инициализируем поля структуры
-    // data поле - сохраняем исходный указатель без битовой конвертации
-    // (для opaque pointers не нужны приведения типа)
-    llvm::Value* dataField = Builder.CreateStructGEP(arrayStruct, arrayPtr, 0, "data_field");
-    Builder.CreateStore(dataPtr, dataField);
-    
-    // length поле
-    llvm::Value* lengthField = Builder.CreateStructGEP(arrayStruct, arrayPtr, 1, "length_field");
-    llvm::Value* sizeAsI32 = Builder.CreateIntCast(size, llvm::Type::getInt32Ty(TheContext), false);
-    Builder.CreateStore(sizeAsI32, lengthField);
-    
-    // capacity поле
-    llvm::Value* capacityField = Builder.CreateStructGEP(arrayStruct, arrayPtr, 2, "capacity_field");
-    Builder.CreateStore(sizeAsI32, capacityField);
-    
-    // Сохраняем тип элементов для этого массива в таблицу типов
-    arrayElementTypes[arrayPtr] = elementType;
-    
-    return arrayPtr;
+    llvm::Value* data = Builder.CreateCall(allocData, {bytes}, "array_data");
+
+    Builder.CreateStore(data, Builder.CreateStructGEP(arrayStruct, header, 0));
+    Builder.CreateStore(size, Builder.CreateStructGEP(arrayStruct, header, 1));
+    Builder.CreateStore(size, Builder.CreateStructGEP(arrayStruct, header, 2));
+    return header;
 }
 
-// Получение элемента массива по индексу
-llvm::Value* CodeGenContext::getArrayElement(llvm::Value* array, llvm::Value* index) {
-    // 1. Получаем структуру массива
-    llvm::StructType* arrayStruct = llvm::StructType::getTypeByName(TheContext, "array_struct");
-    if (!arrayStruct) {
-        LogError("Array structure type not defined");
-        return llvm::UndefValue::get(Builder.getPtrTy());
-    }
-    
-    // 2. Получаем указатель на данные из структуры
-    llvm::Value* dataField = Builder.CreateStructGEP(arrayStruct, array, 0, "data_field");
-    llvm::Value* dataPtr = Builder.CreateLoad(Builder.getPtrTy(), dataField, "data_ptr");
-    
-    // 3. Определяем тип элемента из таблицы типов
-    llvm::Type* elementType = nullptr;
-    if (arrayElementTypes.find(array) != arrayElementTypes.end()) {
-        elementType = arrayElementTypes[array];
-    } else {
-        // Если тип неизвестен, используем generic i8 и делаем warning
-        LogWarning("Element type for array unknown, using i8");
-        elementType = llvm::Type::getInt8Ty(TheContext);
-    }
-    
-    // 4. Получаем указатель на элемент с явным указанием типа
-    llvm::Value* elementPtr = Builder.CreateGEP(elementType, dataPtr, index, "element_ptr");
-    
-    // 5. Загружаем значение
-    return Builder.CreateLoad(elementType, elementPtr, "element_value");
+llvm::Value* CodeGenContext::getArrayData(llvm::Value* array) {
+    llvm::Value* field = Builder.CreateStructGEP(getArrayStruct(), array, 0);
+    return Builder.CreateLoad(llvm::PointerType::get(TheContext, 0), field, "array_data");
 }
 
-// Установка элемента массива по индексу
-void CodeGenContext::setArrayElement(llvm::Value* array, llvm::Value* index, llvm::Value* value) {
-    // 1. Получаем структуру массива
-    llvm::StructType* arrayStruct = llvm::StructType::getTypeByName(TheContext, "array_struct");
-    if (!arrayStruct) {
-        LogError("Array structure type not defined");
-        return;
-    }
-    
-    // 2. Получаем указатель на данные из структуры
-    llvm::Value* dataField = Builder.CreateStructGEP(arrayStruct, array, 0, "data_field");
-    llvm::Value* dataPtr = Builder.CreateLoad(Builder.getPtrTy(), dataField, "data_ptr");
-    
-    // 3. Определяем тип элемента
-    llvm::Type* elementType = value->getType();
-    
-    // 4. Получаем указатель на элемент
-    llvm::Value* elementPtr = Builder.CreateGEP(elementType, dataPtr, index, "element_ptr");
-    
-    // 5. Сохраняем значение
-    Builder.CreateStore(value, elementPtr);
-    
-    // 6. Обновляем таблицу типов элементов, если нужно
-    if (arrayElementTypes.find(array) == arrayElementTypes.end()) {
-        arrayElementTypes[array] = elementType;
-    }
+llvm::Value* CodeGenContext::getArrayLength(llvm::Value* array) {
+    llvm::Value* field = Builder.CreateStructGEP(getArrayStruct(), array, 1);
+    return Builder.CreateLoad(llvm::Type::getInt32Ty(TheContext), field, "array_len");
 }
 
-// Освобождение памяти массива
-void CodeGenContext::freeArray(llvm::Value* array) {
-    // 1. Получаем структуру массива
-    llvm::StructType* arrayStruct = llvm::StructType::getTypeByName(TheContext, "array_struct");
-    if (!arrayStruct) {
-        LogError("Array structure type not defined");
-        return;
-    }
-    
-    // 2. Получаем указатель на данные из структуры
-    llvm::Value* dataField = Builder.CreateStructGEP(arrayStruct, array, 0, "data_field");
-    llvm::Value* dataPtr = Builder.CreateLoad(Builder.getPtrTy(), dataField, "data_ptr");
-    
-    // 3. Вызываем free для освобождения данных
-    llvm::Function* freeFunc = getOrDeclareFunction("free",
-        llvm::FunctionType::get(
-            llvm::Type::getVoidTy(TheContext),
-            llvm::PointerType::get(TheContext, 0),
-            false
-        )
-    );
-    
-    // Для opaque pointers не требуется явное приведение типа
-    Builder.CreateCall(freeFunc, dataPtr);
-    
-    // 4. Обнуляем указатель на данные (опционально)
-    llvm::Value* nullPtr = llvm::ConstantPointerNull::get(Builder.getPtrTy());
-    Builder.CreateStore(nullPtr, dataField);
-    
-    // 5. Обнуляем длину и емкость
-    llvm::Value* lengthField = Builder.CreateStructGEP(arrayStruct, array, 1, "length_field");
-    Builder.CreateStore(Builder.getInt32(0), lengthField);
-    
-    llvm::Value* capacityField = Builder.CreateStructGEP(arrayStruct, array, 2, "capacity_field");
-    Builder.CreateStore(Builder.getInt32(0), capacityField);
-    
-    // 6. Удаляем из таблицы типов
-    if (arrayElementTypes.find(array) != arrayElementTypes.end()) {
-        arrayElementTypes.erase(array);
-    }
+llvm::Value* CodeGenContext::getArrayElementPtr(llvm::Value* array, llvm::Type* elementType, llvm::Value* index, int line) {
+    llvm::Type* i64Type = llvm::Type::getInt64Ty(TheContext);
+    llvm::Type* i32Type = llvm::Type::getInt32Ty(TheContext);
+
+    // i1 это 0 или 1, а не 0 или -1. Отрицательный индекс после расширения станет огромным беззнаковым и не пройдёт проверку
+    llvm::Value* wideIndex = index->getType()->isIntegerTy(1)
+        ? Builder.CreateZExt(index, i64Type, "index")
+        : Builder.CreateSExt(index, i64Type, "index");
+    llvm::Value* length = getArrayLength(array);
+
+    llvm::Function* function = Builder.GetInsertBlock()->getParent();
+    llvm::BasicBlock* failBlock = llvm::BasicBlock::Create(TheContext, "bounds.fail", function);
+    llvm::BasicBlock* okBlock = llvm::BasicBlock::Create(TheContext, "bounds.ok", function);
+    Builder.CreateCondBr(Builder.CreateICmpUGE(wideIndex, Builder.CreateZExt(length, i64Type)), failBlock, okBlock);
+
+    Builder.SetInsertPoint(failBlock);
+    llvm::Function* panic = getOrDeclareFunction("ms_panic_index",
+        llvm::FunctionType::get(llvm::Type::getVoidTy(TheContext), {i64Type, i32Type, i32Type}, false));
+    panic->setDoesNotReturn();
+    Builder.CreateCall(panic, {wideIndex, length, Builder.getInt32(ErrorEngine::getInstance().displayLine(line))});
+    Builder.CreateUnreachable();
+
+    Builder.SetInsertPoint(okBlock);
+    return Builder.CreateGEP(elementType, getArrayData(array), wideIndex, "element_ptr");
 }
 
 void CodeGenContext::emitPanic(const std::string& message, int line) {
