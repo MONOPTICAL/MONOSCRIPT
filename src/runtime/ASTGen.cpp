@@ -320,8 +320,13 @@ void ASTGen::visit(VariableReassignNode& node) {
     if (std::dynamic_pointer_cast<NoneNode>(node.expression))
         throw std::runtime_error("Codegen Error: присваивание пустого литерала [] или {} пока не реализовано");
 
-    // Получаем тип переменной
-    llvm::Type* varType = context.NamedValues[node.name]->getType();
+    // Тип значения в переменной, а не её адреса
+    llvm::Value* variable = context.NamedValues[node.name];
+    llvm::Type* varType = nullptr;
+    if (auto* local = llvm::dyn_cast<llvm::AllocaInst>(variable))
+        varType = local->getAllocatedType();
+    else if (auto* global = llvm::dyn_cast<llvm::GlobalVariable>(variable))
+        varType = global->getValueType();
     if (!varType) {
         LogWarning("Не удалось получить тип для переменной " + node.name);
         result = nullptr;
