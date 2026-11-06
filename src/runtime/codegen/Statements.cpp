@@ -111,10 +111,13 @@ namespace Statements {
             }
         }
         
+        // В void-функции return без значения: выражение там это NullNode
+        if (context.Builder.GetInsertBlock()->getParent()->getReturnType()->isVoidTy()) {
+            return context.Builder.CreateRetVoid();
+        }
+
         if (!result) {
-            if (context.Builder.GetInsertBlock()->getParent()->getReturnType()->isVoidTy()) {
-                return context.Builder.CreateRetVoid();
-            } else {
+            {
                 codeGen.LogWarning("Не удалось сгенерировать значение для return");
                 llvm::Value* null = context.getNullValue();
                 return context.Builder.CreateRet(null);
@@ -122,8 +125,11 @@ namespace Statements {
         } else {
             // Для массивов не нужно делать loadValueIfPointer,
             // так как они уже представлены как ptr
+            // Обычную локальную переменную загружаем всегда, иначе вернётся её адрес
+            auto localVariable = llvm::dyn_cast<llvm::AllocaInst>(result);
             if (!result->getType()->isPointerTy() || 
-                !llvm::StructType::getTypeByName(context.TheContext, "array_struct")) {
+                !llvm::StructType::getTypeByName(context.TheContext, "array_struct") ||
+                (localVariable && !localVariable->getAllocatedType()->isStructTy())) {
                 result = TypeConversions::loadValueIfPointer(context, result, "return_load");
             }
             

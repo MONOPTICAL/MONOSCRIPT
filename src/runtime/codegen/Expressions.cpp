@@ -10,6 +10,32 @@
 #include <string>
 #include <vector>
 
+// Целочисленное деление на ноль останавливает программу с понятным сообщением
+static void emitDivisionByZeroCheck(CodeGenContext& context, llvm::Value* divisor) {
+    llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
+    llvm::BasicBlock* errorBlock = llvm::BasicBlock::Create(context.TheContext, "div.zero", function);
+    llvm::BasicBlock* okBlock = llvm::BasicBlock::Create(context.TheContext, "div.ok", function);
+
+    llvm::Value* isZero = context.Builder.CreateICmpEQ(
+        divisor, llvm::ConstantInt::get(divisor->getType(), 0), "is_zero_check"
+    );
+    context.Builder.CreateCondBr(isZero, errorBlock, okBlock);
+
+    context.Builder.SetInsertPoint(errorBlock);
+    llvm::Type* i32Type = llvm::Type::getInt32Ty(context.TheContext);
+    llvm::FunctionCallee putsFunc = context.TheModule->getOrInsertFunction(
+        "puts", i32Type, llvm::PointerType::getUnqual(context.TheContext)
+    );
+    llvm::FunctionCallee exitFunc = context.TheModule->getOrInsertFunction(
+        "exit", llvm::Type::getVoidTy(context.TheContext), i32Type
+    );
+    context.Builder.CreateCall(putsFunc, {context.Builder.CreateGlobalString("Runtime Error: division by zero")});
+    context.Builder.CreateCall(exitFunc, {llvm::ConstantInt::get(i32Type, 1)});
+    context.Builder.CreateUnreachable();
+
+    context.Builder.SetInsertPoint(okBlock);
+}
+
 llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryOpNode& node, llvm::Value* left, llvm::Value* right) {
     left = TypeConversions::loadValueIfPointer(context, left, "left");
     right = TypeConversions::loadValueIfPointer(context, right, "right");
@@ -103,47 +129,8 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
             }
             return context.Builder.CreateFDiv(left, right, "divtmp_float");
         } else {
-            // Упрощенный вариант для целочисленного деления:
-            llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
-
-            llvm::BasicBlock* currentBlock = context.Builder.GetInsertBlock();
-
-            llvm::BasicBlock* trapBlock = llvm::BasicBlock::Create(context.TheContext, "trap", function);
-            llvm::BasicBlock* divBlock = llvm::BasicBlock::Create(context.TheContext, "div", function);
-
-            // Проверка на делитель == 0
-            llvm::Value* isZero = context.Builder.CreateICmpEQ(
-                right, llvm::ConstantInt::get(right->getType(), 0), "is_zero_check"
-            );
-            context.Builder.CreateCondBr(isZero, trapBlock, divBlock);
-
-            // Код в trap-блоке
-            context.Builder.SetInsertPoint(trapBlock);
-            llvm::Function* trapFunc = llvm::Intrinsic::getOrInsertDeclaration(
-                context.TheModule.get(), llvm::Intrinsic::trap
-            );
-            context.Builder.CreateCall(trapFunc);
-            context.Builder.CreateUnreachable();
-
-            // Код в блоке деления
-            context.Builder.SetInsertPoint(divBlock);
-            auto div = context.Builder.CreateSDiv(left, right, "divtmp_int");
-            // Создаем переход к продолжению
-            llvm::BasicBlock* continueBlock = llvm::BasicBlock::Create(
-                context.TheContext, "div_continue", function
-            );
-            context.Builder.CreateBr(continueBlock);
-
-            // Устанавливаем точку вставки на блок продолжения
-            context.Builder.SetInsertPoint(continueBlock);
-
-            // Создаем PHI-узел для результата деления
-            llvm::PHINode* phi = context.Builder.CreatePHI(
-                div->getType(), 1, "div_result"
-            );
-            phi->addIncoming(div, divBlock);
-
-            return phi;
+            emitDivisionByZeroCheck(context, right);
+            return context.Builder.CreateSDiv(left, right, "divtmp_int");
         }
     }
     else if (node.op == "srem" || node.op == "frem") {
@@ -156,6 +143,7 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
             }
             return context.Builder.CreateFRem(left, right, "remtmp_float");
         } else {
+            emitDivisionByZeroCheck(context, right);
             return context.Builder.CreateSRem(left, right, "remtmp_int");
         }
     } 

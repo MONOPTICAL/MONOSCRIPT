@@ -39,7 +39,7 @@ int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimi
     
     if (!handle) {
         std::cerr << "Error loading standard library (libm_std.so): " << dlerror() << std::endl;
-        return 1;
+        return RUN_FAILED;
     }
 
     // JIT
@@ -70,7 +70,7 @@ int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimi
         if (!ClonedModule) {
             std::cerr << "Error cloning module for JIT: ";
             Err.print("executeModule", llvm::errs());
-            return 1;
+            return RUN_FAILED;
         }
     }
 
@@ -161,10 +161,17 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
 #if DEBUG
             auto t_jit_start = std::chrono::high_resolution_clock::now();
 #endif
+            if (!context.TheModule->getFunction(entryFunctionName)) {
+                std::cerr << "Error: entry function not found: " << entryFunctionName << ", add main or mark a function with @entry" << std::endl;
+                return RUN_FAILED;
+            }
+
             int result = executeModule(context.TheModule.get(), entryFunctionName, offOptimization);
 #if DEBUG
             auto t_jit_end = std::chrono::high_resolution_clock::now();
 #endif
+            if (result == RUN_FAILED) return RUN_FAILED;
+
             std::cout << "[" << entryFunctionName << " exited with code " << result << "]" << std::endl;
 
 #if DEBUG
@@ -183,10 +190,10 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
             return result;
         } else {
             std::cerr << "Ошибка: Не удалось получить модуль LLVM для выполнения." << std::endl;
-            return 1;
+            return RUN_FAILED;
         }
     } catch (const std::exception& e) {
         std::cerr << "Ошибка при выполнении: " << e.what() << std::endl;
-        return 1;
+        return RUN_FAILED;
     }
 }

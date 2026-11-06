@@ -10,6 +10,8 @@
 //   // expect-parse: (- (- 10 3) 2) в разборе должно быть это S-выражение, семантика не запускается
 //   // expect-output: текст        программа при запуске печатает эту строку, директив может быть несколько,
 //                                  строки проверяются по порядку; без LLVM такой тест пропускается
+//   // expect-runtime-error: текст программа запускается и останавливается с этим сообщением и кодом 1,
+//                                  без LLVM такой тест пропускается
 //   // expect-quiet                на успехе компилятор ничего не печатает
 //   // xfail: причина              известный баг: падение не ломает прогон
 //
@@ -237,6 +239,11 @@ static bool loadTest(const fs::path& path, TestCase& test)
             test.expect = "run";
             test.outputChecks.push_back(trim(line.substr(18)));
         }
+        else if (startsWith(line, "// expect-runtime-error: "))
+        {
+            test.expect = "runtime-error";
+            test.errorText = trim(line.substr(25));
+        }
         else if (line == "// expect-quiet")
             test.quiet = true;
         else if (startsWith(line, "// xfail: "))
@@ -282,6 +289,14 @@ static std::string evaluate(const TestCase& test, const RunResult& run)
         return "компилятор упал, код выхода " + std::to_string(run.exitCode);
 
     if (test.expect == "no-crash") return "";
+
+    if (test.expect == "runtime-error")
+    {
+        if (run.exitCode == 0) return "ожидалась ошибка при запуске, но программа завершилась успешно";
+        if (run.output.find(test.errorText) == std::string::npos)
+            return "в выводе нет текста: " + test.errorText;
+        return "";
+    }
 
     if (test.expect == "error")
     {
@@ -497,7 +512,8 @@ int runFrontendTests(const std::vector<std::string>& checkCommand, const std::ve
         ReportEntry entry;
         entry.name = relative.stem().string();
 
-        if (test.expect == "run" && runCommand.empty())
+        const bool needsRun = test.expect == "run" || test.expect == "runtime-error";
+        if (needsRun && runCommand.empty())
         {
             entry.status = TestStatus::Skipped;
             ++skipped;
@@ -505,7 +521,7 @@ int runFrontendTests(const std::vector<std::string>& checkCommand, const std::ve
             continue;
         }
 
-        const RunResult run = runCheck(test.expect == "run" ? runCommand : checkCommand, test);
+        const RunResult run = runCheck(needsRun ? runCommand : checkCommand, test);
         entry.failure = evaluate(test, run);
         entry.output = run.output;
         splitReason(test.xfail, entry.reason, entry.location);
