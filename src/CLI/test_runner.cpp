@@ -285,6 +285,21 @@ static bool hasErrorOnLine(const std::string& output, int line)
 static std::string evaluate(const TestCase& test, const RunResult& run)
 {
     if (run.exitCode == 124) return "завис (таймаут 10 с)";
+
+    // Программа дошла до конца: код выхода теперь её собственный, это не ошибка компилятора.
+    // Строки вывода ищем по порядку: между ними может быть отладочный вывод
+    const bool programFinished = run.output.find(" exited with code ") != std::string::npos;
+    if (test.expect == "run" && programFinished) {
+        std::istringstream programOutput(run.output);
+        std::string programLine;
+        size_t nextOutputCheck = 0;
+        while (nextOutputCheck < test.outputChecks.size() && std::getline(programOutput, programLine))
+            if (trim(programLine) == test.outputChecks[nextOutputCheck]) ++nextOutputCheck;
+        if (nextOutputCheck < test.outputChecks.size())
+            return "в выводе нет строки: " + test.outputChecks[nextOutputCheck];
+        return "";
+    }
+
     if (run.exitCode != 0 && run.exitCode != 1)
         return "компилятор упал, код выхода " + std::to_string(run.exitCode);
 
@@ -313,15 +328,6 @@ static std::string evaluate(const TestCase& test, const RunResult& run)
     for (const auto& check : test.parseChecks)
         if (run.output.find(check) == std::string::npos)
             return "в разборе нет: " + check;
-
-    // Строки вывода ищем по порядку: между ними может быть отладочный вывод
-    std::istringstream outputStream(run.output);
-    std::string outputLine;
-    size_t nextCheck = 0;
-    while (nextCheck < test.outputChecks.size() && std::getline(outputStream, outputLine))
-        if (trim(outputLine) == test.outputChecks[nextCheck]) ++nextCheck;
-    if (nextCheck < test.outputChecks.size())
-        return "в выводе нет строки: " + test.outputChecks[nextCheck];
 
     // В Debug-сборке отладочный вывод разрешён
     if (!DEBUG && test.quiet && !trim(run.output).empty()) return "на успехе компилятор что-то напечатал";

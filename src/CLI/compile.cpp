@@ -91,7 +91,7 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath, const s
     }
     
     // mono
-    gccCmd += " " + stdlibPath + " -lm -ldl -Wl,-rpath," + stdlibDir;
+    gccCmd += " " + stdlibPath + " -lgc -lm -ldl -Wl,-rpath," + stdlibDir;
     
     std::cout << "Запуск команды: " << gccCmd << std::endl;
     int gccRet = std::system(gccCmd.c_str());
