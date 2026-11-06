@@ -6,258 +6,282 @@
 <h3 align="center">MONOSCRIPT</h3>
 
   <p align="center">
-    Convenient scripting language for creating plugins for MONOPTICAL
+    Convenient language for creating plugins for MONOPTICAL
     <br />
   </p>
   <hr>
 </div>
 
-**MONOSCRIPT** is an experimental programming language with both static and dynamic typing. It features a concise syntax inspired by **Python**, **C**, and functional ideas from **Elixir** and **F#**. Designed as an **embedded scripting language**, it emphasizes:
+**MONOSCRIPT** is an experimental, statically typed programming language with type inference, compiled through **LLVM**. It feels like a scripting language, runs instantly through a JIT, and can also be built into a native executable.
 
-- safe execution,
-    
-- modularity,
-    
-- extensibility,
-    
-- ease of learning and code readability.
-    
+```go
+[i64]fibonacci(i64: n) @strict @pure
+|   if n < 2
+|   |   return n
+|   return fibonacci(n - 1) + fibonacci(n - 2)
 
-It was created to be used in closed environments, such as **security plugins**, **scanning systems**, **data analytics**, **automation**, and as part of the **MONOPTICAL** project.
+[i32]main()
+|   echo("fib(30) = " + fibonacci(30))
+|   return 0
+```
+
+> 🚧 **Early development.** Numbers, strings, functions, loops and modules work today. Arrays, maps and structs are type-checked, but do not fully run yet. See [Current State](#-current-state).
+
+## 💡 Why MONOSCRIPT?
+
+MONOPTICAL needs plugins: small programs for security checks, scanning, data analytics and automation. They have to be quick to write, and they must not fail in surprising ways.
+
+Scripting languages are quick to write, but type errors only show up when the code is already running. Systems languages catch those errors, but they are too heavy for a small plugin. MONOSCRIPT aims for the middle:
+
+|Goal|How|
+|---|---|
+|Quick to write|Short syntax, type inference, run a file with one command|
+|Hard to break|Static types, no silent narrowing, errors at compile time|
+|Strict where it matters|Turn on `@strict` and `@pure` per function, not for the whole project|
+|Fast|Native code through LLVM instead of an interpreter|
+|Easy to extend|Add native functions in **D** with one entry in a TOML file|
+
+## ✨ What Makes It Different
+
+### 🏷️ Strictness Per Function
+
+You choose how strict each function is. Quick code stays quick, and critical code gets stronger guarantees:
+
+```go
+[i32]quick()
+|   i8 small = 5
+|   i32 wide = small          // widens automatically
+|   return wide
+
+[i32]careful() @strict
+|   i8 small = 5
+|   i32 wide = small->i32     // @strict requires an explicit cast
+|   return wide
+
+[i32]main()
+|   echo("" + quick() + careful())
+|   return 0
+```
+
+### 🧼 Purity That Is Actually Checked
+
+`@pure` is a promise the compiler enforces. A pure function cannot call impure functions, read globals or modify the objects passed to it:
+
+```go
+[string]label(i32: score) @pure
+|   return "score: " + score    // OK
+
+[void]report(i32: score) @pure
+|   echo(label(score))          // compile error: echo is impure
+
+[i32]main()
+|   return 0
+```
+
+### 🔢 No Silent Narrowing
+
+Widening is automatic. Anything that can lose data needs an explicit cast:
+
+```go
+[i32]main()
+|   i32 big = 300
+|   i64 wide = big          // OK
+|   i8 small = big->i8      // OK: you asked for it
+|   i8 oops = big           // compile error: use explicit cast ->i8
+|   return 0
+```
+
+### 🧱 Visible Structure
+
+Blocks start with `|`, so nesting is visible at a glance and does not depend on invisible whitespace:
+
+```go
+[i32]main()
+|   for i in range(10)
+|   |   if i % 2 == 0
+|   |   |   echo("even: " + i)
+|   return 0
+```
+
+### 🔌 Explicit Modules
+
+Import a whole module, a single function or a function under an alias. Functions can stay `@private`, and replacing an imported function has to be intentional:
+
+```go
+use
+|> http_server
+|> math -> sqrt
+|> math -> pow : power
+
+[i32]helper() @overwrite    // without @overwrite, a name clash is a compile error
+|   return 100
+```
 
 ## 🧭 Paradigms
 
-MONOSCRIPT combines several programming paradigms:
-
 |Paradigm|Description|
 |---|---|
-|Imperative|Traditional constructs like `if`, `for`, `while`, mutability, and step-by-step execution.|
-|Functional|Lambdas, pure functions, pipe operators.|
-|Modular|Organized via `use`, modules, and namespaces.|
-|Structural|Custom `struct`s with methods and encapsulation support.|
-
-> About OOP The language is **not object-oriented** in the classic sense (no class inheritance), but **structs with methods** offer similar code organization.
+|Imperative|`if`, `for`, `while`, mutable variables, step-by-step execution.|
+|Modular|`use`, `@private` and `@overwrite`.|
+|Structural|Custom `struct`s, no class inheritance.|
+|Functional|Pure functions with `@pure`. Lambdas and pipes are planned.|
 
 ## 🔠 Data Types
 
----
-
-**MONOSCRIPT** features a compact and expressive type system aimed at both strict static checks and flexible dynamic usage. It avoids common runtime errors like null dereferencing and type mismatches.
-
 ### 📃 Primitive Types
 
-- `i1`, `i8`, `i16`, `i32`, `i64` — integers with varying widths
-    
+- `i1` — boolean, `true` and `false`
+- `i8`, `i16`, `i32`, `i64` — signed integers
 - `float` — floating-point numbers
-    
 - `string` — text values
-    
 - `void` — absence of value (used for functions)
-    
 
 ### 📦 Containers and Structs
 
-- `array<T>` — arrays of fixed or dynamic size
-    
-- `map<K, V>` — key-value mappings (dictionaries)
-    
-- `struct` — user-defined structures with fields and methods
-    
+- `array<T>` — arrays
+- `map<K, V>` — key-value mappings
+- `struct` — user-defined structures
+
+Like in Python, numbers are copied, while objects are passed by reference. Use `copy(x)` when you need a separate copy.
 
 ### ⚙️ Typing
 
-MONOSCRIPT's type system adapts to the use case:
-
-|Characteristic|Details|
+|Form|Example|
 |---|---|
-|Static|`type name = value` declares explicit type.|
-|Dynamic|`name ^= value` infers the type automatically.|
-|Hybrid|Both styles can be used within the same program.|
-|Null-safe|Variables are non-null by default; checked explicitly via `?x`.|
-
-> This safety reduces bugs and makes code behavior more predictable while remaining concise.
+|Explicit type|`i32 count = 0`|
+|Inferred type|`name ^= "value"`|
+|Constant|`const i32 limit = 10`, `final limit ^= 10`|
+|Cast|`value->i8`|
 
 ## 📋 Syntax
 
-### 📌 Key Principles
+### 🧪 Functions
 
-- **Readability over brevity**.
-    
-- **Blocks start with `|`** — makes structure visually clear.
-    
-- **Return types in square brackets** before function names:
-    
+The return type goes in square brackets, and the parameter type goes before its name:
 
 ```go
 [i32]sum(i32: a, i32: b)
+|   return a + b
+
+[i32]main()
+|   echo("1 + 2 = " + sum(1, 2))
+|   return 0
 ```
 
 ### 🧱 Operators
 
 |Operator|Meaning|
 |---|---|
-|`=`|Assignment (static type)|
-|`^=`|Assignment with inferred type|
-|`+ - * / %`|Arithmetic|
-|`== != > <`|Comparison|
-|`and or`|Logical operations|
-|`!expr`|Negation|
-|`:`|Start of multi-line lambda|
-|`->`|One-liner lambda body or Casting|
+|`=`|Assignment|
+|`^=`|Declaration with inferred type|
+|`+ - * / %`|Arithmetic, `+` also joins strings|
+|`== != > < >= <=`|Comparison of numbers and strings|
+|`and or !`|Logical operations|
+|`->`|Cast|
 
 ### ⚖️ Control Structures
 
 - `if`, `else if`, `else`
-    
-- `for i in range(...)`
-    
+- `for i in range(n)`
 - `while ...`
-    
 - `break`, `continue`
-    
-
-### 📍 Declarations
-
-- `const` — constant with explicit type
-    
-- `final` — constant with inferred type
-    
-- `use |> module` — module import
-    
-- `struct`, `return`, `null`
-    
-
-### 🧪 Functions & Lambdas
-
-**Named functions:**
-
-```go
-[i32]sum(i32: a, i32: b)
-|   return a + b
-```
-
-**One-liner lambda:**
-
-```go
-[i8](i8: x) -> x * x
-```
-
-**Block lambda:**
-
-```go
-[array<i8>](array<i8>: a) :
-|   for i in range(a)
-|   |   a[i] = a[i] * 2
-```
-
-### 🔗 Pipes (`|>`) — Functional Chains
-
-```go
-x ^= [1,2,3]
-    |> map(x, [i32](i32: a) -> a + 1)
-    |> filter(x, [i32](i32: a) -> a > 2)
-```
-
-- Each step gets the output of the previous.
-    
-- Enables readable, declarative chaining.
-    
-
-### 🧰 Structs & Methods
-
-```go
-[struct]User
-|  map<string,string> info
-|  [void]__init__(string: name, string: id)
-|  |  info = {"name": name, "id": id}
-|  [string]getName()
-|  |  return info["name"]
-```
-
-- Methods are regular functions inside structs.
-    
-- Encapsulation via internal fields.
-    
-- No inheritance.
-    
-
-### 📥 Imports (`use`)
-
-```cpp
-use
-|> http_server
-|> math -> sqrt : sqrtAlias
-```
-**Importing modules and functions** is done using the `use` keyword and pipe chains.
-
-- The module `http_server` is imported, then from the module `math` the function `sqrt` under the alias `sqrtAlias`.
-- You can import multiple modules and functions in one chain.
 
 ### 🏷️ Labels
 
+Labels go after the function declaration:
+
+|Label|Effect|
+|---|---|
+|`@entry`|Marks the entry point instead of `main`|
+|`@strict`|No implicit casts and no type inference|
+|`@pure`|No side effects, checked by the compiler|
+|`@private`|Hidden from imports|
+|`@overwrite`|Replaces an imported function on purpose|
+
+### 🧰 Structs
+
 ```go
-[i32]main() @entry @strict
-|   echo("Hello World!")
+[struct]User
+|   i32 age = 18
+|   string name = "anon"
+
+[void]birthday(User: user)
+|   user.age = user.age + 1
+
+[i32]main()
+|   User user = User()
+|   birthday(user)
+|   return user.age
 ```
-**Labels** allow you to mark functions, variables, or structures with special attributes that affect their behavior during compilation or execution.
 
-- Labels are specified after the declaration using `@`.
-- Multiple labels can be used simultaneously.
+## 📍 Current State
 
+|Feature|Status|
+|---|---|
+|Numbers, strings, operators and casts|✅ Working|
+|`if`, `while`, `for i in range(n)`|✅ Working|
+|Functions, recursion, calling before declaration|✅ Working|
+|Modules, `@strict`, `@pure`, `@entry`|✅ Working|
+|JIT and native executables|✅ Working|
+|Arrays: element access, `for x in array`|🚧 Type-checked, code generation in progress|
+|Structs and `copy`|🚧 Type-checked, code generation in progress|
+|Garbage collection (Boehm)|🚧 Linked, not used yet|
+|Maps|🚧 Type-checked, not generated yet|
+|Struct methods|📅 Planned|
+|Lambdas and pipes (`\|>`)|📅 Planned|
+|Null safety|📅 Planned|
+|Embedding and sandboxing|📅 Planned|
 
-### 🪜 Security
+## 🚀 Getting Started
 
-- **Null safety** — checked explicitly with `?x`.
-    
-- **Sandboxing** — interpreter runs in isolated environments.
-    
+You will need CMake 3.24+, a C++20 compiler, LLVM, `dmd`, `gcc` and `libgc-dev`.
 
-### ⚖️ Embeddability & Extensibility
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+```
 
-- MONOSCRIPT is embeddable in other apps.
-    
-- Core interpreter written in **C++**, **D** and **Zig**.
-    
-- Easily extended with native modules.
-    
-- Module system via `use` is supported.
-    
+```bash
+cmake --build build
+```
+
+Run a program with the JIT:
+
+```bash
+./ms run hello.ms
+```
+
+Build a native executable:
+
+```bash
+./ms --compile hello hello.ms
+```
+
+Run the test suite:
+
+```bash
+./ms --run_tests
+```
 
 ## 📄 License
 
 MONOSCRIPT is an open-source project under the GNU LGPL v2.1:
 
 - You can use it freely.
-    
+
 - Engine changes must remain open.
-    
+
 - Embedding does not require disclosing your source.
-    
 
 ## ❤️ Conclusion
 
 **MONOSCRIPT is not trying to compete with giants. It's about solving real problems in a simple, secure, and enjoyable way.**
 
-Perfect for:
+Made for:
 
 - scripting and logic in security systems,
-    
-- DevOps/Kubernetes automation,
-    
-- safe and readable mini-programs,
-    
-- educational and embedded projects.
-    
 
-```rust
-[i64]fibonacci(i64: n) @strict @pure
-|   if (n == 0)
-|   |   return 0
-|   else if (n == 1)
-|   |   return 1
-|   return fibonacci(n - 1) + fibonacci(n - 2)
+- scanning and data analytics,
 
-[i32]main()
-|   echo(toString_long(fibonacci(47))) // 2971215073
-|   return 0
-```
+- DevOps and automation,
+
+- small, safe and readable programs.
