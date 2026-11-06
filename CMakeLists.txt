@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.24) 
+cmake_minimum_required(VERSION 3.24)
 project(ms)
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
@@ -7,13 +7,51 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 
-find_package(LLVM REQUIRED CONFIG)
+add_definitions(-DSTDLIB_TOML_PATH="${CMAKE_SOURCE_DIR}/mono/mono.toml") # Путь к toml файлу
+add_definitions(-DFRONTEND_TESTS_PATH="${CMAKE_SOURCE_DIR}/tests/frontend") # Путь к тестам для -run_tests
 
-message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
-message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+# Фронтенд не зависит от LLVM, поэтому тесты собираются и без него
+add_library(ms_frontend STATIC
+    src/lexer/Lexer.cpp
+    src/lexer/ParsingFunctions.cpp
+    src/parser/Logic.cpp
+    src/parser/Parser.cpp
+    src/parser/Parsers.cpp
+    src/visitors/Register.cpp
+    src/visitors/BuiltIn.cpp
+    src/visitors/TypeSymbolVisitor/Expressions.cpp
+    src/visitors/TypeSymbolVisitor/Statements.cpp
+    src/visitors/TypeSymbolVisitor/Types.cpp
+    src/visitors/TypeSymbolVisitor/Utils.cpp
+    src/visitors/TypeSymbolVisitor/NotFinished.cpp
+    src/visitors/TypeSymbolVisitor/StructClass.cpp
+    src/visitors/TypeSymbolVisitor/Operators.cpp
+    src/linker/Linker.cpp
+    src/loader/loader.cpp
+    src/CLI/cli.cpp
+    src/CLI/ast_tools.cpp
+    src/CLI/symantic.cpp
+    src/CLI/test_runner.cpp
+    src/errors/ErrorEngine.cpp
+)
 
-# Врубаем определения LLVM чтобы билдил нормально
-add_definitions(${LLVM_DEFINITIONS})
+# DEBUG_MODE
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+  target_compile_definitions(ms_frontend PUBLIC DEBUG=true)
+  message(STATUS "Debug mode enabled (DEBUG=true)")
+else()
+  target_compile_definitions(ms_frontend PUBLIC DEBUG=false)
+  message(STATUS "Debug mode disabled (DEBUG=false)")
+endif()
+
+find_package(LLVM CONFIG QUIET)
+
+if(LLVM_FOUND)
+  message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+  message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+
+  # Врубаем определения LLVM чтобы билдил нормально
+  add_definitions(${LLVM_DEFINITIONS})
 
   # СТАНДАРНАЯ БИБЛИОТЕКА
   # ----------------------
@@ -29,92 +67,89 @@ add_definitions(${LLVM_DEFINITIONS})
   )
   add_custom_target(build_dlib ALL DEPENDS ${D_LIB}) # Создаём цель для сборки библиотеки
   add_definitions(-DSTDLIB_SO_PATH="${D_LIB}") # Путь к .so библиотеке
-  add_definitions(-DSTDLIB_TOML_PATH="${CMAKE_SOURCE_DIR}/mono/mono.toml") # Путь к toml файлу
   # ----------------------
 
-# Добавить пути к заголовочным файлам LLVM
-include_directories(${LLVM_INCLUDE_DIRS})
+  # Добавить пути к заголовочным файлам LLVM
+  include_directories(${LLVM_INCLUDE_DIRS})
 
-# Добавить пути к библиотекам LLVM
-link_directories(${LLVM_LIBRARY_DIRS})
+  # Добавить пути к библиотекам LLVM
+  link_directories(${LLVM_LIBRARY_DIRS})
 
-# Ну а тут список компонентов LLVM
-llvm_map_components_to_libnames(llvm_libs
-  core
-  support
-  irreader
-  executionengine
-  mcjit             
-  orcjit           
-  target            
-  # X86 
-  # -------
-  X86CodeGen
-  X86AsmParser
-  X86Desc
-  X86Info
-  # -------
-  analysis
-  transformutils
-  instcombine
-  instrumentation
-  ipo
-  vectorize
-  scalaropts
-  objcarcopts
-  passes
-  asmprinter        
-)
+  # Ну а тут список компонентов LLVM
+  llvm_map_components_to_libnames(llvm_libs
+    core
+    support
+    irreader
+    executionengine
+    mcjit
+    orcjit
+    target
+    # X86
+    # -------
+    X86CodeGen
+    X86AsmParser
+    X86Desc
+    X86Info
+    # -------
+    analysis
+    transformutils
+    instcombine
+    instrumentation
+    ipo
+    vectorize
+    scalaropts
+    objcarcopts
+    passes
+    asmprinter
+  )
 
-add_executable(ms # Create an executable target named ms
-    src/main.cpp 
-    src/lexer/Lexer.cpp 
-    src/lexer/ParsingFunctions.cpp 
-    src/parser/Logic.cpp 
-    src/parser/Parser.cpp 
-    src/parser/Parsers.cpp
-    src/visitors/Register.cpp
-    src/visitors/BuiltIn.cpp
-    src/visitors/TypeSymbolVisitor/Expressions.cpp
-    src/visitors/TypeSymbolVisitor/Statements.cpp
-    src/visitors/TypeSymbolVisitor/Types.cpp
-    src/visitors/TypeSymbolVisitor/Utils.cpp
-    src/visitors/TypeSymbolVisitor/NotFinished.cpp
-    src/visitors/TypeSymbolVisitor/StructClass.cpp
-    src/visitors/TypeSymbolVisitor/Operators.cpp
-    src/linker/Linker.cpp
-    src/loader/loader.cpp
-    src/runtime/ASTGen.cpp
-    src/runtime/CodeGenContext.cpp
-    src/runtime/codegen/Declarations.cpp
-    src/runtime/codegen/Arrays.cpp
-    src/runtime/codegen/Statements.cpp
-    src/runtime/codegen/Expressions.cpp
-    src/runtime/codegen/TypeConversions.cpp
-    src/CLI/cli.cpp
-    src/CLI/ast_tools.cpp
-    src/CLI/runner.cpp
-    src/CLI/symantic.cpp
-    src/CLI/compile.cpp
-    src/errors/ErrorEngine.cpp
-)
+  add_executable(ms # Create an executable target named ms
+      src/main.cpp
+      src/runtime/ASTGen.cpp
+      src/runtime/CodeGenContext.cpp
+      src/runtime/codegen/Declarations.cpp
+      src/runtime/codegen/Arrays.cpp
+      src/runtime/codegen/Statements.cpp
+      src/runtime/codegen/Expressions.cpp
+      src/runtime/codegen/TypeConversions.cpp
+      src/CLI/runner.cpp
+      src/CLI/compile.cpp
+  )
 
-# Добавляем библиотеку D
-add_dependencies(ms build_dlib) 
+  # Добавляем библиотеку D
+  add_dependencies(ms build_dlib)
 
-# DEBUG_MODE
-if(CMAKE_BUILD_TYPE MATCHES Debug)
-  target_compile_definitions(ms PRIVATE DEBUG=true)
-  message(STATUS "Debug mode enabled (DEBUG=true)")
+  target_link_libraries(ms PRIVATE ms_frontend ${llvm_libs})
+
+  if(UNIX AND NOT APPLE)
+      target_link_options(ms PRIVATE -Wl,--export-dynamic)
+  endif()
 else()
-  target_compile_definitions(ms PRIVATE DEBUG=false)
-  message(STATUS "Debug mode disabled (DEBUG=false)")
+  message(WARNING "LLVM не найден: ms не будет собран, доступны только тесты фронтенда")
 endif()
 
-target_link_libraries(ms PRIVATE ${llvm_libs})
+# ТЕСТЫ
+# ----------------------
+enable_testing()
 
-if(UNIX AND NOT APPLE)
-    target_link_options(ms PRIVATE -Wl,--export-dynamic)
-endif()
+add_executable(ms_check tests/ms_check.cpp)
+target_link_libraries(ms_check PRIVATE ms_frontend)
+
+add_executable(run_tests tests/run_tests.cpp)
+target_link_libraries(run_tests PRIVATE ms_frontend)
+
+set_target_properties(ms_check run_tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+
+add_test(NAME frontend COMMAND run_tests $<TARGET_FILE:ms_check> ${CMAKE_SOURCE_DIR}/tests/frontend)
+
+# Собирает только нужное для тестов и сразу гоняет их
+add_custom_target(test-frontend
+    COMMAND run_tests $<TARGET_FILE:ms_check> ${CMAKE_SOURCE_DIR}/tests/frontend
+    DEPENDS ms_check run_tests
+    USES_TERMINAL
+)
+# ----------------------
+
 # Билд с дебагом : cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build
 # Билд без дебага : cmake -B build -DCMAKE_BUILD_TYPE=Release
+# Тесты фронтенда : ./ms -run_tests или без LLVM: cmake --build build --target test-frontend

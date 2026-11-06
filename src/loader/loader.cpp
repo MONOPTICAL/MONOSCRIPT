@@ -103,4 +103,15 @@ std::string findLibraryPath(const std::string& Default_LIB) {
     return Default_LIB;
 }
 
+
+std::string findTestsPath() {
+
+#ifdef FRONTEND_TESTS_PATH
+    if (std::ifstream(std::string(FRONTEND_TESTS_PATH) + "/ok/hello.ms").good()) {
+        return FRONTEND_TESTS_PATH;
+    }
+#endif
+    return getExecutableDir() + "/tests/frontend";
+}
+
 }

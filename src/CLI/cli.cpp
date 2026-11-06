@@ -12,6 +12,8 @@ void printHelp(const char* programName) {
               << "  --run, run       ▶️  Execute the program via LLVM\n"
               << "  --compile        🏗️  Compile to executable\n"
               << "  --offOptimization 🛠️  Disable LLVM optimization\n"
+              << "  --run_tests [FILTER] 🧪 Run frontend tests, FILTER selects tests by path\n"
+              << "  --verbose        📋 Show every test with -run_tests\n"
               << "\n⌨️ If FILE is not specified, input is read from standard input.\n"
               << std::endl;
 }
@@ -42,6 +44,10 @@ CLIOptions parseArgs(int argc, char* argv[]) {
             }
         } else if (arg == "--offOptimization") {
             options.offOptimization = true;
+        } else if (arg == "--run_tests") {
+            options.runTests = true;
+        } else if (arg == "--verbose") {
+            options.verbose = true;
         } else if (arg[0] != '-') {
             options.inputFile = arg;
         } else {
