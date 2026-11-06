@@ -120,6 +120,7 @@ if(LLVM_FOUND)
   add_dependencies(ms build_dlib)
 
   target_link_libraries(ms PRIVATE ms_frontend ${llvm_libs})
+  target_compile_definitions(ms PRIVATE LLVM_TOOLS_PATH="${LLVM_TOOLS_BINARY_DIR}")
 
   if(UNIX AND NOT APPLE)
       target_link_options(ms PRIVATE -Wl,--export-dynamic)

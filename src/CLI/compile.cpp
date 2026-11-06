@@ -31,7 +31,14 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath, const s
     irFile.close();
 
     std::string objPath = outputPath + ".o";
-    std::string llcCmd = "llc -filetype=obj -o " + objPath + " " + irPath;
+    // llc может лежать не в PATH, а рядом с LLVM, с которым собран компилятор
+    std::string llcTool = "llc";
+#ifdef LLVM_TOOLS_PATH
+    if (std::ifstream(std::string(LLVM_TOOLS_PATH) + "/llc").good())
+        llcTool = std::string(LLVM_TOOLS_PATH) + "/llc";
+#endif
+    // pic нужен, потому что gcc по умолчанию собирает PIE, а без него не линкуются строки
+    std::string llcCmd = llcTool + " -filetype=obj -relocation-model=pic -o " + objPath + " " + irPath;
     
     std::cout << "Запуск команды: " << llcCmd << std::endl;
     int llcRet = std::system(llcCmd.c_str());
@@ -103,7 +110,7 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath, const s
     return true;
 }
 
-void compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::string& outputFile) {
+bool compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::string& outputFile) {
     CodeGenContext context(outputFile);
     ASTGen codeGen(context);
     combinedAST->accept(codeGen);
@@ -151,10 +158,17 @@ void compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::st
         context.TheModule->print(llvm::outs(), nullptr);
         std::cerr << "--- END LLVM IR(O2) ---\n" << std::endl;
 #endif
+        if (!context.TheModule->getFunction(entryFunctionName)) {
+            std::cerr << "Error: entry function not found: " << entryFunctionName << ", add main or mark a function with @entry" << std::endl;
+            return false;
+        }
         if (!emitExecutable(context.TheModule.get(), outputFile, entryFunctionName)) {
             std::cerr << "Ошибка при компиляции в исполняемый файл." << std::endl;
+            return false;
         }
+        return true;
     } else {
         std::cerr << "Ошибка: Не удалось получить модуль LLVM для компиляции." << std::endl;
+        return false;
     }
 }

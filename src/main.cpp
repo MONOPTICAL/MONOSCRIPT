@@ -41,14 +41,18 @@ int main(int argc, char* argv[]) {
         // Выполнение только если указан флаг --run или run
         if (options.runJIT) {
             std::string currentFilePath = std::filesystem::current_path().string();
-            runProgram(combinedAST, currentFilePath, options.showAST, options.offOptimization);
+            if (runProgram(combinedAST, currentFilePath, options.showAST, options.offOptimization) == RUN_FAILED) {
+                return 1;
+            }
             return 0;
         }
 
         if (options.compileExecutable) {
             // Компиляция в исполняемый файл
             std::string outputFile = options.ExecutableFile.empty() ? "output" : options.ExecutableFile;
-            compileToExecutable(combinedAST, outputFile);
+            if (!compileToExecutable(combinedAST, outputFile)) {
+                return 1;
+            }
             std::cout << "Компиляция завершена. Исполняемый файл: " << outputFile << std::endl;
             return 0;
         }

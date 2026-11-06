@@ -114,7 +114,10 @@ void ASTGen::visit(FunctionNode& node) {
     unsigned idx = 0;
     for (auto &arg : func->args()) {
         arg.setName(node.parameters[idx++].second);
-        context.NamedValues[arg.getName().str()] = &arg;
+        // Параметр это обычная переменная: его можно читать и присваивать
+        llvm::AllocaInst* paramSlot = context.createEntryAlloca(arg.getType(), arg.getName().str());
+        context.Builder.CreateStore(&arg, paramSlot);
+        context.NamedValues[arg.getName().str()] = paramSlot;
     }
 
     // Генерируем тело функции, если оно есть
@@ -183,17 +186,9 @@ void ASTGen::visit(BlockNode& node) {
         if (dynamic_cast<FunctionNode*>(stmt.get()) && prevBlock) {
             context.Builder.SetInsertPoint(prevBlock);
         }
-        if (dynamic_cast<IfNode*>(stmt.get()) && prevBlock) {
+        // Инструкция могла создать новые блоки: if, цикл, проверку деления. Продолжаем с последнего
+        else if (prevBlock) {
             prevBlock = context.Builder.GetInsertBlock();
-            context.Builder.SetInsertPoint(prevBlock);
-        }
-        if (dynamic_cast<WhileNode*>(stmt.get()) && prevBlock) {
-            prevBlock = context.Builder.GetInsertBlock();
-            context.Builder.SetInsertPoint(prevBlock);
-        }
-        if (dynamic_cast<ForNode*>(stmt.get()) && prevBlock) {
-            prevBlock = context.Builder.GetInsertBlock();
-            context.Builder.SetInsertPoint(prevBlock);
         }
     }
 
@@ -315,16 +310,21 @@ void ASTGen::visit(IfNode& node) {
         context.Builder.CreateCondBr(condValue, thenBlock, mergeBlock);
     }
 
+    // Переменные каждой ветки живут только внутри неё
+    auto outerNamedValues = context.NamedValues;
+
     context.Builder.SetInsertPoint(thenBlock);
     node.thenBlock->accept(*this);
     if (!context.Builder.GetInsertBlock()->getTerminator())
         context.Builder.CreateBr(mergeBlock);
+    context.NamedValues = outerNamedValues;
 
     if (node.elseBlock) {
         context.Builder.SetInsertPoint(elseBlock);
         node.elseBlock->accept(*this);
         if (!context.Builder.GetInsertBlock()->getTerminator())
             context.Builder.CreateBr(mergeBlock);
+        context.NamedValues = outerNamedValues;
     }
 
     context.Builder.SetInsertPoint(mergeBlock);
@@ -420,10 +420,14 @@ void ASTGen::visit(WhileNode& node) {
     }
     context.Builder.CreateCondBr(condValue, loopBodyBlock, loopEndBlock);
 
+    // Переменные тела живут только внутри цикла
+    auto outerNamedValues = context.NamedValues;
+
     context.Builder.SetInsertPoint(loopBodyBlock);
     if (node.body) {
         node.body->accept(*this);
     }
+    context.NamedValues = outerNamedValues;
     
     if (!context.Builder.GetInsertBlock()->getTerminator()) {
         context.Builder.CreateBr(loopCondBlock);
