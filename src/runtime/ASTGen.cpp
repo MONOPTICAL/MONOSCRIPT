@@ -344,7 +344,7 @@ void ASTGen::visit(ForNode& node) {
     if (limit->getType() != counterType)
         limit = context.Builder.CreateIntCast(limit, counterType, true, "limit_cast");
 
-    llvm::AllocaInst* counter = context.Builder.CreateAlloca(counterType, nullptr, node.varName);
+    llvm::AllocaInst* counter = context.createEntryAlloca(counterType, node.varName);
     context.Builder.CreateStore(llvm::ConstantInt::get(counterType, 0), counter);
 
     llvm::Function* function = context.Builder.GetInsertBlock()->getParent();

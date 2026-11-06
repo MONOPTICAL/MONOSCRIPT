@@ -394,6 +394,8 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
         }
     }
 
+    checkPureAlias(node.expression);
+
     // Добавляем переменную в реестр
     auto varNode = std::make_shared<VariableAssignNode>(node.name, node.isConst, node.type, node.expression);
     varNode->inferredType = node.type; // Устанавливаем тип переменной
@@ -454,6 +456,7 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
         || varTypeStr.starts_with("map")
     ) {
         node.expression->accept(*this);
+        checkPureAlias(node.expression);
         validateCollectionElements(varType, node.expression, false);
         auto Block = std::dynamic_pointer_cast<BlockNode>(node.expression);
         auto Generic = std::dynamic_pointer_cast<GenericTypeNode>(varType);
@@ -497,6 +500,7 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
     else
     {
         node.expression->accept(*this);
+        checkPureAlias(node.expression);
         checkConversion(node.expression, varTypeStr);
         expressionType = varTypeStr;
     }

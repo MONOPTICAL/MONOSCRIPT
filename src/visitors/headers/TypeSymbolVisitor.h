@@ -42,6 +42,9 @@ private:
 
     void                                                            collectDeclarations(ProgramNode& node);
 
+    // В @pure нельзя завести новую ссылку на объект, который передали снаружи
+    void                                                            checkPureAlias(const std::shared_ptr<ASTNode>& expr);
+
     /*
     Проверяет, существует ли переменная в реестре(если переданный node является идентификатором)
     */
