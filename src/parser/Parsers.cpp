@@ -187,6 +187,7 @@ std::shared_ptr<ASTNode> Parser::parseIf()
     // Поэтому мы просто сразу посылаем его в parseExpression который разберёт его
 
     auto condition = parseExpression();
+    if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
     int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока if
     nextLine(); // Переходим к следующей строке токенов 
 
@@ -205,7 +206,9 @@ std::shared_ptr<ASTNode> Parser::parseIf()
         }
         else
         {
-            nextLine(); // consume 'else'
+            advance(); // consume 'else'
+            if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
+            nextLine();
             elseBlock = parseBlock(expectedIndent);
         }
     }
@@ -240,6 +243,7 @@ std::shared_ptr<ASTNode> Parser::parseFor()
     
     int currentLine = lineIndex; // Сохраняем текущую линию
     auto iterable = parseExpression(); // Парсим переменную для итерации
+    if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
     if (currentLine < lineIndex) // Если мы не перешли на следующую линию, то это не for
         lineIndex--;
 
@@ -267,6 +271,7 @@ std::shared_ptr<ASTNode> Parser::parseWhile()
 
     consume(TokenType::Keyword, "Expected 'while' keyword"); // Проверяем наличие ключевого слова while
     auto condition = parseExpression();
+    if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
 
     int expectedIndent = getIndentLevel(lines[lineIndex]) + 1;
     nextLine();
@@ -497,7 +502,8 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
 
     std::string name = current().value; // Сохраняем имя структуры
     consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора структуры
-    
+    if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
+
     int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока структуры
     nextLine(); // Переходим к следующему токену
     auto body = parseBlock(expectedIndent); // Парсим тело структуры
