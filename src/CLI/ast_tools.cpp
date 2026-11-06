@@ -85,12 +85,14 @@ std::shared_ptr<ProgramNode> parseAndLinkModules(
     
     // Инициализация ErrorEngine
     std::vector<std::string>* sourceFromTokens = new std::vector<std::string>();
+    std::vector<int>* lineNumbers = new std::vector<int>();
     for (const auto& tokenList : tokens) {
         std::string sourceLine;
         for (const auto& token : tokenList) {
             sourceLine += token.value + " ";
         }
         sourceFromTokens->push_back(sourceLine);
+        lineNumbers->push_back(tokenList.front().line);
     }
 
 #if DEBUG
@@ -104,7 +106,7 @@ std::shared_ptr<ProgramNode> parseAndLinkModules(
     std::cout << "--- Конец исходного кода из токенов ---\n";
 #endif
 
-    ErrorEngine::getInstance().initialize(*sourceFromTokens);
+    ErrorEngine::getInstance().initialize(*sourceFromTokens, *lineNumbers);
 
     return combinedAST;
 }

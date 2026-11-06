@@ -43,8 +43,6 @@ std::shared_ptr<TypeNode> TypeSymbolVisitor::checkForIdentifier(std::shared_ptr<
         if (!varAssign->expression->inferredType)
             LogError("Expression type is null for variable: " + idNode->name, node);
 
-        if (varAssign->expression && varAssign->expression->implicitCastTo) 
-            std::cout << varAssign->implicitCastTo->toString() << std::endl;
         return varAssign->expression->inferredType;
     }
     else if (auto varAssignNode = std::dynamic_pointer_cast<VariableAssignNode>(node)) {
@@ -587,10 +585,11 @@ std::shared_ptr<TypeNode> TypeSymbolVisitor::get_common_type_from_list(
     std::shared_ptr<ASTNode> error_context_node, // Для LogError в правильном контексте
     bool allow_numeric_promotion_for_simple_types) {
 
-    // DEBUGGING:
+#if DEBUG
      std::cout << "get_common_type_from_list called with types: ";
      for (const auto& t : types) { std::cout << (t ? t->toString() : "null") << ", "; }
      std::cout << "allow_promo: " << allow_numeric_promotion_for_simple_types << std::endl;
+#endif
 
     if (types.empty()) {
         // Если список типов пуст, возвращаем "auto", что может быть уточнено позже.
@@ -706,9 +705,10 @@ std::shared_ptr<TypeNode> TypeSymbolVisitor::get_common_type_from_list(
                 std::shared_ptr<TypeNode> common_k = get_common_type_from_list(all_key_types, error_context_node, true); // Передаем true
                 std::shared_ptr<TypeNode> common_v = get_common_type_from_list(all_value_types, error_context_node, true); // Передаем true
                 
-                // DEBUGGING:
-                 std::cout << "get_common_type_from_list (map) common_k: " << (common_k ? common_k->toString() : "null") 
+#if DEBUG
+                 std::cout << "get_common_type_from_list (map) common_k: " << (common_k ? common_k->toString() : "null")
                            << ", common_v: " << (common_v ? common_v->toString() : "null") << std::endl;
+#endif
 
                 if (common_k && common_v && common_k->toString().rfind("error_", 0) != 0 && common_v->toString().rfind("error_", 0) != 0 &&
                     common_k->toString() != "auto_empty_list" && common_v->toString() != "auto_empty_list") {

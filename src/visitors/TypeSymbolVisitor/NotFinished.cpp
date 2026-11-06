@@ -165,7 +165,6 @@ void TypeSymbolVisitor::visit(ReassignMemberNode& node) {
     if (!targetNumeric || !exprNumeric) {
         if (exprTypeStr != targetTypeStr)
         {
-            IC("ZDES");
             LogError("Type mismatch: expected " + targetTypeStr + ", got " + exprTypeStr, node.expression);
         }
         node.inferredType = targetType;
@@ -179,7 +178,9 @@ void TypeSymbolVisitor::visit(ReassignMemberNode& node) {
         return std::dynamic_pointer_cast<UnaryOpNode>(e) != nullptr;
     };
 
+#if DEBUG
     IC(node.expression);
+#endif
     if (isBoolExpr(node.expression) != (targetTypeStr == "i1"))
         LogError("Type mismatch: expected " + targetTypeStr + ", got " +
                  (isBoolExpr(node.expression) ? std::string("i1") : exprTypeStr), node.expression);

@@ -34,9 +34,16 @@ void ErrorEngine::warn(int line, int column, const std::string& message) {
 
 // --- Приватные методы ---
 
+int ErrorEngine::displayLine(int line) const {
+    if (lineNumbers && line >= 0 && line < static_cast<int>(lineNumbers->size())) {
+        return (*lineNumbers)[line];
+    }
+    return line + 1;
+}
+
 void ErrorEngine::printError(int line, int column, const std::string& errorType, const std::string& message, const std::string& hint) {
     // TODO: Добавить цвета
-    std::cerr << errorType << " [line " << line + 1 << ", column " << column + 1 << "]: " << message << std::endl;
+    std::cerr << errorType << " [line " << displayLine(line) << ", column " << column + 1 << "]: " << message << std::endl;
 
     if (sourceLines && sourceLines->size() > 0) {
         printSourceLine(line, column);
@@ -73,7 +80,7 @@ void ErrorEngine::printSourceLine(int line, int column) {
         auto [codeLine, removedCharsCount] = removeLeadingPipesAndSpaces(originalLine);
 
         // Вывод номера строки и самой строки
-        std::cerr << std::setw(5) << line + 1 << " | " << codeLine << std::endl;
+        std::cerr << std::setw(5) << displayLine(line) << " | " << codeLine << std::endl;
         // Вывод указателя (передаем очищенную строку, исходную колонку и кол-во удаленных символов)
         std::cerr << std::setw(5) << "" << " | " << generatePointer(codeLine, column, removedCharsCount) << std::endl;
     } else {

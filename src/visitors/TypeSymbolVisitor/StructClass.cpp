@@ -29,7 +29,9 @@ void TypeSymbolVisitor::visit(StructNode& node) {
     // Добавляем структуру в реестр
     //registry.addType(node.name, std::make_shared<GenericTypeNode>(node.name, std::vector<std::shared_ptr<TypeNode>>{}));
 
+#if DEBUG
     debugContexts();
+#endif
     // Возвращаемся к предыдущему контексту
     contexts.pop_back();
 }

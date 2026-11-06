@@ -91,9 +91,11 @@ void Parser::throwError(const std::string &errMsg)
         sourceFragment = std::string(sourceFragment.size()-2, '-') + sourceFragment + std::string(sourceFragment.size()-2, '-');
     }
     
+    // Пустые строки выкинуты лексером, поэтому настоящий номер берём из токена
+    const bool hasLine = lineIndex < lines.size();
     throw std::runtime_error(
-        "Parser Error [line " + std::to_string(lineIndex+1) + 
-        (tokenIndex < lines[lineIndex].size() ? ", column " + std::to_string(lines[lineIndex][tokenIndex].column) : "") +
+        "Parser Error [line " + std::to_string(hasLine ? lines[lineIndex].front().line : lineIndex+1) +
+        (hasLine && tokenIndex < lines[lineIndex].size() ? ", column " + std::to_string(lines[lineIndex][tokenIndex].column) : "") +
         "]: " + errMsg + "\n\nSOURCE(FILENAME) - placeholders\n" + sourceFragment
     );
 }
@@ -313,6 +315,12 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         catch (const std::invalid_argument& e) // Если преобразование не удалось, выбрасываем исключение
         {
             throw std::runtime_error("Parser Error: Invalid number format at line " + std::to_string(currentToken.line) +
+                ", column " + std::to_string(currentToken.column) +
+                ": " + currentToken.value);
+        }
+        catch (const std::out_of_range& e) // Если число не влезает в тип
+        {
+            throw std::runtime_error("Parser Error: Number out of range at line " + std::to_string(currentToken.line) +
                 ", column " + std::to_string(currentToken.column) +
                 ": " + currentToken.value);
         }

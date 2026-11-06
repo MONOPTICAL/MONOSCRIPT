@@ -38,17 +38,21 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
             for (const auto& stmt : std::dynamic_pointer_cast<BlockNode>(s->body)->statements)
             {
                 auto fn = std::dynamic_pointer_cast<FunctionNode>(stmt);
+#if DEBUG
                 if(fn)
                 {
                     IC(fn->name);
                     IC(fn->labels);
                     IC(methodName);
                 }
+#endif
                 if (fn && fn->name == methodName && fn->labels.end() != std::find(fn->labels.begin(), fn->labels.end(), "@decl"))
                     return true;
                 
             }
+#if DEBUG
             IC(methodName);
+#endif
             return false;
         };
 
@@ -155,8 +159,10 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
     if (noDecl)
     {
         node.inferredType = node.returnType;
+#if DEBUG
         IC(contexts.back().currentFunctionName);
         IC();
+#endif
         return;
     }
 
@@ -253,13 +259,17 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
     if (varType.starts_with("array")
         || varType.starts_with("map")
     ) {
+#if DEBUG
         ASTDebugger::debug(node.expression);
+#endif
         validateCollectionElements(node.type, node.expression, isAuto);
         
     }
     else
     {
+#if DEBUG
         IC(node.expression->inferredType);
+#endif
         node.expression->accept(*this);
         auto exprType = node.expression->implicitCastTo ? node.expression->implicitCastTo
                                                         : node.expression->inferredType;
@@ -647,7 +657,9 @@ void TypeSymbolVisitor::visit(CallNode& node) {
                 if(auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(node.arguments[i]))
                 {
                     castNumbersInBinaryTree(node.arguments[i], paramType);
+#if DEBUG
                     std::cout << "Casting " << argType << " to " << paramType << std::endl;
+#endif
                 }
                 else
                     node.arguments[i]->implicitCastTo = func->parameters[i].first;

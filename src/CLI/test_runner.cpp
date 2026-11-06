@@ -291,7 +291,8 @@ static std::string evaluate(const TestCase& test, const RunResult& run)
         if (run.output.find(check) == std::string::npos)
             return "в разборе нет: " + check;
 
-    if (test.quiet && !trim(run.output).empty()) return "на успехе компилятор что-то напечатал";
+    // В Debug-сборке отладочный вывод разрешён
+    if (!DEBUG && test.quiet && !trim(run.output).empty()) return "на успехе компилятор что-то напечатал";
     if (test.expect != "ok" && test.expect != "parse") return "неизвестная директива expect: " + test.expect;
     return "";
 }
