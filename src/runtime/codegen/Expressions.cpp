@@ -176,6 +176,25 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
         std::vector<llvm::Value*> args = {left, right};
         return context.Builder.CreateCall(concatFunc, args, "concat_result");
     }
+    else if (node.op.starts_with("strcmp_")) {
+        // Сравнение строк: strcmp из libc, результат сравниваем с нулём
+        llvm::Type* i32Type = llvm::Type::getInt32Ty(context.TheContext);
+        llvm::FunctionCallee strcmpFunc = context.TheModule->getOrInsertFunction(
+            "strcmp", i32Type, left->getType(), right->getType()
+        );
+        llvm::Value* compared = context.Builder.CreateCall(strcmpFunc, {left, right}, "strcmp_result");
+
+        llvm::CmpInst::Predicate predicate;
+        if (node.op == "strcmp_eq") predicate = llvm::CmpInst::ICMP_EQ;
+        else if (node.op == "strcmp_ne") predicate = llvm::CmpInst::ICMP_NE;
+        else if (node.op == "strcmp_slt") predicate = llvm::CmpInst::ICMP_SLT;
+        else if (node.op == "strcmp_sgt") predicate = llvm::CmpInst::ICMP_SGT;
+        else if (node.op == "strcmp_sle") predicate = llvm::CmpInst::ICMP_SLE;
+        else if (node.op == "strcmp_sge") predicate = llvm::CmpInst::ICMP_SGE;
+        else return nullptr;
+
+        return context.Builder.CreateICmp(predicate, compared, llvm::ConstantInt::get(i32Type, 0), "cmptmp");
+    }
     else if (node.op.starts_with("icmp")) {
         // Сравнение
         llvm::CmpInst::Predicate predicate;
