@@ -182,6 +182,7 @@ void TypeSymbolVisitor::castAllNumbersToType(const std::shared_ptr<ASTNode>& nod
                 ident->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
     }
     if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+        if (bin->op.starts_with("strcmp_")) return; // Строки к числам не приводим
         castAllNumbersToType(bin->left, targetType);
         castAllNumbersToType(bin->right, targetType);
         std::string implicitCast;
@@ -284,6 +285,7 @@ void TypeSymbolVisitor::findMaxRank(const std::shared_ptr<ASTNode>& node, int& m
         return;
     }
     if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+        if (bin->op.starts_with("strcmp_")) return; // Строки на ранг не влияют
         findMaxRank(bin->left, maxRank);
         findMaxRank(bin->right, maxRank);
     }
@@ -330,6 +332,8 @@ void TypeSymbolVisitor::castNumbersInBinaryTree(std::shared_ptr<ASTNode>& node, 
         findMaxRank(node, maxRank);
         targetType = getTypeByRank(maxRank);
         if (targetType.empty()) {
+            // В условии только сравнения строк: числа приводить не к чему
+            if (node->inferredType && node->inferredType->toString() == "i1") return;
             LogError("Cannot deduce type for auto", node);
             return;
         }

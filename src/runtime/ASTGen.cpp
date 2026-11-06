@@ -241,8 +241,7 @@ void ASTGen::visit(VariableAssignNode& node) {
 }
 
 void ASTGen::visit(ReassignMemberNode& node) {
-    LogWarning("visit не реализован для ReassignMemberNode");
-    result = nullptr;
+    throw std::runtime_error("Codegen Error: присваивание через [] и . пока не реализовано");
 }
 
 void ASTGen::visit(VariableReassignNode& node) {
@@ -647,8 +646,7 @@ void ASTGen::visit(ContinueNode& node) {
 }
 
 void ASTGen::visit(AccessExpression& node) {
-    LogWarning("visit не реализован для AccessExpression: " + node.memberName);
-    result = nullptr;
+    throw std::runtime_error("Codegen Error: доступ через [] и . пока не реализован: " + node.baseName);
 }
 
 void ASTGen::visit(ImportNode &node)
