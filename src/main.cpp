@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
         // Тесты фронтенда
         if (options.runTests) {
             std::string self = loader::getExecutableDir() + "/" + std::filesystem::path(argv[0]).filename().string();
-            return runFrontendTests({self, "--check-file"}, loader::findTestsPath(), options.verbose, options.inputFile);
+            return runFrontendTests({self, "--check-file"}, {self, "run"}, loader::findTestsPath(), options.verbose, options.inputFile);
         }
 
         // Чтение кода
