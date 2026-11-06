@@ -12,10 +12,18 @@ namespace Declarations {
 
 namespace Arrays {
     bool                            isLiteral(const std::shared_ptr<ASTNode>& expression);
+    llvm::Value*                    emitValue(CodeGenContext& context, const std::shared_ptr<ASTNode>& expression, const std::shared_ptr<TypeNode>& type);
     llvm::Value*                    emitLiteral(CodeGenContext& context, const std::shared_ptr<ASTNode>& literal, const std::shared_ptr<TypeNode>& arrayType);
     llvm::Value*                    handleArrayInitialization(CodeGenContext& context, VariableAssignNode& node, llvm::Type* varType, const std::shared_ptr<TypeNode>& arrayType);
     // Адрес элемента, на который указывает цепочка a[i][j], и его тип
     llvm::Value*                    emitElementPtr(CodeGenContext& context, AccessExpression& root, llvm::Type*& elementType);
+};
+
+namespace Objects {
+    void                            registerStruct(CodeGenContext& context, StructNode& node);
+    void                            emitConstructor(CodeGenContext& context, StructNode& node);
+    llvm::Value*                    emitNew(CodeGenContext& context, const std::string& name);
+    llvm::Value*                    emitCopy(CodeGenContext& context, llvm::Value* source, const std::shared_ptr<TypeNode>& type);
 };
 
 namespace Statements {

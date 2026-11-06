@@ -93,6 +93,13 @@ void ASTGen::visit(ProgramNode& node) {
     LogWarning("visit для ProgramNode: выполняю обработку " + std::to_string(node.body.size()) + " узлов");
     result = nullptr;
 
+    // Раскладка структур нужна раньше всего: P() можно вызвать до объявления структуры
+    for (auto& n : node.body) {
+        if (auto structure = std::dynamic_pointer_cast<StructNode>(n)) {
+            Objects::registerStruct(context, *structure);
+        }
+    }
+
     // Сначала объявляем все функции, чтобы их можно было вызывать до определения
     for (auto& n : node.body) {
         if (auto function = std::dynamic_pointer_cast<FunctionNode>(n); function && function->associated.empty()) {
@@ -216,7 +223,7 @@ void ASTGen::visit(FunctionNode& node) {
 }
 
 void ASTGen::visit(StructNode& node) {
-    LogWarning("visit не реализован для StructNode: " + node.name);
+    Objects::emitConstructor(context, node);
     result = nullptr;
 }
 
@@ -580,6 +587,17 @@ void ASTGen::visit(CallNode& node) {
         return;
     }
 
+    // copy(x) и P(). Функция с таким же именем важнее, семантика решила так же
+    if (!calleeFunc && node.callee == "copy") {
+        node.arguments[0]->accept(*this);
+        result = Objects::emitCopy(context, TypeConversions::loadValueIfPointer(context, getResult()), node.inferredType);
+        return;
+    }
+    if (!calleeFunc && context.Structs.count(node.callee)) {
+        result = Objects::emitNew(context, node.callee);
+        return;
+    }
+
     // Если не нашли пробуем объявить через TOML
     if (!calleeFunc) {
         std::string TOML_path = loader::findTomlPath();
@@ -593,11 +611,7 @@ void ASTGen::visit(CallNode& node) {
     }
 
     if (!calleeFunc) {
-        if (node.callee == "copy")
-            throw std::runtime_error("Codegen Error: copy пока не реализован");
-
-        // Семантика уже проверила имя, значит это создание структуры
-        throw std::runtime_error("Codegen Error: создание структуры пока не реализовано: " + node.callee);
+        throw std::runtime_error("Codegen Error: неизвестная функция: " + node.callee);
     }
 
     if (calleeFunc->arg_size() != node.arguments.size()) {

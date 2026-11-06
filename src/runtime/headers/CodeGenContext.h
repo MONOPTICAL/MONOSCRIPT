@@ -16,6 +16,16 @@
 #include "../../parser/headers/AST.h"
 
 
+// Как структура лежит в памяти. Поля-объекты и строки это ссылки
+struct StructLayout {
+    StructNode*                                      node = nullptr;
+    llvm::StructType*                                type = nullptr;
+    llvm::Function*                                  constructor = nullptr;
+    std::map<std::string, unsigned>                  fieldIndex;
+    std::vector<std::shared_ptr<VariableAssignNode>> fields;
+    bool                                             hasReferences = false; // Иначе память без ссылок: сборщику просматривать незачем
+};
+
 class CodeGenContext {
 public:
     llvm::LLVMContext                   TheContext; // Контекст LLVM(он отвечает за управление памятью)
@@ -25,6 +35,7 @@ public:
 
     llvm::Function*                     StartFunction = nullptr; // Точка входа программы: инициализирует рантайм и глобальные переменные
     std::shared_ptr<TypeNode>           CurrentReturnType; // Что возвращает функция, которая генерируется сейчас
+    std::map<std::string, StructLayout> Structs;
 
     std::vector<llvm::BasicBlock*> loopEndBlocks;    // Стек для блоков выхода из цикла (для break)
     std::vector<llvm::BasicBlock*> loopCondBlocks;   // Стек для блоков условия цикла (для continue)
@@ -94,6 +105,8 @@ public:
     // Массив это объект в куче: заголовок { ptr data, i32 length, i32 capacity } и отдельный блок данных.
     // Переменная хранит ссылку на заголовок, тип элементов известен только из типов в AST
     llvm::StructType*                   getArrayStruct();
+    // Память без ссылок сборщик не просматривает и не обнуляет: вызывающий заполняет её сам
+    llvm::Value*                        allocateObject(llvm::Value* bytes, bool hasReferences, const std::string& name);
     llvm::Value*                        createArray(llvm::Type* elementType, llvm::Value* size);
     llvm::Value*                        getArrayData(llvm::Value* array);
     llvm::Value*                        getArrayLength(llvm::Value* array);
