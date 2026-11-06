@@ -5,6 +5,13 @@
 void TypeSymbolVisitor::visit(ProgramNode &node)
 {
     this->program = std::make_shared<ProgramNode>(node);
+
+    // Сначала собираем объявления, чтобы функцию можно было вызвать выше её определения
+    for (const auto& statement : node.body) {
+        if (auto function = std::dynamic_pointer_cast<FunctionNode>(statement); function && function->associated.empty())
+            declaredFunctions.emplace(function->name, function);
+    }
+
     for (const auto& statement : node.body) {
         statement->accept(*this);
     }
@@ -13,7 +20,9 @@ void TypeSymbolVisitor::visit(ProgramNode &node)
 void TypeSymbolVisitor::visit(FunctionNode &node)
 {
     // Проверяем, существует ли функция в реестре(в текущем контексте или глобальном)
-    if(contexts.back().functions.find(node.name) != contexts.back().functions.end()) {
+    // Если вызов выше определения уже положил сюда эту же функцию, это не повтор
+    auto existingFunction = contexts.back().functions.find(node.name);
+    if(existingFunction != contexts.back().functions.end() && existingFunction->second != node.shared_from_this()) {
         if(contexts[0].functions.find(node.name) != contexts[0].functions.end()) {
             LogError("Function already defined in global context: " + node.name);
         }
@@ -582,8 +591,18 @@ void TypeSymbolVisitor::visit(CallNode& node) {
 
     // Проверяем, существует ли функция в реестре
     if (contexts.back().functions.find(node.callee) == contexts.back().functions.end()) {
+        auto declared = declaredFunctions.find(node.callee);
+        const auto isPure = [](const std::shared_ptr<ASTNode>& function) {
+            const auto& labels = std::dynamic_pointer_cast<FunctionNode>(function)->labels;
+            return std::find(labels.begin(), labels.end(), "@pure") != labels.end();
+        };
+
+        // Функция объявлена ниже. Чистая функция по-прежнему видит только чистые
+        if (declared != declaredFunctions.end() && (!checkLabels("@pure") || isPure(declared->second)))
+            contexts.back().functions[node.callee] = declared->second;
+
         // Точное совпадение типов аргументов
-        if (registry.findFunction(node.callee, argTypes) != nullptr) 
+        else if (registry.findFunction(node.callee, argTypes) != nullptr)
             contexts.back().functions[node.callee] = registry.findFunction(node.callee, argTypes);
 
         // Поиск функции с совпадением по имени
