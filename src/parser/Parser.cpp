@@ -172,7 +172,7 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         // final [Type] [variableName] = [expression] or [variableName] ^= [expression]
         // final i32 i = 0 or i ^= 0
         // ↑ if we have keyword final, and next token is type, we have final variable declaration
-    else if(currentToken.type == TokenType::Keyword && currentToken.value == "final" && peek().type == TokenType::Identifier)
+    else if(currentToken.type == TokenType::Keyword && currentToken.value == "final" && (peek().type == TokenType::Type || peek().type == TokenType::Identifier))
     {
         return parseAssignment(true);
     }
