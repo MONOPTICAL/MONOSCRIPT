@@ -87,6 +87,10 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
             LogError("Parameter cannot have the same name as a label: " + param.second);
         }
 
+        if (args.find(param.second) != args.end()) {
+            LogError("Parameter already defined: " + param.second, node.shared_from_this());
+        }
+
         // Добавляем параметр в реестр
         args[param.second] = param.first;
     }
@@ -303,6 +307,11 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
     contexts.back().variables[node.name] = varNode;
 }
 
+static bool isCompareOperator(const std::string& op) {
+    return op.starts_with("icmp_") || op.starts_with("fcmp_") ||
+           op == "and" || op == "or";
+}
+
 void TypeSymbolVisitor::visit(ReturnNode &node)
 {
     // Проверяем, существует ли функция в реестре
@@ -322,7 +331,14 @@ void TypeSymbolVisitor::visit(ReturnNode &node)
         {
             node.expression->accept(*this);
             std::string expectedType = contexts.back().returnType->toString();
-            castAndValidate(node.expression, expectedType, this);
+            auto compare = std::dynamic_pointer_cast<BinaryOpNode>(node.expression);
+            if (compare && isCompareOperator(compare->op) && expectedType == "i1") {
+                // Операнды сравнения приводим друг к другу, а не к i1
+                castNumbersInBinaryTree(node.expression, "auto");
+                compare->inferredType = registry.findType("i1");
+            }
+            else
+                castAndValidate(node.expression, expectedType, this);
             std::string actualType;
 
             if (node.expression->implicitCastTo)
@@ -338,11 +354,6 @@ void TypeSymbolVisitor::visit(ReturnNode &node)
     }
 
     contexts.back().returnedValue = true; // Устанавливаем, что функция вернула значение
-}
-
-static bool isCompareOperator(const std::string& op) {
-    return op.starts_with("icmp_") || op.starts_with("fcmp_") ||
-           op == "and" || op == "or";
 }
 
 // TODO: Переделать функцию полность потому что она хуйня ебанная
@@ -457,6 +468,7 @@ void TypeSymbolVisitor::visit(IfNode& node) {
 
     // Проверяем блок if
     node.thenBlock->accept(*this);
+    const bool thenReturned = contexts.back().returnedValue;
 
     // Убираем контекст блока if
     contexts.pop_back();
@@ -470,11 +482,16 @@ void TypeSymbolVisitor::visit(IfNode& node) {
 
         // Проверяем блок else
         node.elseBlock->accept(*this);
+        const bool elseReturned = contexts.back().returnedValue;
 
         // Убираем контекст блока else
         contexts.pop_back();
+
+        // Если return есть в обеих ветках, то функция точно вернула значение
+        if (thenReturned && elseReturned)
+            contexts.back().returnedValue = true;
     }
-    
+
 }
 
 void TypeSymbolVisitor::visit(ForNode& node) {
