@@ -1,4 +1,4 @@
-// expect-error: Function not found: impure
+// expect-error: Pure function cannot call
 [i32]pure() @pure
 |   return impure()
 

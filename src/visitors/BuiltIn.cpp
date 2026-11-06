@@ -21,6 +21,11 @@ void registerBuiltInFunctions(Registry& registry, const std::string& tomlPath)
             );
         }
 
+        // Функции с pure = true можно вызывать из @pure
+        std::vector<std::string> labels;
+        if (toml::find_or<bool>(func, "pure", false))
+            labels.push_back("@pure");
+
         registry.addBuiltinFunction(
             name,
             std::make_shared<FunctionNode>(
@@ -28,7 +33,7 @@ void registerBuiltInFunctions(Registry& registry, const std::string& tomlPath)
                 "",
                 std::make_shared<SimpleTypeNode>(retStr),
                 args,
-                std::vector<std::string>(),
+                labels,
                 nullptr
             )
         );

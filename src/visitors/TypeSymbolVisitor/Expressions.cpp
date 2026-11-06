@@ -68,6 +68,10 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
         node = *root;
         return;
     }
+
+    // Синтаксис есть, а работы с ним пока нет
+    if (node.op == "**" || node.op == "|>")
+        LogError("Operator '" + node.op + "' is not implemented yet", node.right);
 }
 
 void TypeSymbolVisitor::visit(UnaryOpNode& node) {
@@ -137,15 +141,5 @@ void TypeSymbolVisitor::visit(UnaryOpNode& node) {
 
 void TypeSymbolVisitor::visit(LambdaNode &node)
 {
-    std::unordered_map<std::string, std::shared_ptr<ASTNode>> args = {};
-
-    Context currentFunction = {
-        .labels = {},
-        .variables = {},
-        .functions = {}, 
-        .currentFunctionName = "lambda", // TODO: Проверить не мешает ли это
-        .returnType = node.returnType, // Тип возвращаемого значения
-        .returnedValue = false // Возвращаемое значение
-    };
-
+    LogError("Lambdas are not implemented yet", node.shared_from_this());
 }
