@@ -268,7 +268,7 @@ std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
         if (currentPrecedence < precedence) break; // Если текущий приоритет меньше, чем заданный, выходим из цикла
 
         advance(); // Переходим к следующему токену
-        auto right = parseBinary(currentPrecedence);
+        auto right = parseBinary(currentPrecedence + 1); // +1 чтобы 10 - 3 - 2 было (10 - 3) - 2
 
         left = std::make_shared<BinaryOpNode>(left, currentToken.value, right); // Создаём новый узел бинарной операции
         left->line = lineIndex; left->column = tokenIndex; // Устанавливаем строку и колонку для узла
@@ -493,6 +493,7 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         if(peek().type == TokenType::RightBracket) {
             auto none = std::make_shared<NoneNode>(); 
             none->line = lineIndex; none->column = tokenIndex; // Устанавливаем строку и колонку для узла
+            advance(); advance(); // съедаем [ и ]
             return none; // Возвращаем узел none
         }// если нихуя нету в скобках скипай
 
@@ -510,7 +511,11 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
     }
     else if (currentToken.type == TokenType::LeftBrace)
     {
-        if(peek().type == TokenType::RightBrace)  return std::make_shared<NoneNode>(); 
+        if(peek().type == TokenType::RightBrace)
+        {
+            advance(); advance(); // съедаем { и }
+            return std::make_shared<NoneNode>();
+        }
 
         std::shared_ptr<BlockNode> body = std::make_shared<BlockNode>();
         body->line = lineIndex; body->column = tokenIndex; // Устанавливаем строку и колонку для узла
@@ -545,16 +550,8 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
 
         consume(TokenType::RightParen, "Expected ')' after expression"); // Проверяем наличие правой скобки
 
-        /*
-        TODO: Каст выражений с помощью CastNode.
-        Пример: (1+2)->i32
-        if (check(TokenType::Arrow)) // Если есть каст, то кастим
-        {
-            auto cast = std::make_shared<CastNode>(expression);
-            cast->line = lineIndex; cast->column = tokenIndex; // Устанавливаем строку и колонку для узла
-            return parseCast(cast);
-        }
-        */
+        if(check(TokenType::Arrow)) return parseCast(expression); // Если есть каст, то кастим
+
         return expression; // Возвращаем разобранное выражение
     }
     else if (currentToken.type == TokenType::Keyword)
@@ -623,9 +620,11 @@ void Parser::parseDotNotation(std::shared_ptr<AccessExpression> next)
     {
         next->expression = parseCall();
     }
-    else 
+    else
+    {
         next->expression = std::make_shared<IdentifierNode>(current().value); // Изначально выражение - это идентификатор
         if(!check(TokenType::LeftBracket)) advance();
+    }
 
     if(check(TokenType::Dot))
     {

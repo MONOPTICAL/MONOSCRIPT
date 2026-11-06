@@ -99,6 +99,7 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     {
         auto breakNode = std::make_shared<BreakNode>(); // А тут и в continue нехуй заморачиваться, правильно? правильно
         breakNode->line = lineIndex; breakNode->column = tokenIndex;
+        advance();
         return breakNode;
     }
     // Continue statement
@@ -108,6 +109,7 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     {
         auto continueNode = std::make_shared<ContinueNode>();
         continueNode->line = lineIndex; continueNode->column = tokenIndex;
+        advance();
         return continueNode;
     }
     else if (currentToken.type == TokenType::Identifier && (peek().type == TokenType::Dot || peek().type == TokenType::LeftBracket))

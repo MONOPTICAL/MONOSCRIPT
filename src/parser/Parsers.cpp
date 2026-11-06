@@ -302,8 +302,10 @@ std::shared_ptr<BlockNode> Parser::parseBlock(int expectedIndent)
         // пропустить Pipe токены
         tokenIndex = actualIndent;
 
+        int currentLine = lineIndex;
         auto stmt = parseStatement();  // не должен заниматься отступами
         if (stmt) block->statements.push_back(stmt);
+        if ((currentLine == lineIndex) && !isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
         nextLine();
     }
 
