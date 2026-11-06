@@ -1,5 +1,5 @@
 // expect-output: 3
-// xfail: for не реализован в кодгене, ASTGen.cpp
+// xfail: for по массиву не реализован в кодгене, ASTGen.cpp
 [i32]main()
 |   array<i32> a = [1,2]
 |   i32 n = 0

@@ -238,44 +238,19 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
         
         return context.Builder.CreateICmp(predicate, left, right, "cmptmp");
     }
-    /*
-    TODO: Сделать поддержку float
-    else if (node.op.starts_with("fcmp")) {
-        // Сравнение с плавающей точкой
+    else if (node.op.starts_with("fcmp_")) {
+        // Сравнение с плавающей точкой, семантика выдаёт те же суффиксы, что и для целых
         llvm::CmpInst::Predicate predicate;
-        if (node.op == "fcmp_oeq") 
-        { // ==
-            predicate = llvm::CmpInst::FCMP_OEQ;
-        } 
-        else if (node.op == "fcmp_one") 
-        { // !=
-            predicate = llvm::CmpInst::FCMP_ONE;
-        } 
-        else if (node.op == "fcmp_olt") 
-        { // <
-            predicate = llvm::CmpInst::FCMP_OLT;
-        } 
-        else if (node.op == "fcmp_ogt") 
-        { // >
-            predicate = llvm::CmpInst::FCMP_OGT;
-        } 
-        else if (node.op == "fcmp_oge") 
-        { // >=
-            predicate = llvm::CmpInst::FCMP_OGE;
-        } 
-        else if (node.op == "fcmp_ole") 
-        { // <=
-            predicate = llvm::CmpInst::FCMP_OLE;
-        } 
-        else 
-        {
-            std::cerr << "Warning: Неизвестная операция сравнения с плавающей точкой: " << node.op << std::endl;
-            return nullptr;
-        }
-        
+        if (node.op == "fcmp_eq") predicate = llvm::CmpInst::FCMP_OEQ;
+        else if (node.op == "fcmp_ne") predicate = llvm::CmpInst::FCMP_UNE;
+        else if (node.op == "fcmp_slt") predicate = llvm::CmpInst::FCMP_OLT;
+        else if (node.op == "fcmp_sgt") predicate = llvm::CmpInst::FCMP_OGT;
+        else if (node.op == "fcmp_sle") predicate = llvm::CmpInst::FCMP_OLE;
+        else if (node.op == "fcmp_sge") predicate = llvm::CmpInst::FCMP_OGE;
+        else return nullptr;
+
         return context.Builder.CreateFCmp(predicate, left, right, "cmptmp");
     }
-    */
 #if DEBUG    
     std::cerr << "Warning: Неизвестная бинарная операция: " << node.op << std::endl;
 #endif

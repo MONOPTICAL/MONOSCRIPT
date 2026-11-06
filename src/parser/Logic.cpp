@@ -502,6 +502,7 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
             auto none = std::make_shared<NoneNode>(); 
             none->line = lineIndex; none->column = tokenIndex; // Устанавливаем строку и колонку для узла
             advance(); advance(); // съедаем [ и ]
+            none->isEmptyLiteral = true;
             return none; // Возвращаем узел none
         }// если нихуя нету в скобках скипай
 
@@ -522,7 +523,9 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         if(peek().type == TokenType::RightBrace)
         {
             advance(); advance(); // съедаем { и }
-            return std::make_shared<NoneNode>();
+            auto none = std::make_shared<NoneNode>();
+            none->isEmptyLiteral = true;
+            return none;
         }
 
         std::shared_ptr<BlockNode> body = std::make_shared<BlockNode>();

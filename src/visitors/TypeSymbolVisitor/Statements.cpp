@@ -316,6 +316,15 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
         LogError("Type cannot be " + varType, node.shared_from_this());
     }
     
+    // Объект это ссылка: без значения в переменной оказалась бы пустая ссылка
+    if (auto noValue = std::dynamic_pointer_cast<NoneNode>(node.expression); noValue && !isAuto) {
+        const bool isCollection = varType.starts_with("array") || varType.starts_with("map");
+        if (noValue->isEmptyLiteral && !isCollection)
+            LogError("Empty literal cannot initialize variable '" + node.name + "' of type " + varType, node.shared_from_this());
+        if (!noValue->isEmptyLiteral && (isCollection || registry.findStruct(varType)))
+            LogError("Variable '" + node.name + "' of type " + varType + " must have a value", node.shared_from_this());
+    }
+
     if (isAuto) {
         if (std::dynamic_pointer_cast<NoneNode>(node.expression))
             LogError("Cannot infer type of empty value for variable '" + node.name + "', declare the type explicitly", node.shared_from_this());
@@ -702,6 +711,21 @@ void TypeSymbolVisitor::visit(CallNode& node) {
         auto visible = scope->second.find(node.callee);
         if (visible != scope->second.end())
             node.callee = visible->second->name;
+    }
+
+    // copy(x): поверхностная копия объекта. Функция с таким же именем важнее
+    if (node.callee == "copy"
+        && contexts.back().functions.find(node.callee) == contexts.back().functions.end()
+        && declaredFunctions.find(node.callee) == declaredFunctions.end()) {
+        if (node.arguments.size() != 1) {
+            LogError("copy expects 1 argument, got " + std::to_string(node.arguments.size()), node.shared_from_this());
+        }
+        const std::string copiedType = argTypes[0]->toString();
+        if (!copiedType.starts_with("array") && !copiedType.starts_with("map") && !registry.findStruct(copiedType)) {
+            LogError("copy expects an array, map or struct, got " + copiedType, node.arguments[0]);
+        }
+        node.inferredType = argTypes[0];
+        return;
     }
 
     // Создание структуры: P(). Функция с таким же именем важнее

@@ -24,10 +24,10 @@ void TypeSymbolVisitor::visit(StructNode& node) {
     // Обрабатываем тело структуры
     if (auto blockNode = std::dynamic_pointer_cast<BlockNode>(node.body)) {
         for (const auto& statement : blockNode->statements) {
-            // Конструкторов пока нет, поэтому значение полю взять неоткуда. Коллекция может быть пустой
+            // Конструкторов пока нет, поэтому значение полю взять неоткуда. [] и {} это значение
             auto field = std::dynamic_pointer_cast<VariableAssignNode>(statement);
-            if (field && std::dynamic_pointer_cast<NoneNode>(field->expression)
-                && !std::dynamic_pointer_cast<GenericTypeNode>(field->type)) {
+            auto noValue = field ? std::dynamic_pointer_cast<NoneNode>(field->expression) : nullptr;
+            if (noValue && !noValue->isEmptyLiteral) {
                 LogError("Field '" + field->name + "' of struct '" + node.name + "' must have a default value", statement);
             }
 
