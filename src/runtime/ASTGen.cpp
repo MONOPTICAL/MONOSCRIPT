@@ -191,6 +191,10 @@ void ASTGen::visit(BlockNode& node) {
             prevBlock = context.Builder.GetInsertBlock();
             context.Builder.SetInsertPoint(prevBlock);
         }
+        if (dynamic_cast<ForNode*>(stmt.get()) && prevBlock) {
+            prevBlock = context.Builder.GetInsertBlock();
+            context.Builder.SetInsertPoint(prevBlock);
+        }
     }
 
     // Восстанавливаем точку вставки после генерации блока
@@ -328,7 +332,56 @@ void ASTGen::visit(IfNode& node) {
 }
 
 void ASTGen::visit(ForNode& node) {
-    throw std::runtime_error("Codegen Error: цикл for пока не реализован: " + node.varName);
+    auto range = std::dynamic_pointer_cast<CallNode>(node.iterable);
+    if (!range || range->callee != "range")
+        throw std::runtime_error("Codegen Error: цикл for по массиву пока не реализован: " + node.varName);
+
+    llvm::Type* counterType = context.getLLVMType(node.varType, context.TheContext);
+
+    // Граница считается один раз, до начала цикла
+    range->arguments[0]->accept(*this);
+    llvm::Value* limit = TypeConversions::loadValueIfPointer(context, getResult(), "limit");
+    if (limit->getType() != counterType)
+        limit = context.Builder.CreateIntCast(limit, counterType, true, "limit_cast");
+
+    llvm::AllocaInst* counter = context.Builder.CreateAlloca(counterType, nullptr, node.varName);
+    context.Builder.CreateStore(llvm::ConstantInt::get(counterType, 0), counter);
+
+    llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
+    llvm::BasicBlock* condBlock = llvm::BasicBlock::Create(context.TheContext, "for.cond", function);
+    llvm::BasicBlock* bodyBlock = llvm::BasicBlock::Create(context.TheContext, "for.body", function);
+    llvm::BasicBlock* stepBlock = llvm::BasicBlock::Create(context.TheContext, "for.step", function);
+    llvm::BasicBlock* endBlock = llvm::BasicBlock::Create(context.TheContext, "for.end", function);
+
+    // continue идёт на шаг счётчика, а не на условие
+    context.pushLoopContext(stepBlock, endBlock);
+
+    context.Builder.CreateBr(condBlock);
+
+    context.Builder.SetInsertPoint(condBlock);
+    llvm::Value* current = context.Builder.CreateLoad(counterType, counter, "for.current");
+    context.Builder.CreateCondBr(context.Builder.CreateICmpSLT(current, limit, "for.check"), bodyBlock, endBlock);
+
+    // Переменные тела живут только внутри цикла
+    auto outerNamedValues = context.NamedValues;
+    context.NamedValues[node.varName] = counter;
+
+    context.Builder.SetInsertPoint(bodyBlock);
+    node.body->accept(*this);
+    if (!context.Builder.GetInsertBlock()->getTerminator())
+        context.Builder.CreateBr(stepBlock);
+
+    context.NamedValues = outerNamedValues;
+
+    context.Builder.SetInsertPoint(stepBlock);
+    llvm::Value* step = context.Builder.CreateLoad(counterType, counter, "for.step.current");
+    context.Builder.CreateStore(context.Builder.CreateAdd(step, llvm::ConstantInt::get(counterType, 1), "for.next"), counter);
+    context.Builder.CreateBr(condBlock);
+
+    context.Builder.SetInsertPoint(endBlock);
+    context.popLoopContext();
+
+    result = nullptr;
 }
 
 void ASTGen::visit(WhileNode& node) {
@@ -409,6 +462,9 @@ void ASTGen::visit(CallNode& node) {
     }
 
     if (!calleeFunc) {
+        if (node.callee == "copy")
+            throw std::runtime_error("Codegen Error: copy пока не реализован");
+
         // Семантика уже проверила имя, значит это создание структуры
         throw std::runtime_error("Codegen Error: создание структуры пока не реализовано: " + node.callee);
     }

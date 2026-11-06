@@ -380,6 +380,7 @@ class NullNode : public ASTNode {
 class NoneNode : public ASTNode {
     public:
         NoneNode() = default;
+        bool isEmptyLiteral = false; // написано [] или {}, а не просто нет значения
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);

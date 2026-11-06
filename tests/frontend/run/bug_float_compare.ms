@@ -1,5 +1,4 @@
 // expect-output: true
-// xfail: сравнение float закомментировано в кодгене, Expressions.cpp:246
 [i1]f(float: a)
 |   return a > 1.5
 

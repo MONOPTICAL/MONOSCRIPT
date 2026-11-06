@@ -137,6 +137,11 @@ void TypeSymbolVisitor::visit(ReassignMemberNode& node) {
         if (it != contexts.back().variables.end())
             if (auto var = std::dynamic_pointer_cast<VariableAssignNode>(it->second); var && var->isConst)
                 LogError("Cannot modify member of constant variable: " + baseId->name, node.shared_from_this());
+
+        // У параметров и переменной цикла нет своего значения: это объект, который передали снаружи
+        if (it != contexts.back().variables.end() && checkLabels("@pure"))
+            if (auto var = std::dynamic_pointer_cast<VariableAssignNode>(it->second); var && !var->expression)
+                LogError("Pure function cannot modify object passed to it: " + baseId->name, node.shared_from_this());
     }
 
     access->accept(*this);
