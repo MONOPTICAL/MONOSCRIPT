@@ -215,7 +215,7 @@ void TypeSymbolVisitor::castAllNumbersToType(const std::shared_ptr<ASTNode>& nod
     }
 }
 
-static bool checkIntLimits(const std::string& type, int value) {
+static bool checkIntLimits(const std::string& type, int64_t value) {
     if (type == "i1") return value == 0 || value == 1;
     if (type == "i8") return value >= -128 && value <= 127;
     if (type == "i16") return value >= -32768 && value <= 32767;
@@ -228,7 +228,7 @@ static bool checkIntLimits(const std::string& type, int value) {
 void TypeSymbolVisitor::castAndValidate(const std::shared_ptr<ASTNode>& node, const std::string& targetType, TypeSymbolVisitor* visitor) {
     if (!node) return;
     if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
-        int value = num->value;
+        int64_t value = num->value;
         std::string fromType = num->inferredType ? num->inferredType->toString() : (num->type ? num->type->toString() : "");
         if (targetType != "float" && !checkIntLimits(targetType, value)) {
             visitor->LogError("Value " + std::to_string(value) + " does not fit in type " + targetType, node);

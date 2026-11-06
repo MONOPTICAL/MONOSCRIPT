@@ -79,7 +79,33 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
                 LogError("Index access '[]' attempted on non-collection type '" + currentType->toString() + "'.", accessNode);
                 return;
             }
-            currentType = (genericType->baseName == "array") ? genericType->typeParameters[0] : genericType->typeParameters[1];
+
+            // Индекс лежит в следующем звене цепочки
+            auto indexNode = std::dynamic_pointer_cast<AccessExpression>(accessNode->nextAccess);
+            if (indexNode && indexNode->expression) {
+                indexNode->expression->accept(*this);
+                auto indexType = indexNode->expression->implicitCastTo ? indexNode->expression->implicitCastTo
+                                                                       : indexNode->expression->inferredType;
+                if (!indexType) {
+                    LogError("Could not resolve type of index", indexNode->expression);
+                    return;
+                }
+
+                const std::string indexTypeStr = indexType->toString();
+                if (genericType->baseName == "array") {
+                    const int rank = getTypeRank(indexTypeStr);
+                    if (rank == 0 || indexTypeStr == "float")
+                        LogError("Array index must be an integer, got " + indexTypeStr, indexNode->expression);
+                } else {
+                    const std::string keyTypeStr = genericType->typeParameters[0]->toString();
+                    const bool bothIntegers = getTypeRank(indexTypeStr) > 0 && indexTypeStr != "float" &&
+                                              getTypeRank(keyTypeStr) > 0 && keyTypeStr != "float";
+                    if (indexTypeStr != keyTypeStr && !bothIntegers)
+                        LogError("Map key must be " + keyTypeStr + ", got " + indexTypeStr, indexNode->expression);
+                }
+            }
+
+            currentType =(genericType->baseName == "array") ? genericType->typeParameters[0] : genericType->typeParameters[1];
             currentStructDef = registry.findStruct(currentType->toString());
         }
         

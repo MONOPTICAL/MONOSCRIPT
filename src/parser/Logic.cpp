@@ -649,6 +649,15 @@ void Parser::parseArrayNotation(std::shared_ptr<AccessExpression> next)
     next->expression = parseExpression();
     
     consume(TokenType::RightBracket, "Expected ']' after array notation");
+
+    if(check(TokenType::Dot))
+    {
+        next->notation = "."; // Устанавливаем нотацию для текущего узла
+    }
+    else if(check(TokenType::LeftBracket))
+    {
+        next->notation = "[]"; // Устанавливаем нотацию для текущего узла
+    }
 }
 
 std::shared_ptr<ASTNode> Parser::parseMemberExpression()

@@ -128,11 +128,13 @@ void ASTGen::visit(FunctionNode& node) {
             context.Builder.CreateRet(llvm::ConstantInt::get(returnLLVMType, 0));
         } else if (returnLLVMType->isVoidTy()) {
             context.Builder.CreateRetVoid();
+        } else {
+            // Семантика уже проверила что return есть на всех путях, сюда код не дойдёт
+            context.Builder.CreateUnreachable();
         }
-        // TODO: Добавить тут обработки если надо
     }
 
-    
+
     // Восстанавливаем старую таблицу символов
     context.NamedValues = oldNamedValues;
     
