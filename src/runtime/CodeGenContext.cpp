@@ -68,26 +68,25 @@ llvm::StructType* CodeGenContext::getArrayStruct() {
     );
 }
 
+llvm::Value* CodeGenContext::allocateObject(llvm::Value* bytes, bool hasReferences, const std::string& name) {
+    llvm::FunctionType* allocType = llvm::FunctionType::get(
+        llvm::PointerType::get(TheContext, 0), {llvm::Type::getInt64Ty(TheContext)}, false);
+    return Builder.CreateCall(getOrDeclareFunction(hasReferences ? "GC_malloc" : "GC_malloc_atomic", allocType), {bytes}, name);
+}
+
 llvm::Value* CodeGenContext::createArray(llvm::Type* elementType, llvm::Value* size) {
-    llvm::Type* ptrType = llvm::PointerType::get(TheContext, 0);
-    llvm::Type* i64Type = llvm::Type::getInt64Ty(TheContext);
-    llvm::FunctionType* allocType = llvm::FunctionType::get(ptrType, {i64Type}, false);
-
-    // Данные без ссылок сборщику просматривать незачем. Такая память не обнулена, вызывающий заполняет её сам
-    llvm::Function* allocScanned = getOrDeclareFunction("GC_malloc", allocType);
-    llvm::Function* allocData = elementType->isPointerTy() ? allocScanned : getOrDeclareFunction("GC_malloc_atomic", allocType);
-
     llvm::StructType* arrayStruct = getArrayStruct();
     const llvm::DataLayout& layout = TheModule->getDataLayout();
 
-    llvm::Value* header = Builder.CreateCall(allocScanned, {Builder.getInt64(layout.getTypeAllocSize(arrayStruct))}, "array");
+    // В заголовке лежит ссылка на данные
+    llvm::Value* header = allocateObject(Builder.getInt64(layout.getTypeAllocSize(arrayStruct)), true, "array");
 
     llvm::Value* bytes = Builder.CreateMul(
-        Builder.CreateZExt(size, i64Type),
+        Builder.CreateZExt(size, Builder.getInt64Ty()),
         Builder.getInt64(layout.getTypeAllocSize(elementType)),
         "array_bytes"
     );
-    llvm::Value* data = Builder.CreateCall(allocData, {bytes}, "array_data");
+    llvm::Value* data = allocateObject(bytes, elementType->isPointerTy(), "array_data");
 
     Builder.CreateStore(data, Builder.CreateStructGEP(arrayStruct, header, 0));
     Builder.CreateStore(size, Builder.CreateStructGEP(arrayStruct, header, 1));

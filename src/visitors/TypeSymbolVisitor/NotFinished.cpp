@@ -14,6 +14,7 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
             if (varIt != contexts.back().variables.end()) {
                 if (auto varAssign = std::dynamic_pointer_cast<VariableAssignNode>(varIt->second)) {
                     currentType = varAssign->type;
+                    idNode->inferredType = currentType; // С этого типа кодген начинает обход цепочки
                 }
             } else {
                 currentStructDef = registry.findStruct(idNode->name);
@@ -64,6 +65,9 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
             if (auto var = std::dynamic_pointer_cast<VariableAssignNode>(*fieldIt)) {
                 currentType = var->type;
                 currentStructDef = registry.findStruct(currentType->toString()); 
+                // Кодгену нужен тип на каждом звене: сам он типы не выводит
+                if (auto fieldLink = std::dynamic_pointer_cast<AccessExpression>(accessNode->nextAccess))
+                    fieldLink->inferredType = currentType;
             } else if (auto str = std::dynamic_pointer_cast<StructNode>(*fieldIt)) {
                 currentStructDef = str;
             }

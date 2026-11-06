@@ -11,7 +11,7 @@ namespace Arrays
     }
 
     // Значение выражения, приведённое к нужному типу
-    static llvm::Value* emitValue(CodeGenContext& context, const std::shared_ptr<ASTNode>& expression, const std::shared_ptr<TypeNode>& type)
+    llvm::Value* emitValue(CodeGenContext& context, const std::shared_ptr<ASTNode>& expression, const std::shared_ptr<TypeNode>& type)
     {
         if (isLiteral(expression))
             return emitLiteral(context, expression, type);
@@ -71,23 +71,33 @@ namespace Arrays
             throw std::runtime_error("Codegen Error: доступ через [] и . пока не реализован: " + root.baseName);
         llvm::Value* base = TypeConversions::loadValueIfPointer(context, codeGen.getResult());
 
-        // Звено хранит индекс, а то, что было перед ним, говорит о своей нотации, что идёт дальше
+        // Каждое звено говорит своей нотацией, как получено следующее. Следующее звено хранит индекс или имя поля и тип результата
         AccessExpression* link = &root;
+        std::shared_ptr<TypeNode> currentType = root.expression->inferredType;
         llvm::Value* elementPtr = nullptr;
         while (auto next = std::dynamic_pointer_cast<AccessExpression>(link->nextAccess)) {
-            if (link->notation != "[]" || !next->inferredType)
-                throw std::runtime_error("Codegen Error: доступ через . пока не реализован: " + root.baseName);
-
-            // Уже не последнее звено: то, что лежит в элементе, это следующий массив
+            // Уже не последнее звено: то, что лежит по адресу, это следующий объект
             if (elementPtr)
-                base = context.Builder.CreateLoad(context.Builder.getPtrTy(), elementPtr, "nested_array");
+                base = context.Builder.CreateLoad(context.Builder.getPtrTy(), elementPtr, "nested_object");
 
-            next->expression->accept(codeGen);
-            llvm::Value* index = TypeConversions::loadValueIfPointer(context, codeGen.getResult());
-            index = TypeConversions::applyImplicitCast(context, index, next->expression->implicitCastTo);
+            if (!next->inferredType)
+                throw std::runtime_error("Codegen Error: не удалось определить тип в цепочке доступа: " + root.baseName);
 
             elementType = context.getLLVMType(next->inferredType, context.TheContext);
-            elementPtr = context.getArrayElementPtr(base, elementType, index, next->line);
+
+            if (link->notation == "[]") {
+                next->expression->accept(codeGen);
+                llvm::Value* index = TypeConversions::loadValueIfPointer(context, codeGen.getResult());
+                index = TypeConversions::applyImplicitCast(context, index, next->expression->implicitCastTo);
+                elementPtr = context.getArrayElementPtr(base, elementType, index, next->line);
+            } else {
+                auto layout = currentType ? context.Structs.find(currentType->toString()) : context.Structs.end();
+                if (layout == context.Structs.end())
+                    throw std::runtime_error("Codegen Error: доступ через . не к структуре: " + root.baseName);
+                elementPtr = context.Builder.CreateStructGEP(layout->second.type, base, layout->second.fieldIndex.at(next->baseName), next->baseName);
+            }
+
+            currentType = next->inferredType;
             link = next.get();
         }
 

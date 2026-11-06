@@ -1,5 +1,4 @@
 // expect-output: 1
-// xfail: структуры не реализованы в кодгене, ASTGen.cpp
 [struct]P
 |   i32 age = 1
 

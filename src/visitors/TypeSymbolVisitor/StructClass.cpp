@@ -1,4 +1,37 @@
 #include "../headers/TypeSymbolVisitor.h"
+#include <algorithm>
+
+// Какие структуры обязательно создаются при создании этой: поле такого типа или вызов P() в значении поля
+static void collectConstructedStructs(const std::shared_ptr<ASTNode>& expression, Registry& registry, std::vector<std::string>& result) {
+    if (auto call = std::dynamic_pointer_cast<CallNode>(expression)) {
+        if (registry.findStruct(call->callee)) result.push_back(call->callee);
+        for (const auto& argument : call->arguments) collectConstructedStructs(argument, registry, result);
+    } else if (auto block = std::dynamic_pointer_cast<BlockNode>(expression)) {
+        for (const auto& element : block->statements) collectConstructedStructs(element, registry, result);
+    }
+}
+
+static bool constructsItself(const std::string& name, const std::string& target, Registry& registry, std::vector<std::string>& visited) {
+    if (std::find(visited.begin(), visited.end(), name) != visited.end()) return false;
+    visited.push_back(name);
+
+    auto structure = registry.findStruct(name);
+    auto body = structure ? std::dynamic_pointer_cast<BlockNode>(structure->body) : nullptr;
+    if (!body) return false;
+
+    for (const auto& statement : body->statements) {
+        auto field = std::dynamic_pointer_cast<VariableAssignNode>(statement);
+        if (!field) continue;
+
+        std::vector<std::string> constructed;
+        if (field->type && registry.findStruct(field->type->toString())) constructed.push_back(field->type->toString());
+        collectConstructedStructs(field->expression, registry, constructed);
+
+        for (const auto& other : constructed)
+            if (other == target || constructsItself(other, target, registry, visited)) return true;
+    }
+    return false;
+}
 
 void TypeSymbolVisitor::visit(StructNode& node) {
     // Проверяем, существует ли структура в реестре
@@ -33,6 +66,13 @@ void TypeSymbolVisitor::visit(StructNode& node) {
 
             statement->accept(*this);
         }
+    }
+
+    // Ссылка не бывает пустой, поэтому такую структуру создать невозможно: создание никогда не закончится.
+    // Массив с пустым значением по умолчанию это не цикл: array<Node> kids = []
+    std::vector<std::string> visited;
+    if (constructsItself(node.name, node.name, registry, visited)) {
+        LogError("Struct '" + node.name + "' cannot be created: its fields always create another " + node.name, node.shared_from_this());
     }
 
     // Добавляем структуру в реестр

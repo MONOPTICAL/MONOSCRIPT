@@ -109,6 +109,7 @@ if(LLVM_FOUND)
       src/runtime/CodeGenContext.cpp
       src/runtime/codegen/Declarations.cpp
       src/runtime/codegen/Arrays.cpp
+      src/runtime/codegen/Objects.cpp
       src/runtime/codegen/Statements.cpp
       src/runtime/codegen/Expressions.cpp
       src/runtime/codegen/TypeConversions.cpp
