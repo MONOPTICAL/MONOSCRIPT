@@ -1,5 +1,4 @@
-// expect-error: 10: Unknown statement
-// xfail: пустые строки выкидываются, номер считается без них, Lexer.cpp:386
+// expect-error: 9: Unknown statement
 
 // c2
 

@@ -17,8 +17,10 @@ public:
     }
     
     // Initialize with source code
-    void initialize(const std::vector<std::string>& sourceLinesParam) {
+    // lineNumbersParam - настоящий номер в файле для каждой строки из sourceLinesParam
+    void initialize(const std::vector<std::string>& sourceLinesParam, const std::vector<int>& lineNumbersParam) {
         sourceLines = &sourceLinesParam;
+        lineNumbers = &lineNumbersParam;
         errorCount = 0;
         warningCount = 0;
     }
@@ -44,10 +46,12 @@ private:
     ErrorEngine() : sourceLines(nullptr), errorCount(0), warningCount(0) {}
     
     const std::vector<std::string>* sourceLines = nullptr;
+    const std::vector<int>* lineNumbers = nullptr;
     int errorCount;
     int warningCount;
 
     // Error formatting and output
+    int displayLine(int line) const;
     void printError(int line, int column, const std::string& errorType, const std::string& message, const std::string& hint = "");
     void printSourceLine(int line, int column);
     std::string generatePointer(const std::string& cleanedLine, int originalColumn, int removedCharsCount);

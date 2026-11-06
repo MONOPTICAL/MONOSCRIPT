@@ -1,5 +1,4 @@
-// expect-error: 10: Variable not found: y
-// xfail: пустые строки выкидываются, номер считается без них, Lexer.cpp:386
+// expect-error: 9: Variable not found: y
 
 // c2
 
