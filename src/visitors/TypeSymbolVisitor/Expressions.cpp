@@ -74,6 +74,13 @@ void TypeSymbolVisitor::visit(UnaryOpNode& node) {
     node.operand->accept(*this);
     std::shared_ptr<TypeNode> operandType = node.operand->inferredType;
 
+    // Узел уже обходили и переименовали оператор, второй обход ничего не меняет
+    if (node.op == "neg" || node.op == "not" || node.op == "nullcheck")
+    {
+        node.inferredType = operandType;
+        return;
+    }
+
     if (node.op == "?")
     {
         if (std::dynamic_pointer_cast<CallNode>(node.operand)) {}

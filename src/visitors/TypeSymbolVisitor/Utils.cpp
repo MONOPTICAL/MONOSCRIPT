@@ -384,27 +384,20 @@ void TypeSymbolVisitor::findMaxRank(const std::shared_ptr<ASTNode>& node, int& m
         findMaxRank(unary->operand, maxRank);
     }
     if (auto call = std::dynamic_pointer_cast<CallNode>(node)) {
-        if (!checkLabels("@strict"))
-        {   
-            for (const auto& arg : call->arguments) 
-                findMaxRank(arg, maxRank);
-        }
-        else
-        {            
-            if (contexts.back().functions.find(call->callee) == contexts.back().functions.end()) {
-                if (registry.findFunction(call->callee) == nullptr) 
-                    LogError("Function not found: " + call->callee, node);
-                else
-                {
-                    auto func = std::dynamic_pointer_cast<FunctionNode>(registry.findFunction(call->callee));
-                    maxRank = std::max(maxRank, getTypeRank(func->returnType->toString()));
-                }
-            }
+        // Важен тип, который вызов возвращает, а не типы его аргументов
+        if (contexts.back().functions.find(call->callee) == contexts.back().functions.end()) {
+            if (registry.findFunction(call->callee) == nullptr)
+                LogError("Function not found: " + call->callee, node);
             else
             {
-                auto func = std::dynamic_pointer_cast<FunctionNode>(contexts.back().functions[call->callee]);
+                auto func = std::dynamic_pointer_cast<FunctionNode>(registry.findFunction(call->callee));
                 maxRank = std::max(maxRank, getTypeRank(func->returnType->toString()));
             }
+        }
+        else
+        {
+            auto func = std::dynamic_pointer_cast<FunctionNode>(contexts.back().functions[call->callee]);
+            maxRank = std::max(maxRank, getTypeRank(func->returnType->toString()));
         }
     }
     if (auto accessExpression = std::dynamic_pointer_cast<AccessExpression>(node)) {
@@ -470,6 +463,11 @@ void TypeSymbolVisitor::validateCollectionElements(
     if (!genericType || !block) 
     {
         if (std::dynamic_pointer_cast<NoneNode>(expr))
+            return;
+
+        // Переменная или элемент другой коллекции: тип должен совпасть полностью
+        expr->accept(*this);
+        if (genericType && expr->inferredType && expr->inferredType->toString() == genericType->toString())
             return;
 
         LogError("Invalid collection initialization", expr);
