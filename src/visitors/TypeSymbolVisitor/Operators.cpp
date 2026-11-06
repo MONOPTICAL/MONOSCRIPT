@@ -4,7 +4,6 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
 {
     std::shared_ptr<CallNode> callNode;
     std::shared_ptr<TypeNode> type;
-    node->accept(visitor);
 
     if(node->implicitCastTo)
         type = node->implicitCastTo;
@@ -33,19 +32,23 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
                 std::make_shared<FloatNumberNode>(floatNumberNode->value)
             }
         );
-    } else if (auto binaryOpNode = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+    } else if (std::dynamic_pointer_cast<BinaryOpNode>(node) || std::dynamic_pointer_cast<UnaryOpNode>(node)) {
+        auto binary = std::dynamic_pointer_cast<BinaryOpNode>(node);
+        auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node);
+        const bool isBoolean = (unary && unary->op != "neg") ||
+            (binary && (binary->op.starts_with("icmp_") || binary->op.starts_with("fcmp_") ||
+                        binary->op.starts_with("strcmp_") || binary->op == "and" || binary->op == "or"));
+
+        std::string toStringMethod = "toString_int";
+        const std::string typeName = type->toString();
+        if (isBoolean) toStringMethod = "toString_bool";
+        else if (typeName == "float") toStringMethod = "toString_float";
+        else if (typeName == "i64") toStringMethod = "toString_long";
+        else if (typeName != "i32") node->implicitCastTo = std::make_shared<SimpleTypeNode>("i32");
+
         callNode = std::make_shared<CallNode>(
-            "toString_int",
-            std::vector<std::shared_ptr<ASTNode>>{
-                std::make_shared<BinaryOpNode>(binaryOpNode->left, binaryOpNode->op, binaryOpNode->right)
-            }
-        );
-    } else if (auto unaryOpNode = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
-        callNode = std::make_shared<CallNode>(
-            "toString_int",
-            std::vector<std::shared_ptr<ASTNode>>{
-                std::make_shared<UnaryOpNode>(unaryOpNode->op, unaryOpNode->operand)
-            }
+            toStringMethod,
+            std::vector<std::shared_ptr<ASTNode>>{node}
         );
     } else if (auto call = std::dynamic_pointer_cast<CallNode>(node)) {
         std::string toStringMethod;
@@ -54,6 +57,8 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
             toStringMethod = "toString_float";
         else if (type->toString() == "i1")
             toStringMethod = "toString_bool";
+        else if (type->toString() == "i64")
+            toStringMethod = "toString_long";
         else
             toStringMethod = "toString_int";
 
@@ -62,6 +67,26 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
             std::vector<std::shared_ptr<ASTNode>>{
                 std::make_shared<CallNode>(call->callee, call->arguments)
             }
+        );
+    } else if (std::dynamic_pointer_cast<IdentifierNode>(node)) {
+        std::string toStringMethod;
+        const std::string typeName = type->toString();
+
+        if (typeName == "float")
+            toStringMethod = "toString_float";
+        else if (typeName == "i1")
+            toStringMethod = "toString_bool";
+        else if (typeName == "i64")
+            toStringMethod = "toString_long";
+        else {
+            toStringMethod = "toString_int";
+            if (typeName != "i32") // i8 и i16 расширяем под параметр toString_int
+                node->implicitCastTo = std::make_shared<SimpleTypeNode>("i32");
+        }
+
+        callNode = std::make_shared<CallNode>(
+            toStringMethod,
+            std::vector<std::shared_ptr<ASTNode>>{node}
         );
     }
 
@@ -85,10 +110,15 @@ void TypeSymbolVisitor::handlePlusOperator(std::shared_ptr<BinaryOpNode>& node, 
         if (checkLabels("@strict") && !(left == "string" && right == "string"))
             LogError("Implicit type casting is not allowed for '+' in @strict mode: " + left + " and " + right, node->right->shared_from_this());
         
+        // Операнды внутри выражения приводим друг к другу до превращения в строку
         if (left != "string") {
+            if (std::dynamic_pointer_cast<BinaryOpNode>(node->left) || std::dynamic_pointer_cast<UnaryOpNode>(node->left))
+                castNumbersInBinaryTree(node->left, "auto");
             node->left = toStringHandler(node->left, *this);
         }
         if (right != "string") {
+            if (std::dynamic_pointer_cast<BinaryOpNode>(node->right) || std::dynamic_pointer_cast<UnaryOpNode>(node->right))
+                castNumbersInBinaryTree(node->right, "auto");
             node->right = toStringHandler(node->right, *this);
         }
         { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "scat", node->right); node->implicitCastTo = cast; }
