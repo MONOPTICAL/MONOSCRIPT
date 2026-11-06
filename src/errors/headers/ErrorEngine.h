@@ -37,6 +37,9 @@ public:
     void reportWithHint(int line, int column, const std::string& module, const std::string& message, const std::string& hint, const std::string& errorType = "Unknown Error");
     void warn(int line, int column, const std::string& message);
 
+    // Настоящий номер строки в файле по номеру строки из узла AST
+    int displayLine(int line) const;
+
     // Statistics
     int getErrorCount() const;
     int getWarningCount() const;
@@ -51,7 +54,6 @@ private:
     int warningCount;
 
     // Error formatting and output
-    int displayLine(int line) const;
     void printError(int line, int column, const std::string& errorType, const std::string& message, const std::string& hint = "");
     void printSourceLine(int line, int column);
     std::string generatePointer(const std::string& cleanedLine, int originalColumn, int removedCharsCount);

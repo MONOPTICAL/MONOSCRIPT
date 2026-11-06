@@ -1,4 +1,4 @@
-// expect-runtime-error: division by zero
+// expect-runtime-error: division by zero at line 5
 [i32]main()
 |   i32 a = 7
 |   i32 b = 0

@@ -9,39 +9,47 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
     
     std::shared_ptr<BinaryOpNode> root = std::make_shared<BinaryOpNode>(node.left, node.op, node.right);
     root->implicitCastTo = node.implicitCastTo; // Явный каст (a + b)->i32 не должен потеряться
+    root->line = node.line; root->column = node.column;
+
+    // Обработчики операторов создают новый узел, а место в исходном коде остаётся прежним
+    auto finish = [&]() {
+        const int line = node.line, column = node.column;
+        node = *root;
+        node.line = line; node.column = column;
+    };
 
     // "+"
     if (node.op == "+" || node.op == "add" || node.op == "fadd") {
         handlePlusOperator(root, leftType, rightType);
-        node = *root;
+        finish();
         return;
     }
 
     // "-"
     if (node.op == "-" || node.op == "sub" || node.op == "fsub") {
         handleMinusOperator(root, leftType, rightType);
-        node = *root;
+        finish();
         return;
     }
 
     // "*"
     if (node.op == "*" || node.op == "mul" || node.op == "fmul") {
         handleMulOperator(root, leftType, rightType);
-        node = *root;
+        finish();
         return;
     }
 
     // "/"
     if (node.op == "/" || node.op == "sdiv" || node.op == "fdiv") {
         handleDivOperator(root, leftType, rightType);
-        node = *root;
+        finish();
         return;
     }
 
     // "%"
     if (node.op == "%" || node.op == "srem" || node.op == "frem") {
         handleModOperator(root, leftType, rightType);
-        node = *root;
+        finish();
         return;
     }
 
@@ -58,14 +66,14 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
     // "==", "!=", "<", ">", "<=", ">="
     if (getCmpOp(node.op) != "") {
         handleCompareOperator(root, leftType, rightType);
-        node = *root;
+        finish();
         return;
     }
 
     // and, or 
     if (node.op == "and" || node.op == "or") {
         handleLogicalOperator(root, leftType, rightType);
-        node = *root;
+        finish();
         return;
     }
 
@@ -87,17 +95,8 @@ void TypeSymbolVisitor::visit(UnaryOpNode& node) {
 
     if (node.op == "?")
     {
-        if (std::dynamic_pointer_cast<CallNode>(node.operand)) {}
-        else if (std::dynamic_pointer_cast<AccessExpression>(node.operand)) {}
-        else if (std::dynamic_pointer_cast<IdentifierNode>(node.operand)) {}
-        else if (std::dynamic_pointer_cast<LambdaNode>(node.operand)) {}
-        else
-        {
-            LogError("Unsupported operand type for '?'", node.shared_from_this());
-            return;
-        }
-
-        node.op = "nullcheck";
+        LogError("Operator '?' is not implemented yet", node.shared_from_this());
+        return;
     }
     else if (node.op == "!")
     {

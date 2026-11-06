@@ -40,39 +40,12 @@ namespace Declarations
         return alloca;
     }
     
-    llvm::Value* handleGlobalStringVariable(CodeGenContext &context, VariableAssignNode &node, llvm::Type *varType, std::shared_ptr<StringNode> strNode)
-    {
-        // Создаем константный массив символов для строки
-        llvm::Constant* strConstant = llvm::ConstantDataArray::getString(context.TheContext, strNode->value, true);
-        
-        // Создаем глобальную переменную с правильным типом (массив символов)
-        llvm::GlobalVariable* globalVar = new llvm::GlobalVariable(
-            *context.TheModule,
-            strConstant->getType(),  // Тип - массив символов
-            node.isConst,            // isConstant
-            llvm::GlobalValue::PrivateLinkage,
-            strConstant,             // Инициализатор
-            node.name
-        );
-
-        // Устанавливаем атрибуты для глобальной переменной
-        globalVar->setAlignment(llvm::MaybeAlign(1)); // Выравнивание 1 байт
-        globalVar->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global); // Глобальный адрес
-
-        // Сохраняем переменную в таблице символов
-        context.NamedValues[node.name] = globalVar;
-
-        return globalVar;
-    }
-
     llvm::Value* handleGlobalArrayVariable(CodeGenContext &context, VariableAssignNode &node, llvm::Type *varType, std::shared_ptr<BlockNode> blockExpr)
     {
         ASTGen codeGen(context);
         
-        if (!blockExpr->statements.empty() && std::dynamic_pointer_cast<KeyValueNode>(blockExpr->statements[0])) {
-            codeGen.LogWarning("Инициализация map не реализована");
-            return nullptr;
-        }
+        if (!blockExpr->statements.empty() && std::dynamic_pointer_cast<KeyValueNode>(blockExpr->statements[0]))
+            throw std::runtime_error("Codegen Error: map пока не реализован: " + node.name);
     
         codeGen.LogWarning("Инициализация массива: " + node.name);
     
@@ -242,14 +215,23 @@ namespace Declarations
         return arrayVar;
     }
 
+    // Сборщик не видит память JIT, поэтому глобальную переменную со ссылкой показываем ему сами
+    static void registerGCRoot(CodeGenContext& context, llvm::GlobalVariable* globalVar)
+    {
+        llvm::Type* ptrType = llvm::PointerType::get(context.TheContext, 0);
+        llvm::Function* addRoots = context.getOrDeclareFunction("GC_add_roots",
+            llvm::FunctionType::get(llvm::Type::getVoidTy(context.TheContext), {ptrType, ptrType}, false)
+        );
+
+        const uint64_t size = context.TheModule->getDataLayout().getTypeAllocSize(globalVar->getValueType());
+        llvm::Value* end = context.Builder.CreateConstGEP1_64(llvm::Type::getInt8Ty(context.TheContext), globalVar, size);
+        context.Builder.CreateCall(addRoots, {globalVar, end});
+    }
+
+    // Вызывается внутри стартовой функции: всё, что не константа, вычисляется при запуске программы
     llvm::Value* handleGlobalVariable(CodeGenContext& context, VariableAssignNode& node, llvm::Type* varType)
     {
         ASTGen codeGen(context);
-
-        if (std::shared_ptr<StringNode> strNode = std::dynamic_pointer_cast<StringNode>(node.expression)) {
-
-            return handleGlobalStringVariable(context, node, varType, strNode);
-        }
 
         if (std::shared_ptr<BlockNode> blockNode = std::dynamic_pointer_cast<BlockNode>(node.expression)) {
             
@@ -258,42 +240,34 @@ namespace Declarations
 
         node.expression->accept(codeGen);
         llvm::Value* initValue = codeGen.getResult();
-        
-        codeGen.LogWarning("Глобальный контекст: создаем глобальную переменную " + node.name);
-    
-
-        if (varType->isPointerTy())
-        {
-            // Если тип указатель, то получаем тип элемента и меняем тип переменной
-            auto typeOfTheValue = context.getTypeByASTNode(node.expression);
-            varType = context.getLLVMType(typeOfTheValue, context.TheContext);
-        }
-        
 
         if (!initValue) {
             codeGen.LogWarning("Не удалось сгенерировать значение для глобальной переменной");
             return nullptr;
         }
-        
-        codeGen.LogWarning("Генерация значения для глобальной переменной " + node.name);
-        
-        // Для глобальной переменной используем GlobalVariable вместо alloca
+
+        initValue = TypeConversions::loadValueIfPointer(context, initValue);
+        initValue = TypeConversions::convertValueToType(context, initValue, varType);
+
+        llvm::Constant* constantValue = llvm::dyn_cast<llvm::Constant>(initValue);
+
         llvm::GlobalVariable* globalVar = new llvm::GlobalVariable(
             *context.TheModule,
             varType,
-            node.isConst, // isConstant
+            node.isConst && constantValue, // Переменную, в которую пишем при запуске, нельзя класть в константную память
             llvm::GlobalValue::PrivateLinkage,
-            llvm::Constant::getNullValue(varType), // Инициализатор
+            constantValue ? constantValue : llvm::Constant::getNullValue(varType),
             node.name
         );
-        
-        // Если инициализатор - константа, используем её
-        if (llvm::Constant* constVal = llvm::dyn_cast<llvm::Constant>(initValue)) {
-            globalVar->setInitializer(constVal);
-        }
-        
+
+        // Константная ссылка указывает на данные программы, сборщику там делать нечего
+        if (varType->isPointerTy() && !globalVar->isConstant())
+            registerGCRoot(context, globalVar);
+
+        if (!constantValue)
+            context.Builder.CreateStore(initValue, globalVar);
+
         context.NamedValues[node.name] = globalVar;
-        codeGen.LogWarning("Глобальная переменная " + node.name + " создана");
         return globalVar;
     }
 }

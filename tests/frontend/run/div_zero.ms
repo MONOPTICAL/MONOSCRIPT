@@ -1,4 +1,4 @@
-// expect-runtime-error: division by zero
+// expect-runtime-error: division by zero at line 6
 [i32]main()
 |   echo("before")
 |   i32 a = 7

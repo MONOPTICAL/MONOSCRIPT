@@ -24,6 +24,8 @@ public:
     std::map<std::string, llvm::Value*> NamedValues; // Простая таблица символов для переменных/параметров
     std::map<llvm::Value*, llvm::Type*> arrayElementTypes;
 
+    llvm::Function*                     StartFunction = nullptr; // Точка входа программы: инициализирует рантайм и глобальные переменные
+
     std::vector<llvm::BasicBlock*> loopEndBlocks;    // Стек для блоков выхода из цикла (для break)
     std::vector<llvm::BasicBlock*> loopCondBlocks;   // Стек для блоков условия цикла (для continue)
 
@@ -79,6 +81,12 @@ public:
         if (loopCondBlocks.empty()) return nullptr;
         return loopCondBlocks.back();
     }
+
+    // Останавливает программу с ошибкой выполнения. После этого текущий блок завершён
+    void                                emitPanic(const std::string& message, int line);
+
+    // Имя функции, с которой начинается программа: помеченная @entry или main
+    static std::string                  findEntryName(const ProgramNode& program);
 
     void LogError(const std::string& message);
     void LogWarning(const std::string& message);

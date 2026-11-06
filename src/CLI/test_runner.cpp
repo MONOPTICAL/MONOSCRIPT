@@ -10,10 +10,14 @@
 //   // expect-parse: (- (- 10 3) 2) в разборе должно быть это S-выражение, семантика не запускается
 //   // expect-output: текст        программа при запуске печатает эту строку, директив может быть несколько,
 //                                  строки проверяются по порядку; без LLVM такой тест пропускается
-//   // expect-runtime-error: текст программа запускается и останавливается с этим сообщением и кодом 1,
+//   // expect-runtime-error: текст программа запускается и останавливается с этим сообщением и кодом 101,
+//                                  без LLVM такой тест пропускается
+//   // expect-start-error: текст   программу не удаётся запустить: компилятор выходит с этим сообщением и кодом 1,
 //                                  без LLVM такой тест пропускается
 //   // expect-quiet                на успехе компилятор ничего не печатает
 //   // xfail: причина              известный баг: падение не ломает прогон
+//
+// Тесты с запуском выполняются дважды: через JIT и через --compile. Код выхода и вывод должны совпасть с ожидаемым.
 //
 // Файлы без директив считаются вспомогательными (например, импортируемые модули).
 // Если xfail-тест вдруг прошёл, это ошибка прогона: баг починен, пометку надо убрать.
@@ -37,6 +41,7 @@
 
 #if !defined(_WIN32) && !defined(_WIN64)
 #include <sys/wait.h>
+#include <unistd.h>
 #endif
 
 namespace fs = std::filesystem;
@@ -244,6 +249,11 @@ static bool loadTest(const fs::path& path, TestCase& test)
             test.expect = "runtime-error";
             test.errorText = trim(line.substr(25));
         }
+        else if (startsWith(line, "// expect-start-error: "))
+        {
+            test.expect = "start-error";
+            test.errorText = trim(line.substr(23));
+        }
         else if (line == "// expect-quiet")
             test.quiet = true;
         else if (startsWith(line, "// xfail: "))
@@ -252,14 +262,8 @@ static bool loadTest(const fs::path& path, TestCase& test)
     return !test.expect.empty();
 }
 
-static RunResult runCheck(const std::vector<std::string>& command_, const TestCase& test)
+static RunResult runShell(const std::string& command)
 {
-    // Запуск из папки теста: линкер ищет импортируемые модули рядом
-    std::string command = "cd " + shellQuote(test.path.parent_path().string()) + " && timeout 10";
-    for (const auto& part : command_) command += " " + shellQuote(part);
-    if (test.expect == "parse") command += " --parse-only";
-    command += " " + shellQuote(test.path.filename().string()) + " 2>&1";
-
     RunResult result{-1, ""};
     FILE* pipe = popen(command.c_str(), "r");
     if (!pipe) return result;
@@ -275,11 +279,45 @@ static RunResult runCheck(const std::vector<std::string>& command_, const TestCa
     return result;
 }
 
+// Запуск из папки теста: линкер ищет импортируемые модули рядом
+static std::string inTestDir(const TestCase& test)
+{
+    return "cd " + shellQuote(test.path.parent_path().string()) + " && timeout 10";
+}
+
+static RunResult runCheck(const std::vector<std::string>& command_, const TestCase& test)
+{
+    std::string command = inTestDir(test);
+    for (const auto& part : command_) command += " " + shellQuote(part);
+    if (test.expect == "parse") command += " --parse-only";
+    command += " " + shellQuote(test.path.filename().string()) + " 2>&1";
+    return runShell(command);
+}
+
+// Собирает тест через --compile и запускает готовый файл. Если собрать не вышло, в результате ошибка компилятора
+static RunResult runCompiled(const std::string& compiler, const TestCase& test)
+{
+    const fs::path binary = fs::temp_directory_path() / ("ms_test_" + std::to_string(getpid()) + "_" + test.path.stem().string());
+
+    RunResult result = runCheck({compiler, "--compile", binary.string()}, test);
+    if (result.exitCode == 0)
+        result = runShell(inTestDir(test) + " " + shellQuote(binary.string()) + " 2>&1");
+
+    // Если сборка упала, компилятор оставляет промежуточные файлы
+    std::error_code ignored;
+    for (const char* suffix : {"", ".ll", ".o"})
+        fs::remove(binary.string() + suffix, ignored);
+    return result;
+}
+
 static bool hasErrorOnLine(const std::string& output, int line)
 {
     const std::string prefix = "[line " + std::to_string(line);
     return output.find(prefix + ",") != std::string::npos || output.find(prefix + "]") != std::string::npos;
 }
+
+// Такой код выхода у программы, остановленной ошибкой выполнения (ms_panic в mono/rt.d)
+constexpr int RUNTIME_ERROR_CODE = 101;
 
 // Пустая строка - тест прошёл, иначе причина провала
 static std::string evaluate(const TestCase& test, const RunResult& run)
@@ -300,14 +338,26 @@ static std::string evaluate(const TestCase& test, const RunResult& run)
         return "";
     }
 
+    if (test.expect == "runtime-error")
+    {
+        if (run.exitCode != RUNTIME_ERROR_CODE)
+            return "ожидалась ошибка выполнения с кодом " + std::to_string(RUNTIME_ERROR_CODE) + ", код выхода " + std::to_string(run.exitCode);
+        if (run.output.find(test.errorText) == std::string::npos)
+            return "в выводе нет текста: " + test.errorText;
+        return "";
+    }
+
+    if (run.exitCode == RUNTIME_ERROR_CODE && test.expect == "run")
+        return "неожиданная ошибка выполнения";
+
     if (run.exitCode != 0 && run.exitCode != 1)
         return "компилятор упал, код выхода " + std::to_string(run.exitCode);
 
     if (test.expect == "no-crash") return "";
 
-    if (test.expect == "runtime-error")
+    if (test.expect == "start-error")
     {
-        if (run.exitCode == 0) return "ожидалась ошибка при запуске, но программа завершилась успешно";
+        if (run.exitCode == 0) return "ожидалось, что программа не запустится";
         if (run.output.find(test.errorText) == std::string::npos)
             return "в выводе нет текста: " + test.errorText;
         return "";
@@ -518,7 +568,7 @@ int runFrontendTests(const std::vector<std::string>& checkCommand, const std::ve
         ReportEntry entry;
         entry.name = relative.stem().string();
 
-        const bool needsRun = test.expect == "run" || test.expect == "runtime-error";
+        const bool needsRun = test.expect == "run" || test.expect == "runtime-error" || test.expect == "start-error";
         if (needsRun && runCommand.empty())
         {
             entry.status = TestStatus::Skipped;
@@ -530,6 +580,23 @@ int runFrontendTests(const std::vector<std::string>& checkCommand, const std::ve
         const RunResult run = runCheck(needsRun ? runCommand : checkCommand, test);
         entry.failure = evaluate(test, run);
         entry.output = run.output;
+
+        // Собранный файл должен вести себя так же, как JIT
+        if (entry.failure.empty() && needsRun)
+        {
+            RunResult compiled = runCompiled(runCommand[0], test);
+            entry.output = compiled.output;
+
+            // Собранный файл не печатает строку о завершении, её печатает только ms run
+            if (run.output.find(" exited with code ") != std::string::npos)
+                compiled.output += "\n[ exited with code " + std::to_string(compiled.exitCode) + "]\n";
+
+            if (compiled.exitCode != run.exitCode)
+                entry.failure = "--compile: код выхода " + std::to_string(compiled.exitCode) + ", а через JIT " + std::to_string(run.exitCode);
+            else if (const std::string failure = evaluate(test, compiled); !failure.empty())
+                entry.failure = "--compile: " + failure;
+        }
+
         splitReason(test.xfail, entry.reason, entry.location);
 
         if (entry.failure.empty() && test.xfail.empty()) { entry.status = TestStatus::Passed; ++passed; }
