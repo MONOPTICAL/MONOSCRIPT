@@ -401,10 +401,63 @@ void ASTGen::visit(IfNode& node) {
     result = nullptr;
 }
 
+// for x in a: x это копия числа или ссылка на объект, запись в x массив не меняет.
+// Массив вычисляется один раз, поэтому a = [...] в теле цикла не влияет на обход
+static void emitArrayFor(CodeGenContext& context, ASTGen& codeGen, ForNode& node) {
+    llvm::Type* i32Type = llvm::Type::getInt32Ty(context.TheContext);
+    llvm::Type* elementType = context.getLLVMType(node.varType, context.TheContext);
+
+    node.iterable->accept(codeGen);
+    llvm::Value* array = TypeConversions::loadValueIfPointer(context, codeGen.getResult(), "for.array");
+    llvm::Value* length = context.getArrayLength(array);
+
+    llvm::AllocaInst* index = context.createEntryAlloca(i32Type, "for.index");
+    llvm::AllocaInst* element = context.createEntryAlloca(elementType, node.varName);
+    context.Builder.CreateStore(context.Builder.getInt32(0), index);
+
+    llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
+    llvm::BasicBlock* condBlock = llvm::BasicBlock::Create(context.TheContext, "for.cond", function);
+    llvm::BasicBlock* bodyBlock = llvm::BasicBlock::Create(context.TheContext, "for.body", function);
+    llvm::BasicBlock* stepBlock = llvm::BasicBlock::Create(context.TheContext, "for.step", function);
+    llvm::BasicBlock* endBlock = llvm::BasicBlock::Create(context.TheContext, "for.end", function);
+
+    context.pushLoopContext(stepBlock, endBlock);
+    context.Builder.CreateBr(condBlock);
+
+    context.Builder.SetInsertPoint(condBlock);
+    llvm::Value* current = context.Builder.CreateLoad(i32Type, index, "for.current");
+    context.Builder.CreateCondBr(context.Builder.CreateICmpSLT(current, length, "for.check"), bodyBlock, endBlock);
+
+    auto outerNamedValues = context.NamedValues;
+    context.NamedValues[node.varName] = element;
+
+    // Длина не меняется, индекс всегда в границах: проверка здесь не нужна
+    context.Builder.SetInsertPoint(bodyBlock);
+    llvm::Value* elementPtr = context.Builder.CreateGEP(elementType, context.getArrayData(array), current, "for.element_ptr");
+    context.Builder.CreateStore(context.Builder.CreateLoad(elementType, elementPtr, "for.element"), element);
+
+    node.body->accept(codeGen);
+    if (!context.Builder.GetInsertBlock()->getTerminator())
+        context.Builder.CreateBr(stepBlock);
+
+    context.NamedValues = outerNamedValues;
+
+    context.Builder.SetInsertPoint(stepBlock);
+    llvm::Value* step = context.Builder.CreateLoad(i32Type, index, "for.step.current");
+    context.Builder.CreateStore(context.Builder.CreateAdd(step, context.Builder.getInt32(1), "for.next"), index);
+    context.Builder.CreateBr(condBlock);
+
+    context.Builder.SetInsertPoint(endBlock);
+    context.popLoopContext();
+}
+
 void ASTGen::visit(ForNode& node) {
     auto range = std::dynamic_pointer_cast<CallNode>(node.iterable);
-    if (!range || range->callee != "range")
-        throw std::runtime_error("Codegen Error: цикл for по массиву пока не реализован: " + node.varName);
+    if (!range || range->callee != "range") {
+        emitArrayFor(context, *this, node);
+        result = nullptr;
+        return;
+    }
 
     llvm::Type* counterType = context.getLLVMType(node.varType, context.TheContext);
 
