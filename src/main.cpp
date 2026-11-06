@@ -6,11 +6,15 @@
 #include "CLI/headers/test_runner.h"
 #include "errors/headers/ErrorEngine.h"
 #include "loader/headers/loader.h"
+#include <gc/gc.h>
 #include <iostream>
 #include <chrono>
 #include <filesystem>
 
 int main(int argc, char* argv[]) {
+    // Сборщик мусора запускается первым, до любого выделения памяти программой
+    GC_INIT();
+
     // Служебный режим: так -run_tests запускает сам себя на каждый тест
     if (argc > 1 && std::string(argv[1]) == "--check-file") {
         return checkMain(argc - 1, argv + 1);
@@ -41,10 +45,8 @@ int main(int argc, char* argv[]) {
         // Выполнение только если указан флаг --run или run
         if (options.runJIT) {
             std::string currentFilePath = std::filesystem::current_path().string();
-            if (runProgram(combinedAST, currentFilePath, options.showAST, options.offOptimization) == RUN_FAILED) {
-                return 1;
-            }
-            return 0;
+            int exitCode = runProgram(combinedAST, currentFilePath, options.showAST, options.offOptimization);
+            return exitCode == RUN_FAILED ? 1 : exitCode;
         }
 
         if (options.compileExecutable) {

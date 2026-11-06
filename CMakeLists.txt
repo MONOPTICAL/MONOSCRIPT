@@ -119,7 +119,12 @@ if(LLVM_FOUND)
   # Добавляем библиотеку D
   add_dependencies(ms build_dlib)
 
-  target_link_libraries(ms PRIVATE ms_frontend ${llvm_libs})
+  # Сборщик мусора Boehm для объектов в куче: sudo apt install libgc-dev
+  find_library(GC_LIBRARY gc REQUIRED)
+  find_path(GC_INCLUDE_DIR gc/gc.h REQUIRED)
+  target_include_directories(ms PRIVATE ${GC_INCLUDE_DIR})
+
+  target_link_libraries(ms PRIVATE ms_frontend ${llvm_libs} ${GC_LIBRARY})
   target_compile_definitions(ms PRIVATE LLVM_TOOLS_PATH="${LLVM_TOOLS_BINARY_DIR}")
 
   if(UNIX AND NOT APPLE)
