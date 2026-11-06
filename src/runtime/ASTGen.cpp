@@ -328,8 +328,7 @@ void ASTGen::visit(IfNode& node) {
 }
 
 void ASTGen::visit(ForNode& node) {
-    LogWarning("visit не реализован для ForNode: " + node.varName);
-    result = nullptr;
+    throw std::runtime_error("Codegen Error: цикл for пока не реализован: " + node.varName);
 }
 
 void ASTGen::visit(WhileNode& node) {
@@ -410,9 +409,8 @@ void ASTGen::visit(CallNode& node) {
     }
 
     if (!calleeFunc) {
-        LogWarning("Неизвестная функция: " + node.callee);
-        result = nullptr;
-        return;
+        // Семантика уже проверила имя, значит это создание структуры
+        throw std::runtime_error("Codegen Error: создание структуры пока не реализовано: " + node.callee);
     }
 
     if (calleeFunc->arg_size() != node.arguments.size()) {

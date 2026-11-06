@@ -1,5 +1,4 @@
 // expect: ok
-// xfail: структуры нет в реестре типов, Types.cpp:7
 [struct]P
 |   i32 age = 1
 

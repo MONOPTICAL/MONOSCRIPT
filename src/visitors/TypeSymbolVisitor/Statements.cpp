@@ -25,6 +25,11 @@ void TypeSymbolVisitor::collectDeclarations(ProgramNode &node)
             module = moduleNameOf(mark->moduleName);
         else if (auto import = std::dynamic_pointer_cast<ImportNode>(statement))
             imports.push_back({module, import});
+        else if (auto structure = std::dynamic_pointer_cast<StructNode>(statement)) {
+            // Структуру можно использовать выше её определения
+            if (!registry.findStruct(structure->name))
+                registry.addStruct(structure->name, std::make_shared<StructNode>(structure->name, structure->body));
+        }
         else if (auto function = std::dynamic_pointer_cast<FunctionNode>(statement); function && function->associated.empty()) {
             ownFunctions[module].emplace(function->name, function);
 
@@ -370,7 +375,7 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
                 checkConversion(node.expression, varType);
         }
         else {
-            if (exprType->toString() != "none" && exprType->toString() != "string")
+            if (getTypeRank(exprType->toString()) > 0)
                 castNumbersInBinaryTree(node.expression, "auto");
 
             if(node.expression->implicitCastTo)
@@ -553,20 +558,49 @@ void TypeSymbolVisitor::visit(ForNode& node) {
         LogError("For statement outside of function", node.shared_from_this());
     }
 
-    // Проверяем тип переменной
-    node.iterable->accept(*this);
-    std::string iterableType = node.iterable->inferredType->toString();
-
-    if (iterableType == "none" || iterableType == "null" || iterableType == "void") {
-        LogError("Type cannot be " + iterableType, node.iterable);
+    if (contexts.back().variables.find(node.varName) != contexts.back().variables.end()) {
+        LogError("Variable already defined: " + node.varName, node.shared_from_this());
     }
 
-    node.varType = node.iterable->inferredType; // Устанавливаем тип итератора 
+    // range это конструкция языка, а не функция: for i in range(n)
+    auto range = std::dynamic_pointer_cast<CallNode>(node.iterable);
+    if (range && range->callee == "range") {
+        if (range->arguments.size() != 1) {
+            LogError("range expects 1 argument, got " + std::to_string(range->arguments.size()), node.iterable);
+        }
+
+        auto limit = range->arguments[0];
+        limit->accept(*this);
+        auto limitType = limit->implicitCastTo ? limit->implicitCastTo : limit->inferredType;
+        if (!limitType || getTypeRank(limitType->toString()) == 0 || limitType->toString() == "float") {
+            LogError("range expects an integer, got " + (limitType ? limitType->toString() : std::string("unknown")), limit);
+        }
+
+        // Счётчик i32, если значение не требует i64
+        const std::string counterType = limitType->toString() == "i64" ? "i64" : "i32";
+        checkConversion(limit, counterType);
+        node.varType = registry.findType(counterType);
+        node.iterable->inferredType = limitType;
+    }
+    else {
+        // Проверяем тип переменной
+        node.iterable->accept(*this);
+        auto collection = std::dynamic_pointer_cast<GenericTypeNode>(node.iterable->inferredType);
+        if (!collection || collection->baseName != "array") {
+            LogError("for expects an array or range(n), got " + (node.iterable->inferredType ? node.iterable->inferredType->toString() : std::string("unknown")), node.iterable);
+        }
+
+        node.varType = collection->typeParameters[0]; // Переменная цикла это элемент массива
+    }
 
     // Создаем новый контекст для блока for
     contexts.push_back(contexts.back());
 
     contexts.back().currentFunctionName = "for";
+
+    auto loopVariable = std::make_shared<VariableAssignNode>(node.varName, false, node.varType, nullptr);
+    loopVariable->inferredType = node.varType;
+    contexts.back().variables[node.varName] = loopVariable;
 
     // Проверяем блок for
     node.body->accept(*this);
@@ -668,6 +702,17 @@ void TypeSymbolVisitor::visit(CallNode& node) {
         auto visible = scope->second.find(node.callee);
         if (visible != scope->second.end())
             node.callee = visible->second->name;
+    }
+
+    // Создание структуры: P(). Функция с таким же именем важнее
+    if (contexts.back().functions.find(node.callee) == contexts.back().functions.end()
+        && declaredFunctions.find(node.callee) == declaredFunctions.end()
+        && registry.findStruct(node.callee)) {
+        if (!node.arguments.empty()) {
+            LogError("Struct " + node.callee + " has no constructor with arguments yet", node.shared_from_this());
+        }
+        node.inferredType = std::make_shared<SimpleTypeNode>(node.callee);
+        return;
     }
 
     // Проверяем, существует ли функция в реестре
