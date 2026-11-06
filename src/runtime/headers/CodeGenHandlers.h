@@ -6,13 +6,16 @@
 namespace Declarations {
     llvm::Value*                    handleSimpleAssignment(CodeGenContext& context, VariableAssignNode& node, llvm::Type* varType);
     llvm::Value*                    handleGlobalVariable(CodeGenContext& context, VariableAssignNode& node, llvm::Type* varType);
-    llvm::Value*                    handleGlobalArrayVariable(CodeGenContext &context, VariableAssignNode &node, llvm::Type *varType, std::shared_ptr<BlockNode> blockExpr);
   //llvm::Value*                    handleFunctionDeclaration(CodeGenContext& context, const std::string& name, llvm::FunctionType* type);
     llvm::Value*                    handleSimpleReassignment(CodeGenContext& context, VariableReassignNode& node, llvm::Type* varType);
 };
 
 namespace Arrays {
-    llvm::Value*                    handleArrayInitialization(CodeGenContext& context, VariableAssignNode& node, llvm::Type* varType, std::shared_ptr<BlockNode> blockExpr);
+    bool                            isLiteral(const std::shared_ptr<ASTNode>& expression);
+    llvm::Value*                    emitLiteral(CodeGenContext& context, const std::shared_ptr<ASTNode>& literal, const std::shared_ptr<TypeNode>& arrayType);
+    llvm::Value*                    handleArrayInitialization(CodeGenContext& context, VariableAssignNode& node, llvm::Type* varType, const std::shared_ptr<TypeNode>& arrayType);
+    // Адрес элемента, на который указывает цепочка a[i][j], и его тип
+    llvm::Value*                    emitElementPtr(CodeGenContext& context, AccessExpression& root, llvm::Type*& elementType);
 };
 
 namespace Statements {

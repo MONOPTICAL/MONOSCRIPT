@@ -498,30 +498,15 @@ void TypeSymbolVisitor::validateCollectionElements(
             // Для вложенных коллекций рекурсивно
             if (auto subBlock = std::dynamic_pointer_cast<BlockNode>(statement)) {
                 validateCollectionElements(genericType->typeParameters[0], subBlock, isAuto);
-            } else if (auto binary = std::dynamic_pointer_cast<BinaryOpNode>(statement)) {
-                // TODO : Проверить на корректность в пиздец тяжёлых случаях
-                binary->left->accept(*this);
-                binary->right->accept(*this);
-                auto leftType = binary->left->inferredType;
-                auto rightType = binary->right->inferredType;
+            } else {
+                statement->accept(*this);
                 auto expectedElemType = genericType->typeParameters[0];
-                if (auto expectedGeneric = std::dynamic_pointer_cast<GenericTypeNode>(expectedElemType)) {
+                if (std::dynamic_pointer_cast<GenericTypeNode>(expectedElemType)) {
                     // Вложенная коллекция
                     validateCollectionElements(expectedElemType, statement, isAuto);
                 } else {
-                    castNumbersInBinaryTree(statement, "auto");
-                }
-            } else {
-                statement->accept(*this);
-                auto elemType = statement->inferredType;
-                auto expectedElemType = genericType->typeParameters[0];
-                if (auto expectedGeneric = std::dynamic_pointer_cast<GenericTypeNode>(expectedElemType)) {
-                    // Вложенная коллекция
-                    validateCollectionElements(expectedElemType, statement, isAuto);
-                } else if (elemType->toString() != expectedElemType->toString()) {
-                    if ((numericRank(elemType->toString(), maxRank) > 0 && numericRank(expectedElemType->toString(), maxRank) > 0))
-                        continue;
-                    LogError("Element type mismatch: expected " + expectedElemType->toString() + ", got " + elemType->toString(), statement);
+                    // Элемент подчиняется тем же правилам, что и обычное присваивание
+                    checkConversion(statement, expectedElemType->toString());
                 }
             }
         }

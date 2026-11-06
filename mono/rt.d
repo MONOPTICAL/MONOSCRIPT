@@ -1,6 +1,6 @@
 module mono.rt;
 
-import core.stdc.stdio : fflush, fprintf, stderr, stdout;
+import core.stdc.stdio : fflush, fprintf, snprintf, stderr, stdout;
 import core.stdc.stdlib : exit;
 
 extern(C) nothrow @nogc
@@ -25,6 +25,13 @@ extern(C) void ms_panic(const char* message, int line) nothrow @nogc
     else
         fprintf(stderr, "Runtime Error: %s\n", message);
     exit(PANIC_EXIT_CODE);
+}
+
+extern(C) void ms_panic_index(long index, int length, int line) nothrow @nogc
+{
+    char[64] message;
+    snprintf(message.ptr, message.length, "index %lld out of bounds (len %d)", index, length);
+    ms_panic(message.ptr, line);
 }
 
 private extern(C) void* ms_out_of_memory(size_t) nothrow @nogc

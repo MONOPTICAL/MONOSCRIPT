@@ -446,6 +446,7 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
     std::shared_ptr<VariableAssignNode> varAssign = std::dynamic_pointer_cast<VariableAssignNode>(contexts.back().variables[node.name]);
     std::shared_ptr<TypeNode> varType = varAssign->inferredType;
     std::string varTypeStr = varType->toString();
+    node.inferredType = varType; // Кодгену нужен тип, чтобы собрать литерал a = [1, 2]
 
     if (varAssign->isConst) {
         LogError("Cannot reassign constant variable: " + node.name, node.shared_from_this());
@@ -478,24 +479,9 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
             expressionType = "map<" + types[0] + ", " + types[1] + ">";
         } 
         else {
-            if (Block->statements[0]->inferredType->toString() != Generic->typeParameters[0]->toString()) {
-                if (Generic->typeParameters[0]->toString() == "i1")
-                    if (auto binaryOp = std::dynamic_pointer_cast<BinaryOpNode>(Block->statements[0])) {
-                        if (isCompareOperator(binaryOp->op)) {
-                            expressionType = "array<i1>";
-                        } else {
-                            LogError("Type mismatch: expected i1, got " + Block->statements[0]->inferredType->toString(), node.expression);
-                        }
-                    }
-                else
-                {
-                    
-                    LogError("Element type mismatch: expected " + Generic->typeParameters[0]->toString() + ", got " + Block->statements[0]->inferredType->toString(), node.expression);
-                }
-            }
-            else 
-                expressionType = "array<" + Block->statements[0]->inferredType->toString() + ">";
-        } 
+            // Элементы уже проверил validateCollectionElements
+            expressionType = varTypeStr;
+        }
     }
     else
     {
@@ -724,11 +710,31 @@ void TypeSymbolVisitor::visit(CallNode& node) {
         if (node.arguments.size() != 1) {
             LogError("copy expects 1 argument, got " + std::to_string(node.arguments.size()), node.shared_from_this());
         }
+        if (!argTypes[0]) {
+            LogError("copy cannot take a collection literal, assign it to a variable first", node.arguments[0]);
+        }
         const std::string copiedType = argTypes[0]->toString();
         if (!copiedType.starts_with("array") && !copiedType.starts_with("map") && !registry.findStruct(copiedType)) {
             LogError("copy expects an array, map or struct, got " + copiedType, node.arguments[0]);
         }
         node.inferredType = argTypes[0];
+        return;
+    }
+
+    // len(a): длина массива. Функция с таким же именем важнее
+    if (node.callee == "len"
+        && contexts.back().functions.find(node.callee) == contexts.back().functions.end()
+        && declaredFunctions.find(node.callee) == declaredFunctions.end()) {
+        if (node.arguments.size() != 1) {
+            LogError("len expects 1 argument, got " + std::to_string(node.arguments.size()), node.shared_from_this());
+        }
+        if (!argTypes[0]) {
+            LogError("len cannot take a collection literal, assign it to a variable first", node.arguments[0]);
+        }
+        if (!argTypes[0]->toString().starts_with("array")) {
+            LogError("len expects an array, got " + argTypes[0]->toString(), node.arguments[0]);
+        }
+        node.inferredType = registry.findType("i32");
         return;
     }
 
