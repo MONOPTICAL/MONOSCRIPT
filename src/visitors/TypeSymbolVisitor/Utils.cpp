@@ -288,6 +288,10 @@ std::string TypeSymbolVisitor::resolveExprType(const std::shared_ptr<ASTNode>& n
 }
 
 void TypeSymbolVisitor::checkConversion(const std::shared_ptr<ASTNode>& node, const std::string& targetType, const std::string& errorPrefix) {
+    // Пустой литерал [] или {} подходит к любой коллекции
+    if (std::dynamic_pointer_cast<NoneNode>(node) && (targetType.starts_with("array") || targetType.starts_with("map")))
+        return;
+
     const std::string sourceType = resolveExprType(node);
     const int targetRank = getTypeRank(targetType);
     auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node);

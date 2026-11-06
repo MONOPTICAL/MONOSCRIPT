@@ -230,6 +230,9 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
     }
     
     if (isAuto) {
+        if (std::dynamic_pointer_cast<NoneNode>(node.expression))
+            LogError("Cannot infer type of empty value for variable '" + node.name + "', declare the type explicitly", node.shared_from_this());
+
         if (auto block = std::dynamic_pointer_cast<BlockNode>(node.expression)) {
             std::shared_ptr<TypeNode> inferredType = infer_collection_type_revised(block);
 
@@ -358,6 +361,12 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
         validateCollectionElements(varType, node.expression, false);
         auto Block = std::dynamic_pointer_cast<BlockNode>(node.expression);
         auto Generic = std::dynamic_pointer_cast<GenericTypeNode>(varType);
+
+        // a = [] или a = b: validateCollectionElements уже всё проверил
+        if (!Block) {
+            varAssign->expression = node.expression;
+            return;
+        }
 
         if (auto keyValue = std::dynamic_pointer_cast<KeyValueNode>(Block->statements[0])) {
             std::vector<std::string> types = { keyValue->key->inferredType->toString(), keyValue->value->inferredType->toString() };

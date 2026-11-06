@@ -11,7 +11,7 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
         type = node->inferredType;
 
     if (auto numberNode = std::dynamic_pointer_cast<NumberNode>(node)) {
-        if(type->toString() == "i1")
+        if(numberNode->isBoolLiteral)
             callNode = std::make_shared<CallNode>(
                 "toString_bool",
                 std::vector<std::shared_ptr<ASTNode>>{
@@ -19,12 +19,17 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
                 }
             );
         else
+        {
+            // Литерал печатаем как число: "n=" + 1 это n=1
+            const bool isLong = type->toString() == "i64";
+            auto literalType = std::make_shared<SimpleTypeNode>(isLong ? "i64" : "i32");
+            auto literal = std::make_shared<NumberNode>(numberNode->value, literalType);
+            literal->inferredType = literalType; // Этот узел семантика не обходит, а кодген читает его тип
             callNode = std::make_shared<CallNode>(
-                "toString_int",
-                std::vector<std::shared_ptr<ASTNode>>{
-                    std::make_shared<NumberNode>(numberNode->value, numberNode->inferredType)
-                }
+                isLong ? "toString_long" : "toString_int",
+                std::vector<std::shared_ptr<ASTNode>>{literal}
             );
+        }
     } else if (auto floatNumberNode = std::dynamic_pointer_cast<FloatNumberNode>(node)) {
         callNode = std::make_shared<CallNode>(
             "toString_float",
