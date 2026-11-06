@@ -1,5 +1,4 @@
 // expect-error:
-// xfail: число кастуется в string на return, Statements.cpp:325
 [string]f()
 |   return 5
 

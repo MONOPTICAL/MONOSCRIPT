@@ -8,7 +8,8 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
     std::shared_ptr<TypeNode> rightType = node.right->inferredType;
     
     std::shared_ptr<BinaryOpNode> root = std::make_shared<BinaryOpNode>(node.left, node.op, node.right);
-   
+    root->implicitCastTo = node.implicitCastTo; // Явный каст (a + b)->i32 не должен потеряться
+
     // "+"
     if (node.op == "+" || node.op == "add" || node.op == "fadd") {
         handlePlusOperator(root, leftType, rightType);

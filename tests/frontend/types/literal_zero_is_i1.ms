@@ -1,4 +1,4 @@
-// expect-error: expected i1
+// expect-error: does not fit
 [i32]main()
 |   x ^= 0
 |   x = 1000

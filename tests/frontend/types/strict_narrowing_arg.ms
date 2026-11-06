@@ -1,5 +1,4 @@
 // expect-error:
-// xfail: @strict разрешает сужение i64 в i8 у аргумента, Statements.cpp:636
 [i8]t(i8: a)
 |   return a
 

@@ -46,17 +46,10 @@ std::shared_ptr<TypeNode> TypeSymbolVisitor::checkForIdentifier(std::shared_ptr<
         return varAssign->expression->inferredType;
     }
     else if (auto varAssignNode = std::dynamic_pointer_cast<VariableAssignNode>(node)) {
-        if (varAssignNode->expression == nullptr
-            || std::dynamic_pointer_cast<BlockNode>(varAssignNode->expression)) {
-            if (!varAssignNode->inferredType)
-                LogError("Variable '" + varAssignNode->name + "' has no inferred type", node);
-            return varAssignNode->inferredType;
-        }
-
-        if (!varAssignNode->expression->inferredType)
-            LogError("Expression type is null for variable: " + varAssignNode->name, node);
-
-        return varAssignNode->expression->inferredType;
+        // Тип переменной это то что объявлено, а не тип выражения справа
+        if (!varAssignNode->inferredType)
+            LogError("Variable '" + varAssignNode->name + "' has no inferred type", node);
+        return varAssignNode->inferredType;
     }
 
     if (!node->inferredType)
@@ -251,9 +244,109 @@ void TypeSymbolVisitor::castAndValidate(const std::shared_ptr<ASTNode>& node, co
         bin->inferredType = std::make_shared<SimpleTypeNode>(targetType);
     }
     if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
-        castAndValidate(unary->operand, targetType, visitor);
+        // У отрицательного литерала диапазон проверяем вместе с минусом: i8 x = -128
+        auto number = std::dynamic_pointer_cast<NumberNode>(unary->operand);
+        if (number && unary->op == "neg" && targetType != "float") {
+            if (!checkIntLimits(targetType, -number->value))
+                visitor->LogError("Value " + std::to_string(-number->value) + " does not fit in type " + targetType, node);
+            number->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
+        }
+        else
+            castAndValidate(unary->operand, targetType, visitor);
         unary->inferredType = std::make_shared<SimpleTypeNode>(targetType);
     }
+}
+
+static bool isBooleanOperator(const std::string& op) {
+    return op.starts_with("icmp_") || op.starts_with("fcmp_") || op.starts_with("strcmp_") ||
+           op == "and" || op == "or";
+}
+
+std::string TypeSymbolVisitor::resolveExprType(const std::shared_ptr<ASTNode>& node) {
+    if (node->implicitCastTo) return node->implicitCastTo->toString();
+    if (std::dynamic_pointer_cast<NumberNode>(node)) return "";
+
+    if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+        if (isBooleanOperator(bin->op)) return "i1";
+        if (bin->op == "scat") return "string";
+
+        std::string left = resolveExprType(bin->left);
+        std::string right = resolveExprType(bin->right);
+        return getTypeRank(left) >= getTypeRank(right) ? left : right;
+    }
+
+    if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
+        if (unary->op == "not" || unary->op == "nullcheck") return "i1";
+        return resolveExprType(unary->operand);
+    }
+
+    if (!node->inferredType) {
+        LogError("Cannot infer expression type", node);
+        return "";
+    }
+    return node->inferredType->toString();
+}
+
+void TypeSymbolVisitor::checkConversion(const std::shared_ptr<ASTNode>& node, const std::string& targetType, const std::string& errorPrefix) {
+    const std::string sourceType = resolveExprType(node);
+    const int targetRank = getTypeRank(targetType);
+    auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node);
+
+    // Только литералы: они просто должны влезать в нужный тип
+    if (sourceType.empty()) {
+        if (targetRank == 0)
+            LogError(errorPrefix + "Type mismatch: expected " + targetType + ", got " + node->inferredType->toString(), node);
+        castAndValidate(node, targetType, this);
+        return;
+    }
+
+    if (sourceType != targetType) {
+        const int sourceRank = getTypeRank(sourceType);
+        if (sourceRank == 0 || targetRank == 0)
+            LogError(errorPrefix + "Type mismatch: expected " + targetType + ", got " + sourceType, node);
+
+        // Явный каст компилятор не трогает, он должен давать ровно нужный тип
+        if (node->implicitCastTo && !(bin && (bin->op == "and" || bin->op == "or")))
+            LogError(errorPrefix + "Type mismatch: expected " + targetType + ", got " + sourceType, node);
+
+        if (sourceRank > targetRank)
+            LogError(errorPrefix + "Type mismatch: expected " + targetType + ", got " + sourceType + ", use explicit cast ->" + targetType, node);
+
+        if (checkLabels("@strict"))
+            LogError(errorPrefix + "Implicit cast from " + sourceType + " to " + targetType + " is not allowed in @strict mode, use ->" + targetType, node);
+    }
+
+    if (targetRank == 0) return; // Строки и коллекции приводить не к чему
+
+    // Явный каст: операнды приводим друг к другу, сам каст оставляем
+    if (node->implicitCastTo && bin && !(bin->op == "and" || bin->op == "or")) {
+        auto cast = node->implicitCastTo;
+        auto inferred = node->inferredType;
+        castAllNumbersToType(bin->left, cast->toString() == "i1" ? sourceType : cast->toString());
+        castAllNumbersToType(bin->right, cast->toString() == "i1" ? sourceType : cast->toString());
+        node->inferredType = inferred;
+        return;
+    }
+    if (node->implicitCastTo && !bin) return;
+
+    // Логические выражения: операнды приводим друг к другу, а не к нужному типу
+    if ((bin && isBooleanOperator(bin->op)) ||
+        (std::dynamic_pointer_cast<UnaryOpNode>(node) && sourceType == "i1" && std::dynamic_pointer_cast<UnaryOpNode>(node)->op != "neg")) {
+        std::shared_ptr<ASTNode> expression = node;
+        castNumbersInBinaryTree(expression, "auto");
+        node->inferredType = registry.findType("i1");
+        if (targetType != "i1") node->implicitCastTo = registry.findType(targetType);
+        else if (!bin || !(bin->op == "and" || bin->op == "or")) node->implicitCastTo = nullptr;
+        return;
+    }
+
+    if (bin || std::dynamic_pointer_cast<UnaryOpNode>(node) || std::dynamic_pointer_cast<IdentifierNode>(node)) {
+        castAndValidate(node, targetType, this);
+        return;
+    }
+
+    if (sourceType != targetType)
+        node->implicitCastTo = registry.findType(targetType);
 }
 
 // Первый проход: ищем максимальный rank
