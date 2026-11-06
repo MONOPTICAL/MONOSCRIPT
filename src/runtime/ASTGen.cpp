@@ -62,6 +62,33 @@ static llvm::Function* declareUserFunction(CodeGenContext& context, FunctionNode
     return llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, node.name, context.TheModule.get());
 }
 
+// Завершает стартовую функцию: вызывает функцию пользователя и возвращает её код.
+// Стартовая функция становится настоящим main, поэтому JIT и собранный файл запускаются одинаково
+static void finishStartFunction(CodeGenContext& context, ProgramNode& node, llvm::BasicBlock* startBlock) {
+    llvm::Function* start = context.StartFunction;
+    context.StartFunction = nullptr;
+
+    llvm::Function* entry = context.TheModule->getFunction(CodeGenContext::findEntryName(node));
+    if (!entry) {
+        // Запускать нечего, об этом сообщит тот, кто запускает
+        start->eraseFromParent();
+        return;
+    }
+
+    context.Builder.SetInsertPoint(startBlock);
+    std::vector<llvm::Value*> arguments;
+    for (auto& arg : entry->args()) {
+        arguments.push_back(llvm::Constant::getNullValue(arg.getType()));
+    }
+    context.Builder.CreateRet(context.Builder.CreateCall(entry, arguments));
+    context.Builder.ClearInsertionPoint();
+
+    if (llvm::Function* userMain = context.TheModule->getFunction("main")) {
+        userMain->setName("__ms_user_main");
+    }
+    start->setName("main");
+}
+
 void ASTGen::visit(ProgramNode& node) {
     LogWarning("visit для ProgramNode: выполняю обработку " + std::to_string(node.body.size()) + " узлов");
     result = nullptr;
@@ -73,12 +100,34 @@ void ASTGen::visit(ProgramNode& node) {
         }
     }
 
+    context.StartFunction = llvm::Function::Create(
+        llvm::FunctionType::get(llvm::Type::getInt32Ty(context.TheContext), false),
+        llvm::Function::ExternalLinkage, "__ms_start", context.TheModule.get()
+    );
+    llvm::BasicBlock* startBlock = llvm::BasicBlock::Create(context.TheContext, "entry", context.StartFunction);
+
+    context.Builder.SetInsertPoint(startBlock);
+    context.Builder.CreateCall(context.getOrDeclareFunction("ms_rt_init",
+        llvm::FunctionType::get(llvm::Type::getVoidTy(context.TheContext), false)));
+    context.Builder.ClearInsertionPoint();
+
     for (auto& n : node.body) {
-        if (n) {
+        if (!n) continue;
+
+        // Глобальные переменные инициализируются в стартовой функции в порядке объявления
+        if (std::dynamic_pointer_cast<VariableAssignNode>(n)) {
+            context.Builder.SetInsertPoint(startBlock);
             n->accept(*this);
-            // Результат последнего узла становится результатом программы
+            startBlock = context.Builder.GetInsertBlock(); // Выражение могло создать новые блоки
+            context.Builder.ClearInsertionPoint();
+            continue;
         }
+
+        n->accept(*this);
+        // Результат последнего узла становится результатом программы
     }
+
+    finishStartFunction(context, node, startBlock);
 #if DEBUG
     context.TheModule->print(llvm::outs(), nullptr);
 #endif
@@ -209,6 +258,11 @@ void ASTGen::visit(VariableAssignNode& node) {
         return;
     }
     
+    // Пустой литерал {} и литерал с парами сюда приходят одинаково, поэтому проверяем по типу
+    auto declaredType = node.inferredType ? node.inferredType : node.type;
+    if (auto generic = std::dynamic_pointer_cast<GenericTypeNode>(declaredType); generic && generic->baseName == "map")
+        throw std::runtime_error("Codegen Error: map пока не реализован: " + node.name);
+
     // Получаем тип переменной
     llvm::Type* varType;
 
@@ -235,7 +289,7 @@ void ASTGen::visit(VariableAssignNode& node) {
     }
 
     llvm::BasicBlock* currentBlock = context.Builder.GetInsertBlock();
-    bool isGlobalContext = (currentBlock == nullptr);
+    bool isGlobalContext = (currentBlock->getParent() == context.StartFunction);
     
     if (isGlobalContext) {
         result = Declarations::handleGlobalVariable(context, node, varType);

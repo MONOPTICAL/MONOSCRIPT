@@ -43,3 +43,8 @@ args = ["string"]
 name = "test"
 ret = "void"
 args = []
+
+[[function]]
+name = "gc_collect"
+ret = "void"
+args = []

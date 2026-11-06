@@ -1,4 +1,5 @@
 #include "headers/CodeGenContext.h"
+#include "../errors/headers/ErrorEngine.h"
 #include <iostream>
 
 llvm::Function* CodeGenContext::getOrDeclareFunction(const std::string& name, llvm::FunctionType* type) {
@@ -255,6 +256,36 @@ void CodeGenContext::freeArray(llvm::Value* array) {
     if (arrayElementTypes.find(array) != arrayElementTypes.end()) {
         arrayElementTypes.erase(array);
     }
+}
+
+void CodeGenContext::emitPanic(const std::string& message, int line) {
+    llvm::Function* panic = getOrDeclareFunction("ms_panic",
+        llvm::FunctionType::get(
+            llvm::Type::getVoidTy(TheContext),
+            {llvm::PointerType::get(TheContext, 0), llvm::Type::getInt32Ty(TheContext)},
+            false
+        )
+    );
+    panic->setDoesNotReturn();
+
+    const int sourceLine = ErrorEngine::getInstance().displayLine(line);
+    Builder.CreateCall(panic, {Builder.CreateGlobalString(message), Builder.getInt32(sourceLine)});
+    Builder.CreateUnreachable();
+}
+
+std::string CodeGenContext::findEntryName(const ProgramNode& program) {
+    std::string entryName = "main";
+    for (const auto& node : program.body) {
+        if (auto func = std::dynamic_pointer_cast<FunctionNode>(node)) {
+            for (const auto& label : func->labels) {
+                if (label == "@entry") {
+                    entryName = func->name;
+                    break;
+                }
+            }
+        }
+    }
+    return entryName;
 }
 
 void CodeGenContext::LogError(const std::string &message)

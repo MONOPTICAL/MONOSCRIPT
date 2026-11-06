@@ -144,29 +144,17 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
     try {
         
         if (context.TheModule != nullptr) { 
-            std::string entryFunctionName = "main";
-            
-            // Поиск функции с меткой @entry
-            for (const auto& node : combinedAST->body) {
-                if (auto func = std::dynamic_pointer_cast<FunctionNode>(node)) {
-                    for (const auto& label : func->labels) {
-                        if (label == "@entry") {
-                            entryFunctionName = func->name;
-                            break;
-                        }
-                    }
-                }
-            }
+            const std::string entryFunctionName = CodeGenContext::findEntryName(*combinedAST);
             
 #if DEBUG
             auto t_jit_start = std::chrono::high_resolution_clock::now();
 #endif
-            if (!context.TheModule->getFunction(entryFunctionName)) {
+            if (!context.TheModule->getFunction("main")) {
                 std::cerr << "Error: entry function not found: " << entryFunctionName << ", add main or mark a function with @entry" << std::endl;
                 return RUN_FAILED;
             }
 
-            int result = executeModule(context.TheModule.get(), entryFunctionName, offOptimization);
+            int result = executeModule(context.TheModule.get(), "main", offOptimization);
 #if DEBUG
             auto t_jit_end = std::chrono::high_resolution_clock::now();
 #endif

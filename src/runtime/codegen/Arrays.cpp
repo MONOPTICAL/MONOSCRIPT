@@ -6,16 +6,15 @@ namespace Arrays
     llvm::Value* handleArrayInitialization(CodeGenContext& context, VariableAssignNode& node, llvm::Type* varType, std::shared_ptr<BlockNode> blockExpr)
     {
         ASTGen codeGen(context);
+
+        // Проверяем, является ли первый элемент KeyValueNode (для map)
+        if (!blockExpr->statements.empty() && std::dynamic_pointer_cast<KeyValueNode>(blockExpr->statements[0]))
+            throw std::runtime_error("Codegen Error: map пока не реализован: " + node.name);
+
         // Генерируем код для выражения
         node.expression->accept(codeGen);
         
         codeGen.LogWarning("Инициализация массива через блок для " + node.name);
-    
-        // Проверяем, является ли первый элемент KeyValueNode (для map)
-        if (!blockExpr->statements.empty() && std::dynamic_pointer_cast<KeyValueNode>(blockExpr->statements[0])) {
-            codeGen.LogWarning("Инициализация map не реализована");
-            return nullptr;
-        }
         
         // 1. Определяем тип элемента массива
         llvm::Type* elementType = nullptr;

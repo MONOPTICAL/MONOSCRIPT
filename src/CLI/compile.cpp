@@ -12,7 +12,7 @@
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Target/TargetMachine.h>
 
-bool emitExecutable(llvm::Module* module, const std::string& outputPath, const std::string& entryFunction) {
+bool emitExecutable(llvm::Module* module, const std::string& outputPath) {
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
     llvm::InitializeNativeTargetAsmParser();
@@ -61,34 +61,8 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath, const s
         stdlibDir = stdlibPath.substr(0, lastSlash);
     }
     
-    bool needsWrapper = (entryFunction != "main");
-    std::string wrapperPath;
-    
-    if (needsWrapper) {
-        wrapperPath = outputPath + "_wrapper.c";
-        std::ofstream wrapperFile(wrapperPath);
-        
-        if (!wrapperFile.is_open()) {
-            std::cerr << "Не удалось создать файл-обертку для main" << std::endl;
-            return false;
-        }
-
-        wrapperFile << "#include <stdint.h>\n\n";
-        wrapperFile << "extern int " << entryFunction << "();\n\n";
-        wrapperFile << "int main(int argc, char** argv) {\n";
-        wrapperFile << "    " << entryFunction << "();\n";
-        wrapperFile << "    return 0;\n";
-        wrapperFile << "}\n";
-        
-        wrapperFile.close();
-    }
-    
     // Компилируем и линкуем
     std::string gccCmd = "gcc -g -o " + outputPath + " " + objPath;
-    
-    if (needsWrapper) {
-        gccCmd += " " + wrapperPath;
-    }
     
     // mono
     gccCmd += " " + stdlibPath + " -lgc -lm -ldl -Wl,-rpath," + stdlibDir;
@@ -103,9 +77,6 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath, const s
     // Удаляем промежуточные файлы
     std::remove(irPath.c_str());
     std::remove(objPath.c_str());
-    if (needsWrapper) {
-        std::remove(wrapperPath.c_str());
-    }
     
     return true;
 }
@@ -116,19 +87,6 @@ bool compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::st
     combinedAST->accept(codeGen);
 
     if (context.TheModule != nullptr) {
-        std::string entryFunctionName = "main";
-        
-        // Поиск функции с меткой @entry
-        for (const auto& node : combinedAST->body) {
-            if (auto func = std::dynamic_pointer_cast<FunctionNode>(node)) {
-                for (const auto& label : func->labels) {
-                    if (label == "@entry") {
-                        entryFunctionName = func->name;
-                        break;
-                    }
-                }
-            }
-        }
 #if DEBUG
         std::cerr << "\n--- LLVM IR ---" << std::endl;
         context.TheModule->print(llvm::outs(), nullptr);
@@ -158,11 +116,11 @@ bool compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::st
         context.TheModule->print(llvm::outs(), nullptr);
         std::cerr << "--- END LLVM IR(O2) ---\n" << std::endl;
 #endif
-        if (!context.TheModule->getFunction(entryFunctionName)) {
-            std::cerr << "Error: entry function not found: " << entryFunctionName << ", add main or mark a function with @entry" << std::endl;
+        if (!context.TheModule->getFunction("main")) {
+            std::cerr << "Error: entry function not found: " << CodeGenContext::findEntryName(*combinedAST) << ", add main or mark a function with @entry" << std::endl;
             return false;
         }
-        if (!emitExecutable(context.TheModule.get(), outputFile, entryFunctionName)) {
+        if (!emitExecutable(context.TheModule.get(), outputFile)) {
             std::cerr << "Ошибка при компиляции в исполняемый файл." << std::endl;
             return false;
         }

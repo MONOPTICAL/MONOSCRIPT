@@ -44,8 +44,8 @@ class TypeNode;
 
 class ASTNode : public std::enable_shared_from_this<ASTNode> {
     public:
-        int line; // номер строки в исходном коде
-        int column; // номер столбца в исходном коде
+        int line = 0; // номер строки в исходном коде
+        int column = 0; // номер столбца в исходном коде
 
         std::shared_ptr<TypeNode> inferredType; // Выводимый тип узла (для IR)
 
