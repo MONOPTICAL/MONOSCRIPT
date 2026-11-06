@@ -61,7 +61,7 @@ if(LLVM_FOUND)
   # Создаём .so библиотеку из .d файлов
   add_custom_command(
       OUTPUT ${D_LIB}
-      COMMAND dmd -shared -fPIC -of=${D_LIB} ${D_SOURCES}
+      COMMAND dmd -shared -fPIC -L-lgc -of=${D_LIB} ${D_SOURCES}
       DEPENDS ${D_SOURCES}
       COMMENT "Building D shared library: ${D_LIB}"
   )
