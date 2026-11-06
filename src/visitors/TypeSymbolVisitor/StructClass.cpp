@@ -2,7 +2,9 @@
 
 void TypeSymbolVisitor::visit(StructNode& node) {
     // Проверяем, существует ли структура в реестре
-    if (registry.findStruct(node.name)) {
+    // Сбор объявлений уже положил сюда эту же структуру, повтор это другая структура с тем же именем
+    auto existingStruct = registry.findStruct(node.name);
+    if (existingStruct && existingStruct->body != node.body) {
         LogError("Struct already defined: " + node.name, node.shared_from_this());
     }
 
@@ -22,6 +24,13 @@ void TypeSymbolVisitor::visit(StructNode& node) {
     // Обрабатываем тело структуры
     if (auto blockNode = std::dynamic_pointer_cast<BlockNode>(node.body)) {
         for (const auto& statement : blockNode->statements) {
+            // Конструкторов пока нет, поэтому значение полю взять неоткуда. Коллекция может быть пустой
+            auto field = std::dynamic_pointer_cast<VariableAssignNode>(statement);
+            if (field && std::dynamic_pointer_cast<NoneNode>(field->expression)
+                && !std::dynamic_pointer_cast<GenericTypeNode>(field->type)) {
+                LogError("Field '" + field->name + "' of struct '" + node.name + "' must have a default value", statement);
+            }
+
             statement->accept(*this);
         }
     }

@@ -4,11 +4,12 @@ void TypeSymbolVisitor::visit(SimpleTypeNode &node)
 {
     // Проверяем, существует ли тип в реестре
     auto type = registry.findType(node.name);
-    if (!type) {
+    if (!type && !registry.findStruct(node.name)) {
         LogError("Unknown type: " + node.name);
     }
 
-    node.inferredType = type;
+    // Структуры в реестре типов нет, тип такого узла это он сам
+    node.inferredType = type ? type : std::make_shared<SimpleTypeNode>(node.name);
 }
 
 void TypeSymbolVisitor::visit(GenericTypeNode &node)

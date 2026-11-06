@@ -152,11 +152,19 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     {
         return parseAssignment(false);
     }
+    // Struct variable declaration
+        // [StructName] [variableName] = [expression]
+        // User u = User()
+        // ↑ if we have two identifiers in a row, the first one is a struct type
+    else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::Identifier)
+    {
+        return parseAssignment(false);
+    }
     // Const variable declaration
         // const [Type] [variableName] = [expression] or [variableName] ^= [expression]
         // const i32 i = 0 or i ^= 0
         // ↑ if we have keyword const, and next token is type, we have const variable declaration
-    else if (currentToken.type == TokenType::Keyword && currentToken.value == "const" && peek().type == TokenType::Type)
+    else if (currentToken.type == TokenType::Keyword && currentToken.value == "const" && (peek().type == TokenType::Type || peek().type == TokenType::Identifier))
     {
         return parseAssignment(true);
     }

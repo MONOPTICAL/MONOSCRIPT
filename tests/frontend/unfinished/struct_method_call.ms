@@ -1,5 +1,5 @@
 // expect: ok
-// xfail: поиск члена смотрит только поля, а объявить переменную структуры нельзя, NotFinished.cpp:50 и Parser.cpp:149
+// xfail: методы отложены, поиск члена смотрит только поля, NotFinished.cpp:50
 [struct]P
 |   i32 age = 1
 |   [i32]get()

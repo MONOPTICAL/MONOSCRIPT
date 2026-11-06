@@ -1,5 +1,4 @@
 // expect: ok
-// xfail: Identifier Identifier не считается объявлением, Parser.cpp:149
 [struct]P
 |   i32 age = 1
 
