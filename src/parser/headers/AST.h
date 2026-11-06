@@ -339,7 +339,7 @@ class NumberNode : public ASTNode {
         NumberNode(int64_t value, std::shared_ptr<TypeNode> type) : value(value), type(type) {}
         int64_t value;
         std::shared_ptr<TypeNode> type; // тип числа (i32, i64, i8, i1)
-
+        bool isBoolLiteral = false; // написано true или false, а не 0 или 1
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);

@@ -572,7 +572,8 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
             type->line = lineIndex; type->column = tokenIndex; // Устанавливаем строку и колонку для узла
             
             auto numberNode = std::make_shared<NumberNode>(currentToken.value == "true", type); // Создаём узел булевого значения
-            
+            numberNode->isBoolLiteral = true;
+
             numberNode->line = lineIndex; numberNode->column = tokenIndex; // Устанавливаем строку и колонку для узла
             return numberNode; // Создаём узел булевого значения
         }
