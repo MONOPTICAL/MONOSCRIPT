@@ -1,30 +1,36 @@
 [[function]]
 name = "sum"
+pure = true
 ret = "i32"
 args = ["i32","i32"]
 
 [[function]]
 name = "scat"
+pure = true
 ret = "string"
 args = ["string", "string"]
 
 [[function]]
 name = "toString_int"
+pure = true
 ret = "string"
 args = ["i32"]
 
 [[function]]
 name = "toString_bool"
+pure = true
 ret = "string"
 args = ["i1"]
 
 [[function]]
 name = "toString_float"
+pure = true
 ret = "string"
 args = ["float"]
 
 [[function]]
 name = "toString_long"
+pure = true
 ret = "string"
 args = ["i64"]
 

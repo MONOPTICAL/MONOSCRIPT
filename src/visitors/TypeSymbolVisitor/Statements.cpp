@@ -592,13 +592,9 @@ void TypeSymbolVisitor::visit(CallNode& node) {
     // Проверяем, существует ли функция в реестре
     if (contexts.back().functions.find(node.callee) == contexts.back().functions.end()) {
         auto declared = declaredFunctions.find(node.callee);
-        const auto isPure = [](const std::shared_ptr<ASTNode>& function) {
-            const auto& labels = std::dynamic_pointer_cast<FunctionNode>(function)->labels;
-            return std::find(labels.begin(), labels.end(), "@pure") != labels.end();
-        };
 
-        // Функция объявлена ниже. Чистая функция по-прежнему видит только чистые
-        if (declared != declaredFunctions.end() && (!checkLabels("@pure") || isPure(declared->second)))
+        // Функция объявлена в модуле, в том числе ниже этого вызова
+        if (declared != declaredFunctions.end())
             contexts.back().functions[node.callee] = declared->second;
 
         // Точное совпадение типов аргументов
@@ -616,6 +612,9 @@ void TypeSymbolVisitor::visit(CallNode& node) {
 
     // Проверяем типы аргументов
     std::shared_ptr<FunctionNode> func = std::dynamic_pointer_cast<FunctionNode>(contexts.back().functions[node.callee]);
+
+    if (checkLabels("@pure") && std::find(func->labels.begin(), func->labels.end(), "@pure") == func->labels.end())
+        LogError("Pure function cannot call impure function: " + node.callee, node.shared_from_this());
 
     // Проверяем количество аргументов
     if (argTypes.size() != func->parameters.size()) {
