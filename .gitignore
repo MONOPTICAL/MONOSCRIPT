@@ -5,4 +5,5 @@
 /.vscode
 ms
 *.ms
+!/tests/**/*.ms
 /msTests

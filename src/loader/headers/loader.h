@@ -27,6 +27,8 @@ std::string findTomlPath();
 
 std::string findLibraryPath(const std::string& Default_LIB = "libm_std.so");
 
+std::string findTestsPath();
+
 } 
 
 #endif // LOADER_H
