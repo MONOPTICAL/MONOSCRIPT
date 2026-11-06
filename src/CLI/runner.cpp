@@ -62,7 +62,8 @@ int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimi
 
         llvm::SMDiagnostic Err;
         ClonedModule = llvm::parseIR(
-            *llvm::MemoryBuffer::getMemBuffer(IRBuffer.str()),
+            // Парсер читает до нулевого байта, а в SmallString его нет: только копия буфера его добавляет
+            *llvm::MemoryBuffer::getMemBufferCopy(IRBuffer.str()),
             Err,
             *Ctx
         );
