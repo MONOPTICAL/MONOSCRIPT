@@ -331,7 +331,8 @@ llvm::Value *Declarations::handleSimpleReassignment(CodeGenContext &context, Var
             llvm::Type* loadedType = allocaInst->getAllocatedType();
             value = context.Builder.CreateLoad(loadedType, value, "val_load");
             valueType = value->getType();
-        } else if (llvm::GlobalVariable* globalVar = llvm::dyn_cast<llvm::GlobalVariable>(value)) {
+        } else if (llvm::GlobalVariable* globalVar = llvm::dyn_cast<llvm::GlobalVariable>(value); globalVar && !globalVar->getValueType()->isArrayTy()) {
+            // Строковый литерал это глобальный массив: нужен указатель на него, а не сам массив
             llvm::Type* loadedType = globalVar->getValueType();
             value = context.Builder.CreateLoad(loadedType, value, "val_load");
             valueType = value->getType();

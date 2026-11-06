@@ -33,6 +33,9 @@ private:
 
     std::string                                                     currentModuleName;
 
+    // Все функции верхнего уровня, собранные до проверки тел
+    std::unordered_map<std::string, std::shared_ptr<ASTNode>>       declaredFunctions;
+
     /*
     Проверяет, существует ли переменная в реестре(если переданный node является идентификатором)
     */

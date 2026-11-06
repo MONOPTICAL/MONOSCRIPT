@@ -38,10 +38,41 @@ void ASTGen::visit(GenericTypeNode& node) {
     result = nullptr;
 }
 
+// Объявляет функцию в модуле или возвращает уже объявленную
+static llvm::Function* declareUserFunction(CodeGenContext& context, FunctionNode& node) {
+    if (llvm::Function* existing = context.TheModule->getFunction(node.name)) {
+        return existing;
+    }
+
+    std::vector<llvm::Type*> paramTypes;
+    for (auto& param : node.parameters) {
+        paramTypes.push_back(context.getLLVMType(param.first, context.TheContext));
+    }
+
+    bool isMain = (node.name == "main" || std::find(node.labels.begin(), node.labels.end(), "@entry") != node.labels.end());
+    llvm::Type* returnLLVMType = llvm::Type::getVoidTy(context.TheContext);
+    if (node.returnType) {
+        returnLLVMType = context.getLLVMType(node.returnType, context.TheContext);
+    }
+    if (isMain) {
+        returnLLVMType = llvm::Type::getInt32Ty(context.TheContext);
+    }
+
+    llvm::FunctionType* funcType = llvm::FunctionType::get(returnLLVMType, paramTypes, false);
+    return llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, node.name, context.TheModule.get());
+}
+
 void ASTGen::visit(ProgramNode& node) {
     LogWarning("visit для ProgramNode: выполняю обработку " + std::to_string(node.body.size()) + " узлов");
     result = nullptr;
-    
+
+    // Сначала объявляем все функции, чтобы их можно было вызывать до определения
+    for (auto& n : node.body) {
+        if (auto function = std::dynamic_pointer_cast<FunctionNode>(n); function && function->associated.empty()) {
+            declareUserFunction(context, *function);
+        }
+    }
+
     for (auto& n : node.body) {
         if (n) {
             n->accept(*this);
@@ -64,27 +95,13 @@ void ASTGen::visit(FunctionNode& node) {
         currentFunction = currentBlock->getParent();
     }
 
-    // Создаем минимальную заглушку функции
-    std::vector<llvm::Type*> paramTypes;
-    for (auto& param : node.parameters) {
-        paramTypes.push_back(context.getLLVMType(param.first, context.TheContext));
-    }
-    
     bool isMain = (node.name == "main" || std::find(node.labels.begin(), node.labels.end(), "@entry") != node.labels.end());
-    llvm::Type* returnLLVMType = llvm::Type::getVoidTy(context.TheContext);
-    if (node.returnType) {
-        returnLLVMType = context.getLLVMType(node.returnType, context.TheContext);
-    }
-    if (isMain) {
-        returnLLVMType = llvm::Type::getInt32Ty(context.TheContext);
-    }
-    
-    llvm::FunctionType* funcType = llvm::FunctionType::get(returnLLVMType, paramTypes, false);
-    llvm::Function* func = llvm::Function::Create(
-        funcType, llvm::Function::ExternalLinkage, node.name, context.TheModule.get());
 
-    
-    
+    // Создаем минимальную заглушку функции
+    llvm::Function* func = declareUserFunction(context, node);
+    llvm::Type* returnLLVMType = func->getReturnType();
+
+
     // Создаем блок входа в функцию
     llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(
         context.TheContext, "entry", func);
@@ -246,7 +263,10 @@ void ASTGen::visit(ReassignMemberNode& node) {
 
 void ASTGen::visit(VariableReassignNode& node) {
     LogWarning("visit не реализован для VariableReassignNode: " + node.name);
-    
+
+    if (std::dynamic_pointer_cast<NoneNode>(node.expression))
+        throw std::runtime_error("Codegen Error: присваивание пустого литерала [] или {} пока не реализовано");
+
     // Получаем тип переменной
     llvm::Type* varType = context.NamedValues[node.name]->getType();
     if (!varType) {
@@ -366,6 +386,9 @@ void ASTGen::visit(WhileNode& node) {
 }
 
 void ASTGen::visit(ReturnNode& node) {
+    if (std::dynamic_pointer_cast<NoneNode>(node.expression))
+        throw std::runtime_error("Codegen Error: return пустого литерала [] или {} пока не реализован");
+
     result = Statements::handleReturnStatement(context, node);
 }
 
@@ -405,6 +428,8 @@ void ASTGen::visit(CallNode& node) {
             result = nullptr;
             return;
         }
+        if (std::dynamic_pointer_cast<NoneNode>(node.arguments[i]))
+            throw std::runtime_error("Codegen Error: передача пустого литерала [] или {} в функцию " + node.callee + " пока не реализована");
         node.arguments[i]->accept(*this);
         llvm::Value* argVal = getResult();
         if (!argVal) {
