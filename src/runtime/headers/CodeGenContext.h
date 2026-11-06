@@ -45,10 +45,18 @@ public:
 
     static std::string                  getTypeString(std::shared_ptr<TypeNode> typeNode)
     {
-        return typeNode->inferredType->toString();
+        return typeNode->toString();
     }
 
-    void                                pushLoopContext(llvm::BasicBlock* condBlock, llvm::BasicBlock* endBlock) 
+    // Память под переменную выделяется в начале функции, а не на каждой итерации цикла
+    llvm::AllocaInst*                   createEntryAlloca(llvm::Type* type, const std::string& name)
+    {
+        llvm::Function* function = Builder.GetInsertBlock()->getParent();
+        llvm::IRBuilder<> entryBuilder(&function->getEntryBlock(), function->getEntryBlock().begin());
+        return entryBuilder.CreateAlloca(type, nullptr, name);
+    }
+
+    void                                pushLoopContext(llvm::BasicBlock* condBlock,llvm::BasicBlock* endBlock) 
     {
         if (condBlock) loopCondBlocks.push_back(condBlock);
         if (endBlock) loopEndBlocks.push_back(endBlock);

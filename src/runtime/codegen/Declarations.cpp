@@ -32,9 +32,9 @@ namespace Declarations
         }
 
         // Создаем переменную в таблице символов
-        llvm::AllocaInst* alloca = context.Builder.CreateAlloca(varType, nullptr, node.name);
+        llvm::AllocaInst* alloca = context.createEntryAlloca(varType, node.name);
         context.NamedValues[node.name] = alloca;
-        
+
         // Записываем значение в переменную
         context.Builder.CreateStore(value, alloca);
         return alloca;

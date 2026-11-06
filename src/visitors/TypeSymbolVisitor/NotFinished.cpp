@@ -119,6 +119,26 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
     }
 }
 
+void TypeSymbolVisitor::checkPureAlias(const std::shared_ptr<ASTNode>& expr) {
+    if (!checkLabels("@pure") || !expr->inferredType) return;
+
+    // Числа и строки не меняются на месте, опасны только объекты
+    const std::string type = expr->inferredType->toString();
+    if (!type.starts_with("array") && !type.starts_with("map") && !registry.findStruct(type)) return;
+
+    std::shared_ptr<ASTNode> base = expr;
+    if (auto access = std::dynamic_pointer_cast<AccessExpression>(expr)) base = access->expression;
+
+    auto id = std::dynamic_pointer_cast<IdentifierNode>(base);
+    if (!id) return;
+
+    auto it = contexts.back().variables.find(id->name);
+    if (it == contexts.back().variables.end()) return;
+
+    if (auto var = std::dynamic_pointer_cast<VariableAssignNode>(it->second); var && !var->expression)
+        LogError("Pure function cannot create a new reference to object passed to it, use copy(" + id->name + ")", expr);
+}
+
 void TypeSymbolVisitor::visit(ReassignMemberNode& node) {
     auto access = std::dynamic_pointer_cast<AccessExpression>(node.accessExpression);
     if (!access)
@@ -158,6 +178,7 @@ void TypeSymbolVisitor::visit(ReassignMemberNode& node) {
     }
 
     node.expression->accept(*this);
+    checkPureAlias(node.expression);
     auto exprType = node.expression->implicitCastTo ? node.expression->implicitCastTo
                                                     : node.expression->inferredType;
     if (!exprType)

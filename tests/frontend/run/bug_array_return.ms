@@ -1,5 +1,5 @@
 // expect-output: ok
-// xfail: функция с массивом в return падает в кодгене, ASTGen.cpp
+// xfail: функция с массивом в return даёт ошибку JIT, заголовок массива лежит на стеке, CodeGenContext.cpp:120
 [array<i32>]f()
 |   return [1]
 
