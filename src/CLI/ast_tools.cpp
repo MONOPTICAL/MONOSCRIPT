@@ -60,14 +60,12 @@ std::shared_ptr<ProgramNode> parseAndLinkModules(
         // Копируем все узлы из текущего модуля в объединенный AST
         if (module.ast) {
             for (const auto& node : module.ast->body) {
-                // Пропускаем директивы импорта в объединенном AST, они уже обработаны
-                if (!std::dynamic_pointer_cast<ImportNode>(node)) {
-                    // Добавляем метку модуля в объединенный AST
-                    auto newModuleMark = std::make_shared<ModuleMark>(module.path);
-                    combinedAST->body.push_back(newModuleMark);
-                    
-                    combinedAST->body.push_back(node);
-                }
+                // Добавляем метку модуля в объединенный AST
+                auto newModuleMark = std::make_shared<ModuleMark>(module.path);
+                combinedAST->body.push_back(newModuleMark);
+
+                // Импорты тоже оставляем: по ним семантика решает, что видно этому модулю
+                combinedAST->body.push_back(node);
             }
         }
     }
