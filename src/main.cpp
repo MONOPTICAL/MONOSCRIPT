@@ -31,6 +31,11 @@ int main(int argc, char* argv[]) {
             return runFrontendTests({self, "--check-file"}, {self, "run"}, loader::findTestsPath(), options.verbose, options.inputFile);
         }
 
+        // Сколько всего стадий, зависит от режима: см. вызовы ui::stage
+        const int stageCount = options.runJIT ? 8 : options.compileExecutable ? 10 : 5;
+        ui::pipelineBegin(stageCount, options.compileExecutable);
+        if (options.showTimings) ui::printTimingsAtExit();
+
         // Чтение кода
         std::string sourceCode = readSourceCode(options.inputFile);
         
@@ -56,16 +61,21 @@ int main(int argc, char* argv[]) {
             if (!compileToExecutable(combinedAST, outputFile)) {
                 return 1;
             }
-            std::cout << ui::style(stdout, ui::GREEN) << "Build finished." << ui::style(stdout, ui::RESET)
+            ui::pipelineStop();
+            std::cout << ui::style(stdout, ui::ACCENT) << "Build finished." << ui::style(stdout, ui::RESET)
                       << " Executable: " << ui::style(stdout, ui::BOLD) << outputFile << ui::style(stdout, ui::RESET) << std::endl;
             return 0;
         }
         
+        ui::pipelineStop();
+
         // Если --run не указан, просто завершаем работу после анализа
-        std::cout << ui::style(stdout, ui::GREEN) << "Analysis finished." << ui::style(stdout, ui::RESET)
+        std::cout << ui::style(stdout, ui::ACCENT) << "Analysis finished." << ui::style(stdout, ui::RESET)
                   << " Use run to execute the program." << std::endl;
         
     } catch (const std::exception& e) {
+        ui::pipelineStop();
+
         // Ошибки компиляции уже напечатаны, у них пустой текст
         if (e.what()[0] != '\0') std::cerr << ui::style(stderr, ui::RED) << e.what() << ui::style(stderr, ui::RESET) << std::endl;
         return 1;

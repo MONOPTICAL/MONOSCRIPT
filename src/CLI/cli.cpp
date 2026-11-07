@@ -6,20 +6,20 @@
 
 void printHelp(const char* programName) {
     const std::string name = std::filesystem::path(programName).filename().string();
-    const std::string bold = ui::style(stdout, ui::BOLD), cyan = ui::style(stdout, ui::CYAN), dim = ui::style(stdout, ui::DIM), reset = ui::style(stdout, ui::RESET);
+    const std::string bold = ui::style(stdout, ui::WHITE) + ui::style(stdout, ui::BOLD), accent = ui::style(stdout, ui::ACCENT), dim = ui::style(stdout, ui::DIM), reset = ui::style(stdout, ui::RESET);
 
     auto option = [&](const std::string& flag, const std::string& text) {
-        std::cout << "  " << cyan << flag << reset << std::string(flag.size() < 24 ? 24 - flag.size() : 1, ' ') << text << "\n";
+        std::cout << "  " << accent << flag << reset << std::string(flag.size() < 24 ? 24 - flag.size() : 1, ' ') << text << "\n";
     };
 
     ui::printBanner(stdout);
-    std::cout << "\n" << dim << "  statically typed scripting language on LLVM" << reset << "\n\n"
-              << bold << "USAGE" << reset << "\n"
+    std::cout << "\n" << bold << "USAGE" << reset << "\n"
               << "  " << name << " [OPTIONS] [FILE]\n\n"
               << bold << "RUN" << reset << "\n";
     option("run FILE", "Run a program through the JIT");
     option("--compile OUT FILE", "Build a native executable");
     option("--offOptimization", "Run without LLVM optimization");
+    option("--timings", "Show how long each compiler stage took");
     std::cout << "\n" << bold << "INSPECT" << reset << "\n";
     option("--tokens", "Show tokens");
     option("--ast", "Show AST");
@@ -56,6 +56,8 @@ CLIOptions parseArgs(int argc, char* argv[]) {
             }
         } else if (arg == "--offOptimization") {
             options.offOptimization = true;
+        } else if (arg == "--timings") {
+            options.showTimings = true;
         } else if (arg == "--run_tests") {
             options.runTests = true;
         } else if (arg == "--verbose") {
@@ -77,6 +79,7 @@ CLIOptions parseArgs(int argc, char* argv[]) {
 
 std::string readSourceCode(const std::string& inputFile) {
     std::string sourceCode;
+    ui::stage("Reading the source file");
     
     if (!inputFile.empty()) {
         std::ifstream file(inputFile);

@@ -21,7 +21,7 @@
 #include <llvm/IR/PassManager.h>
 #include <llvm/Passes/PassBuilder.h>
 
-int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimization, ui::Spinner* spinner) {
+int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimization) {
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
     llvm::InitializeNativeTargetAsmParser();
@@ -39,6 +39,7 @@ int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimi
     
     
     if (!handle) {
+        ui::pipelineStop();
         std::cerr << "Error loading standard library (libm_std.so): " << dlerror() << std::endl;
         return RUN_FAILED;
     }
@@ -82,6 +83,7 @@ int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimi
     std::cout << "--- END LLVM IR ---\n" << std::endl;
 #endif
 
+    ui::stage(offOptimization ? "Optimizer: skipped" : "Optimizer: running LLVM O2 passes");
     if(!offOptimization)
     {
         llvm::PassBuilder passBuilder;
@@ -109,6 +111,8 @@ int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimi
     std::cout << "--- END LLVM IR(O2) ---\n" << std::endl;
 #endif
 
+    ui::stage("JIT: compiling to machine code");
+
     // ThreadSafeModule
     llvm::orc::ThreadSafeModule TSM(std::move(ClonedModule), std::move(Ctx));
     ExitOnErr(JIT->addIRModule(std::move(TSM)));
@@ -117,7 +121,7 @@ int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimi
     auto MainFn = MainSymbol.toPtr<int(*)()>();
 
     // Анимация заканчивается до старта: дальше экран принадлежит программе
-    if (spinner) spinner->done();
+    ui::pipelineStop();
 
     // Вызываем функцию
     #if DEBUG
@@ -136,7 +140,7 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
     auto t_start = std::chrono::high_resolution_clock::now();
 #endif
     // Code generation
-    ui::Spinner spinner("Compiling", false);
+    ui::stage("Code generation: building LLVM IR");
     CodeGenContext context(currentFilePath);
     ASTGen codeGen(context);
     combinedAST->accept(codeGen);
@@ -156,17 +160,18 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
             auto t_jit_start = std::chrono::high_resolution_clock::now();
 #endif
             if (!context.TheModule->getFunction("main")) {
+                ui::pipelineStop();
                 std::cerr << "Error: entry function not found: " << entryFunctionName << ", add main or mark a function with @entry" << std::endl;
                 return RUN_FAILED;
             }
 
-            int result = executeModule(context.TheModule.get(), "main", offOptimization, &spinner);
+            int result = executeModule(context.TheModule.get(), "main", offOptimization);
 #if DEBUG
             auto t_jit_end = std::chrono::high_resolution_clock::now();
 #endif
             if (result == RUN_FAILED) return RUN_FAILED;
 
-            std::cout << ui::style(stdout, result == 0 ? ui::DIM : ui::YELLOW) << "[" << entryFunctionName << " exited with code " << result << "]"
+            std::cout << ui::style(stdout, result == 0 ? ui::DIM : ui::ACCENT) << "[" << entryFunctionName << " exited with code " << result << "]"
                       << ui::style(stdout, ui::RESET) << std::endl;
 
 #if DEBUG

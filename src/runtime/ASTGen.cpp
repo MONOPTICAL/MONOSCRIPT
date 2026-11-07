@@ -1,5 +1,6 @@
 #include "headers/ASTVisitors.h"
 #include "headers/CodeGenHandlers.h"
+#include "../CLI/headers/ui.h"
 #include "../loader/headers/loader.h"
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Function.h>
@@ -145,6 +146,7 @@ void ASTGen::visit(ProgramNode& node) {
 
 void ASTGen::visit(FunctionNode& node) {
     LogWarning("visit не полностью реализован для FunctionNode: " + node.name);
+    ui::stageDetail(node.name);
 
     // Сохраняем текущую точку вставки
     llvm::BasicBlock* currentBlock = nullptr;

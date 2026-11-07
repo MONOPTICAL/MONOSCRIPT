@@ -10,6 +10,7 @@ struct CLIOptions {
     bool compileExecutable = false; // LLVM Compile
     bool runTests = false; // Тесты фронтенда, inputFile тогда работает как фильтр по имени
     bool verbose = false; // Подробный вывод тестов
+    bool showTimings = false; // Сколько заняла каждая стадия компилятора
     std::string ExecutableFile;
     std::string inputFile;
 };

@@ -1,10 +1,12 @@
 #include "headers/symantic.h"
 #include "../visitors/headers/TypeSymbolVisitor.h"
 #include "../includes/ASTDebugger.hpp"
+#include "headers/ui.h"
 
 std::shared_ptr<ProgramNode> symanticParseModule(std::shared_ptr<ProgramNode> combinedAST, bool showSymantic)
 {
     // Type checking
+    ui::stage("Semantic analysis: checking types, @strict and @pure");
     TypeSymbolVisitor typeSymbolVisitor;
     combinedAST->accept(typeSymbolVisitor);
     

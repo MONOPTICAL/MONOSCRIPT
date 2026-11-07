@@ -285,6 +285,12 @@ Build a native executable:
 ./ms --compile hello hello.ms
 ```
 
+See which compiler stage takes the time:
+
+```bash
+./ms run hello.ms --timings
+```
+
 Run the test suite:
 
 ```bash
