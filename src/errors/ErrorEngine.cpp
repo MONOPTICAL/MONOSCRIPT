@@ -43,6 +43,7 @@ int ErrorEngine::displayLine(int line) const {
 }
 
 void ErrorEngine::printError(int line, int column, const std::string& errorType, const std::string& message, const std::string& hint) {
+    ui::pipelineStop();
     std::cerr << ui::style(stderr, ui::RED) << ui::style(stderr, ui::BOLD) << errorType << ui::style(stderr, ui::RESET)
               << ui::style(stderr, ui::DIM) << " [line " << displayLine(line) << ", column " << column + 1 << "]" << ui::style(stderr, ui::RESET)
               << ": " << message << std::endl;
@@ -52,7 +53,7 @@ void ErrorEngine::printError(int line, int column, const std::string& errorType,
     }
 
     if (!hint.empty()) {
-        std::cerr << ui::style(stderr, ui::CYAN) << "    Hint: " << hint << ui::style(stderr, ui::RESET) << std::endl;
+        std::cerr << ui::style(stderr, ui::ACCENT) << "    Hint: " << hint << ui::style(stderr, ui::RESET) << std::endl;
     }
     throw std::runtime_error("");
 }

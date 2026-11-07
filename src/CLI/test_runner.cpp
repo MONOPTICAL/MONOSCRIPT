@@ -474,8 +474,8 @@ static void printGroup(const std::string& group, const std::vector<ReportEntry>&
 
     const bool allPassed = passed + skipped == static_cast<int>(entries.size());
     std::cout << "\n";
-    if (allPassed) std::cout << termcolor::green << "✓ ";
-    else std::cout << termcolor::yellow << "▲ ";
+    if (allPassed) std::cout << termcolor::color<141> << "✓ ";
+    else std::cout << termcolor::color<183> << "▲ ";
     std::cout << termcolor::bold << groupTitle(group) << termcolor::reset << termcolor::grey << "  "
               << passed << " of " << entries.size() << " passed" << termcolor::reset << "\n";
 
@@ -487,15 +487,15 @@ static void printGroup(const std::string& group, const std::vector<ReportEntry>&
                 continue;
             case TestStatus::Passed:
                 if (!verbose) continue;
-                std::cout << "  " << termcolor::green << "✓ " << termcolor::reset << entry.name << "\n";
+                std::cout << "  " << termcolor::color<141> << "✓ " << termcolor::reset << entry.name << "\n";
                 break;
             case TestStatus::KnownBug:
-                std::cout << "  " << termcolor::yellow << "• " << termcolor::reset << padRight(entry.name, nameWidth)
-                          << "  " << termcolor::cyan << padRight(entry.location, locationWidth) << termcolor::reset
+                std::cout << "  " << termcolor::color<183> << "• " << termcolor::reset << padRight(entry.name, nameWidth)
+                          << "  " << termcolor::color<183> << padRight(entry.location, locationWidth) << termcolor::reset
                           << "  " << entry.reason << "\n";
                 break;
             case TestStatus::Fixed:
-                std::cout << "  " << termcolor::green << "★ " << padRight(entry.name, nameWidth)
+                std::cout << "  " << termcolor::color<141> << "★ " << padRight(entry.name, nameWidth)
                           << "  fixed, remove the xfail mark" << termcolor::reset << "\n";
                 break;
             case TestStatus::Failed:
@@ -519,22 +519,22 @@ static void printSummary(int total, int passed, int knownBugs, int failed, int f
     const int filled = total > 0 ? passed * barWidth / total : 0;
 
     std::cout << "\n" << termcolor::grey << std::string(barWidth, '-') << termcolor::reset << "\n";
-    std::cout << termcolor::green;
+    std::cout << termcolor::color<141>;
     for (int i = 0; i < filled; ++i) std::cout << "█";
-    std::cout << termcolor::yellow;
+    std::cout << termcolor::color<60>;
     for (int i = filled; i < barWidth; ++i) std::cout << "░";
     std::cout << termcolor::reset << "  " << passed << " of " << total << "\n\n";
 
-    std::cout << "  " << termcolor::green << "Passed:      " << passed << termcolor::reset << "\n";
-    std::cout << "  " << termcolor::yellow << "Known bugs:  " << knownBugs << termcolor::reset << "\n";
+    std::cout << "  " << termcolor::color<141> << "Passed:      " << passed << termcolor::reset << "\n";
+    std::cout << "  " << termcolor::color<183> << "Known bugs:  " << knownBugs << termcolor::reset << "\n";
     if (skipped > 0) std::cout << "  " << termcolor::grey << "Skipped:     " << skipped << " (needs a build with LLVM)" << termcolor::reset << "\n";
-    if (fixed > 0) std::cout << "  " << termcolor::green << "Fixed:       " << fixed << " (remove xfail)" << termcolor::reset << "\n";
+    if (fixed > 0) std::cout << "  " << termcolor::color<141> << "Fixed:       " << fixed << " (remove xfail)" << termcolor::reset << "\n";
     if (failed > 0) std::cout << "  " << termcolor::red << "Failed:      " << failed << termcolor::reset << "\n";
 
     std::cout << "\n";
     if (total == 0) std::cout << termcolor::red << termcolor::bold << "No tests found";
     else if (failed > 0 || fixed > 0) std::cout << termcolor::red << termcolor::bold << "Unexpected results";
-    else std::cout << termcolor::green << termcolor::bold << "No unexpected results";
+    else std::cout << termcolor::color<141> << termcolor::bold << "No unexpected results";
     std::cout << termcolor::reset << std::endl;
 }
 

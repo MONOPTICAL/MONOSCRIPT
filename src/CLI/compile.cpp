@@ -19,6 +19,7 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath) {
     llvm::InitializeNativeTargetAsmParser();
 
     // LLVM IR -> .ll
+    ui::stage("Writing LLVM IR to a file");
     std::error_code EC;
     std::string irPath = outputPath + ".ll";
     llvm::raw_fd_ostream irFile(irPath, EC, llvm::sys::fs::OF_None);
@@ -44,14 +45,13 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath) {
 #if DEBUG
     std::cout << "Запуск команды: " << llcCmd << std::endl;
 #endif
-    ui::Spinner machineCode("Machine code");
+    ui::stage("llc: generating machine code");
     int llcRet = std::system(llcCmd.c_str());
     if (llcRet != 0) {
-        machineCode.fail();
+        ui::pipelineStop();
         std::cerr << "llc failed with code " << llcRet << std::endl;
         return false;
     }
-    machineCode.done();
 
     std::string stdlibPath = loader::findLibraryPath();
     if (stdlibPath.empty()) {
@@ -78,14 +78,13 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath) {
 #if DEBUG
     std::cout << "Запуск команды: " << gccCmd << std::endl;
 #endif
-    ui::Spinner linking("Linking");
+    ui::stage("gcc: linking the executable");
     int gccRet = std::system(gccCmd.c_str());
     if (gccRet != 0) {
-        linking.fail();
+        ui::pipelineStop();
         std::cerr << "gcc failed with code " << gccRet << std::endl;
         return false;
     }
-    linking.done();
     
     // Удаляем промежуточные файлы
     std::remove(irPath.c_str());
@@ -97,11 +96,8 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath) {
 bool compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::string& outputFile) {
     CodeGenContext context(outputFile);
     ASTGen codeGen(context);
-    {
-        ui::Spinner step("Generating IR");
-        combinedAST->accept(codeGen);
-        step.done();
-    }
+    ui::stage("Code generation: building LLVM IR");
+    combinedAST->accept(codeGen);
 
     if (context.TheModule != nullptr) {
 #if DEBUG
@@ -110,7 +106,7 @@ bool compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::st
         std::cerr << "--- END LLVM IR ---\n" << std::endl;
 #endif
         {
-            ui::Spinner step("Optimizing");
+            ui::stage("Optimizer: running LLVM O2 passes");
             llvm::PassBuilder passBuilder;
             llvm::LoopAnalysisManager LAM;
             llvm::FunctionAnalysisManager FAM;
@@ -128,7 +124,6 @@ bool compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::st
         
             // Прогоняем *оптимизейшен*
             MPM.run(*context.TheModule, MAM);
-            step.done();
         }
 #if DEBUG
         std::cerr << "\n--- LLVM IR(O2) ---" << std::endl;
@@ -136,6 +131,7 @@ bool compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::st
         std::cerr << "--- END LLVM IR(O2) ---\n" << std::endl;
 #endif
         if (!context.TheModule->getFunction("main")) {
+            ui::pipelineStop();
             std::cerr << "Error: entry function not found: " << CodeGenContext::findEntryName(*combinedAST) << ", add main or mark a function with @entry" << std::endl;
             return false;
         }

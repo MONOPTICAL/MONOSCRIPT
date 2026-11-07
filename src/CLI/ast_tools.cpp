@@ -4,10 +4,12 @@
 #include "../linker/headers/Linker.h"
 #include "../includes/ASTDebugger.hpp"
 #include "../errors/headers/ErrorEngine.h"
+#include "headers/ui.h"
 #include <iostream>
 #include <filesystem>
 
 std::vector<std::vector<Token>> tokenizeSource(const std::string& sourceCode, bool showTokens) {
+    ui::stage("Lexer: splitting the source into tokens");
     Lexer lexer(sourceCode);
     lexer.tokenize();
     
@@ -25,8 +27,11 @@ std::shared_ptr<ProgramNode> parseAndLinkModules(
     const std::string& inputFile, 
     bool showAST
 ) {
+    ui::stage("Parser: building the syntax tree");
     Parser parser(tokens, inputFile);
     auto program = parser.parse();
+
+    ui::stage("Linker: resolving modules and imports");
     
     // Получаем путь текущего файла
     std::string currentFilePath = std::filesystem::current_path().string();

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include "../headers/TypeSymbolVisitor.h"
+#include "../../CLI/headers/ui.h"
 #include "../../includes/ASTDebugger.hpp"
 #include <string_view>
 #include <filesystem>
@@ -98,6 +99,7 @@ void TypeSymbolVisitor::visit(ProgramNode &node)
 
 void TypeSymbolVisitor::visit(FunctionNode &node)
 {
+    ui::stageDetail(node.name);
     // Проверяем, существует ли функция в реестре(в текущем контексте или глобальном)
     // Если вызов выше определения уже положил сюда эту же функцию, это не повтор
     auto existingFunction = contexts.back().functions.find(node.name);
