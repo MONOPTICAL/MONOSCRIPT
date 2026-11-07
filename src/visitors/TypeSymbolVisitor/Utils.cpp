@@ -163,6 +163,12 @@ static std::string getOperation(const std::string& op, const std::string& type) 
 // Рекурсивно выставляет implicitCastTo для всех чисел, если их тип меньше чем targetType
 void TypeSymbolVisitor::castAllNumbersToType(const std::shared_ptr<ASTNode>& node, const std::string& targetType) {
     if (!node) return;
+    if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node); unary && unary->op == "try") {
+        if (!unary->implicitCastTo && unary->inferredType->toString() != targetType &&
+            getTypeRank(unary->inferredType->toString()) > 0)
+            unary->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
+        return;
+    }
     if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
         if (num->isCharLiteral) return;
         std::string fromType = num->inferredType ? num->inferredType->toString() : (num->type ? num->type->toString() : "");
@@ -208,6 +214,8 @@ void TypeSymbolVisitor::castAllNumbersToType(const std::shared_ptr<ASTNode>& nod
     }   
     if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
         castAllNumbersToType(unary->operand, targetType);
+        // A cast on the whole expression must survive operand type inference.
+        if (unary->implicitCastTo) return;
         if (unary->operand->implicitCastTo) {
             unary->implicitCastTo = unary->operand->implicitCastTo;
         } else {
@@ -229,6 +237,12 @@ static bool checkIntLimits(const std::string& type, int64_t value) {
 // Второй проход: кастим и валидируем (для не-auto)
 void TypeSymbolVisitor::castAndValidate(const std::shared_ptr<ASTNode>& node, const std::string& targetType, TypeSymbolVisitor* visitor) {
     if (!node) return;
+    if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node); unary && unary->op == "try") {
+        if (!unary->implicitCastTo && unary->inferredType->toString() != targetType &&
+            getTypeRank(unary->inferredType->toString()) > 0)
+            unary->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
+        return;
+    }
     if (auto number = std::dynamic_pointer_cast<FloatNumberNode>(node)) {
         if (isFloatType(targetType)) number->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
         return;
@@ -294,6 +308,7 @@ std::string TypeSymbolVisitor::resolveExprType(const std::shared_ptr<ASTNode>& n
     }
 
     if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
+        if (unary->op == "try") return unary->inferredType->toString();
         if (unary->op == "not" || unary->op == "nullcheck") return "i1";
         return resolveExprType(unary->operand);
     }
@@ -387,7 +402,7 @@ void TypeSymbolVisitor::checkConversion(const std::shared_ptr<ASTNode>& node, co
 
     // Логические выражения: операнды приводим друг к другу, а не к нужному типу
     if ((bin && isBooleanOperator(bin->op)) ||
-        (std::dynamic_pointer_cast<UnaryOpNode>(node) && sourceType == "i1" && std::dynamic_pointer_cast<UnaryOpNode>(node)->op != "neg")) {
+        (std::dynamic_pointer_cast<UnaryOpNode>(node) && sourceType == "i1" && std::dynamic_pointer_cast<UnaryOpNode>(node)->op != "neg" && std::dynamic_pointer_cast<UnaryOpNode>(node)->op != "try")) {
         std::shared_ptr<ASTNode> expression = node;
         castNumbersInBinaryTree(expression, "auto");
         node->inferredType = registry.findType("i1");
@@ -408,6 +423,11 @@ void TypeSymbolVisitor::checkConversion(const std::shared_ptr<ASTNode>& node, co
 // Первый проход: ищем максимальный rank
 void TypeSymbolVisitor::findMaxRank(const std::shared_ptr<ASTNode>& node, int& maxRank) {
     if (!node) return;
+    if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node); unary && unary->op == "try") {
+        auto type = unary->implicitCastTo ? unary->implicitCastTo : unary->inferredType;
+        maxRank = std::max(maxRank, getTypeRank(type->toString()));
+        return;
+    }
     if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
         if (num->implicitCastTo)
             maxRank = std::max(maxRank, getTypeRank(num->implicitCastTo->toString()));
@@ -477,7 +497,7 @@ void TypeSymbolVisitor::castNumbersInBinaryTree(std::shared_ptr<ASTNode>& node, 
         targetType = getTypeByRank(maxRank);
         if (targetType.empty()) {
             // В условии только сравнения строк: числа приводить не к чему
-            if (node->inferredType && node->inferredType->toString() == "i1") return;
+            if (node->inferredType && (node->inferredType->toString() == "i1" || node->inferredType->toString() == "char")) return;
             LogError("Cannot deduce type for auto", node);
             return;
         }

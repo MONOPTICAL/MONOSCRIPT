@@ -112,6 +112,20 @@ void TypeSymbolVisitor::visit(UnaryOpNode& node) {
     node.operand->accept(*this);
     std::shared_ptr<TypeNode> operandType = node.operand->inferredType;
 
+    if (node.op == "try") {
+        auto source = std::dynamic_pointer_cast<GenericTypeNode>(operandType);
+        if (!source || source->baseName != "result")
+            LogError("Postfix '?' requires result<T>", node.shared_from_this());
+        auto destination = std::dynamic_pointer_cast<GenericTypeNode>(contexts.back().returnType);
+        if (!destination || destination->baseName != "result" || contexts.back().currentFunctionName.empty())
+            LogError("Postfix '?' requires a function returning result<T>", node.shared_from_this());
+        node.inferredType = source->typeParameters[0];
+        if (node.inferredType->toString() == "void" && node.implicitCastTo)
+            LogError("Cannot cast void after postfix '?'", node.shared_from_this());
+        checkCharCast(node);
+        return;
+    }
+
     // char не число: сначала каст
     if (operandType && operandType->toString() == "char" && !node.operand->implicitCastTo)
         LogError("Unsupported operand type for unary operator: char, use ->i32", node.shared_from_this());

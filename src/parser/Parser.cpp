@@ -114,7 +114,7 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     }
     else if (currentToken.type == TokenType::Identifier && (peek().type == TokenType::Dot || peek().type == TokenType::LeftBracket))
     {
-        auto memberExpression = parseMemberExpression();
+        auto memberExpression = parsePostfix(parseMemberExpression());
 
         if(!isEndOfLine() && check(TokenType::Operator))
         {
@@ -142,6 +142,7 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         // ↑ if we have identifier, and next token is operator and is not dot(Dot annotation), we have dynamic variable declaration or assignment
     else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::Operator)
     {
+        if (peek().value == "?") return parseExpression();
         return parseAssignment(false);
     }
     // Static variable declaration
@@ -183,7 +184,7 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         // ↑ if we have identifier, and next token is left parenthesis, we have function call
     else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::LeftParen)
     {
-        return parseCall();
+        return parseExpression();
     }
     // убрать это нахуй, какой бля нормальный человек начнёт писать строку с (
     else if (currentToken.type == TokenType::LeftParen)

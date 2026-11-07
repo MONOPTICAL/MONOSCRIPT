@@ -208,42 +208,47 @@ std::shared_ptr<ASTNode> Parser::parseIf()
 {
     int line = lineIndex; int token = tokenIndex; // Запоминаем строку и токен
 
-    // Проверяем, что текущий токен - это ключевое слово if
-    consume(TokenType::Keyword, "Expected 'if' keyword"); 
-    // Мы не делаем проверку здесь на наличие круглой скобки, так как это может быть выражение без скобок
-    // И даже если это выражение без скобок, то оно всё равно может казаться как if (expression)
-    // Вот воможные варианты:
-    // if(2+2==4), if((2+2)==4), if 2+2==4, if (2+2)==4
-    // Поэтому мы просто сразу посылаем его в parseExpression который разберёт его
-
+    const int indent = getIndentLevel(lines[lineIndex]);
+    consume(TokenType::Keyword, "Expected 'if' keyword");
     auto condition = parseExpression();
-    if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
-    int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока if
-    nextLine(); // Переходим к следующей строке токенов 
-
-    auto thenBlock = parseBlock(expectedIndent);
-    std::shared_ptr<ASTNode> elseBlock = nullptr;
-    tokenIndex = expectedIndent-1;
-    //if (tokenIndex!=(expectedIndent-1)) 
-
-    if (current().value == "else")
-    {
-        if(peek().value == "if")
-        {
-            advance();
-            elseBlock = parseIf();
-            lineIndex++;
-        }
-        else
-        {
-            advance(); // consume 'else'
-            if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
+    auto branchBody = [&]() -> std::shared_ptr<BlockNode> {
+        if (match(TokenType::Colon)) {
+            if (isEndOfLine()) throwError("Expected a statement after ':'");
+            if (check(TokenType::LeftBracket) || (check(TokenType::Keyword) &&
+                current().value != "return" && current().value != "break" &&
+                current().value != "continue" && current().value != "const" && current().value != "final"))
+                throwError("Inline if/else requires a single simple statement");
+            auto body = std::make_shared<BlockNode>();
+            body->line = lineIndex; body->column = tokenIndex;
+            const int bodyLine = lineIndex;
+            body->statements.push_back(parseStatement());
+            if (lineIndex != bodyLine || !isEndOfLine())
+                throwError("Inline if/else requires a single simple statement");
             nextLine();
-            elseBlock = parseBlock(expectedIndent);
+            return body;
+        }
+        if (!isEndOfLine()) throwError("Expected ':' or end of line after condition");
+        nextLine();
+        if (isEndOfFile() || getIndentLevel(lines[lineIndex]) != indent + 1)
+            throwError("Expected indentation after if/else");
+        return parseBlock(indent + 1);
+    };
+    auto thenBlock = branchBody();
+    std::shared_ptr<ASTNode> elseBlock;
+    if (!isEndOfFile() && getIndentLevel(lines[lineIndex]) == indent) {
+        tokenIndex = indent;
+        if (current().value == "else") {
+            advance();
+            if (current().value == "if") {
+                elseBlock = parseIf();
+                lineIndex++;
+            } else {
+                elseBlock = branchBody();
+            }
         }
     }
-
-    lineIndex--; // Без этого он скипает 2 линии а не одну
+    lineIndex--; // The surrounding block advances to the next unconsumed line.
+    tokenIndex = lines[lineIndex].size();
 
     auto ifNode = std::make_shared<IfNode>(condition, thenBlock, elseBlock);
     ifNode->line = line; ifNode->column = token; // Устанавливаем строку и колонку для узла

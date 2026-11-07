@@ -214,6 +214,17 @@ The return type goes in square brackets, and the parameter type goes before its 
 - `while ...`
 - `break`, `continue`
 
+A single simple statement can follow `:` on the same line. `else` and `else if` stay on their own lines; inline and indented branches can be mixed:
+
+```go
+[i32]sign(i32: n)
+|   if n < 0: return -1
+|   else if n == 0: return 0
+|   else: return 1
+```
+
+An inline branch contains exactly one statement. Nested control blocks use the indented form.
+
 ### 🏷️ Labels
 
 Labels go after the function declaration:
@@ -287,6 +298,17 @@ Something that can fail returns `result<T>`. The caller checks it, and the progr
 |   |   echo("error " + r.code + ": " + r.error)
 |   return 0
 ```
+
+Postfix `r?` unwraps a successful result. On error it immediately returns the original error code and message from the enclosing function, which must return `result<U>`; `U` may differ from the unwrapped type. Prefix `?r` remains a boolean success check. The operand is evaluated once; postfix `?` binds before arithmetic and works with `result<void>` as a standalone statement.
+
+```go
+[result<i32>]sumNumbers(string: a, string: b)
+|   i32 x = toInt(a)?
+|   i32 y = toInt(b)?
+|   return ok(x + y)
+```
+
+Use `r?->i64` for a cast after unwrapping. A nested result can be unwrapped with `r??`. Mutable values borrowed from arguments remain subject to `@pure` checks.
 
 `toInt(s)` returns `result<i32>`: it accepts decimal digits with an optional leading `+` or `-`. Empty input, whitespace, trailing characters and values outside the `i32` range return errors (code 1 for syntax, 2 for range). Check `.ok` before reading `.value`.
 

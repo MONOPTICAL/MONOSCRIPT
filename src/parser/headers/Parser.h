@@ -92,6 +92,7 @@ return [expression]
     // выражения
     std::shared_ptr<ASTNode> parseBinary(int precedence = 0);
     std::shared_ptr<ASTNode> parseUnary();
+    std::shared_ptr<ASTNode> parsePostfix(std::shared_ptr<ASTNode> expression);
     std::shared_ptr<ASTNode> parsePrimary();
     std::shared_ptr<ASTNode> parseMemberExpression();
     
