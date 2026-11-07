@@ -25,6 +25,8 @@ private:
     int tokenIndex; // индекс текущего токена в строке
     int currentIndent; // текущий уровень отступа
     bool isPipe;
+    std::map<std::string, std::string> typeSubstitution; // При разборе копии шаблона: T -> конкретный тип
+    std::shared_ptr<std::vector<std::vector<Token>>> sharedLines; // Токены для копий шаблонов, одни на весь файл
     std::shared_ptr<ASTNode> currentNode; // указатель на текущий узел AST
 
     // указатель на текущий токен

@@ -1,4 +1,5 @@
 #include "headers/Parser.h"
+#include "../visitors/headers/TomlType.h"
 /*
 Ну а тут уже парсеры для всех действий в языке
 */
@@ -19,6 +20,27 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
     consume(TokenType::RightBracket, "Expected ']' before function declaration"); 
     std::string functionName = current().value; // Сохраняем имя функции
     consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора
+
+    // Шаблон: [T]first<T>(array<T>: a)
+    std::vector<std::string> typeParameters;
+    if (check(TokenType::Operator) && current().value == "<")
+    {
+        advance();
+        do
+        {
+            typeParameters.push_back(current().value);
+            consume(TokenType::Identifier, "Expected type parameter name");
+        } while (match(TokenType::Comma));
+
+        if (!check(TokenType::Operator) || current().value != ">")
+            throwError("Expected > to close type parameters");
+        advance();
+    }
+
+    // Пока разбираем сам шаблон, T это имя типа: x->T и T y = x должны разбираться
+    const bool isTemplate = !typeParameters.empty() && typeSubstitution.empty();
+    if (isTemplate)
+        for (const auto& name : typeParameters) typeSubstitution[name] = name;
 
     if (check(TokenType::LeftParen)) // Если следующий токен - это левая скобка, то это функция с параметрами
     {
@@ -121,6 +143,24 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
 
         auto func = std::make_shared<FunctionNode>(functionName, association, returnType, parameters, labels, body); // Создаём узел функции
         func->line = line; func->column = token; // Устанавливаем строку и колонку для узла
+
+        // При разборе копии подстановка уже сделана, это обычная функция
+        if (isTemplate)
+        {
+            typeSubstitution.clear();
+            if (!sharedLines) sharedLines = std::make_shared<std::vector<std::vector<Token>>>(lines);
+            func->typeParameters = typeParameters;
+
+            auto source = sharedLines;
+            const std::string module = moduleName;
+            func->instantiate = [source, module, line, token](const std::map<std::string, std::string>& types) {
+                Parser copy(*source, module);
+                copy.typeSubstitution = types;
+                copy.lineIndex = line;
+                copy.tokenIndex = token;
+                return copy.parseFunction();
+            };
+        }
         return func; // Возвращаем узел функции
     }
     else
@@ -134,6 +174,14 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
 std::shared_ptr<ASTNode> Parser::parseCast(std::shared_ptr<ASTNode> expression)
 {
     consume(TokenType::Arrow, "Expected '->' after expression"); // Проверяем наличие стрелки после выражения
+
+    // x->T в копии шаблона
+    if (check(TokenType::Identifier) && typeSubstitution.count(current().value))
+    {
+        expression->implicitCastTo = parseTomlType(typeSubstitution.at(current().value));
+        advance();
+        return expression;
+    }
     if(check(TokenType::Type))
     {
         std::string typeName = current().value; // Сохраняем имя типа
@@ -502,6 +550,8 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
     if (auto block = std::dynamic_pointer_cast<BlockNode>(body)) {
         for (const auto& statement : block->statements) {
             if (auto method = std::dynamic_pointer_cast<FunctionNode>(statement)) {
+                if (!method->typeParameters.empty())
+                    throwError("Generic methods are not supported yet: " + method->name);
                 method->associated = name;
                 method->parameters.insert(method->parameters.begin(), {std::make_shared<SimpleTypeNode>(name), "self"});
             }

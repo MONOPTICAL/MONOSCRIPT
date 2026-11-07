@@ -30,6 +30,11 @@ private:
     std::unique_ptr<ErrorEngine>                                    errorEngine;
 
     std::vector<Context>                                            contexts;
+    // Копии шаблонов: добавляются в программу после обхода, из какого модуля шаблон
+    std::vector<std::shared_ptr<ASTNode>>                           genericInstances;
+    std::map<std::string, std::string>                              genericModules;
+    std::string                                                     instantiateGeneric(const std::shared_ptr<FunctionNode>& generic, CallNode& call,
+                                                                        const std::vector<std::shared_ptr<TypeNode>>& argTypes);
     bool                                                            lastAccessIndexedString = false; // Последнее звено цепочки это s[i]: писать туда нельзя
     void                                                            checkCharCast(ASTNode& node);
     bool                                                            insideMethod = false;

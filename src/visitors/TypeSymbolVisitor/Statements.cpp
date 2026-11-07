@@ -1,8 +1,198 @@
 #include <algorithm>
 #include "../headers/TypeSymbolVisitor.h"
 #include "../../CLI/headers/ui.h"
+#include "../../errors/headers/ErrorEngine.h"
+#include <iostream>
 
 std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSymbolVisitor& visitor);
+bool isLiteralExpression(const std::shared_ptr<ASTNode>& node);
+
+// Упоминается ли имя в типе: T в array<map<string,T>>
+static bool typeMentions(const std::shared_ptr<TypeNode>& type, const std::string& name) {
+    if (auto simple = std::dynamic_pointer_cast<SimpleTypeNode>(type)) return simple->name == name;
+    if (auto generic = std::dynamic_pointer_cast<GenericTypeNode>(type))
+        for (const auto& parameter : generic->typeParameters)
+            if (typeMentions(parameter, name)) return true;
+    return false;
+}
+
+// Тип литерала без контекста: i32, а не наименьший подходящий, иначе id(1) было бы i1. Вещественный это f64
+static std::shared_ptr<TypeNode> widenLiteralType(const std::shared_ptr<TypeNode>& type) {
+    if (auto generic = std::dynamic_pointer_cast<GenericTypeNode>(type)) {
+        auto widened = std::make_shared<GenericTypeNode>(generic->baseName);
+        for (const auto& parameter : generic->typeParameters)
+            widened->typeParameters.push_back(widenLiteralType(parameter));
+        return widened;
+    }
+    const std::string name = type->toString();
+    if (name == "i1" || name == "i8" || name == "i16") return std::make_shared<SimpleTypeNode>("i32");
+    if (name == "float") return std::make_shared<SimpleTypeNode>("f64");
+    return type;
+}
+
+// Тип литерала коллекции для вывода T. Ничего не меняет в узлах: приведёт уже проверка вызова с готовым типом
+static std::shared_ptr<TypeNode> literalCollectionType(const std::shared_ptr<BlockNode>& block);
+
+static std::shared_ptr<TypeNode> literalValueType(const std::shared_ptr<ASTNode>& value, TypeSymbolVisitor& visitor) {
+    if (auto block = std::dynamic_pointer_cast<BlockNode>(value)) return literalCollectionType(block);
+    value->accept(visitor);
+    return value->implicitCastTo ? value->implicitCastTo : value->inferredType;
+}
+
+// Настоящий тип важнее литералов, среди литералов берём более широкий
+static std::shared_ptr<TypeNode> mergeElementType(const std::shared_ptr<TypeNode>& current, const std::shared_ptr<TypeNode>& next, bool nextIsLiteral, bool& haveValue) {
+    if (!next) return current;
+    if (!nextIsLiteral) {
+        if (!haveValue) { haveValue = true; return next; }
+        return current;
+    }
+    if (haveValue) return current;
+    auto widened = widenLiteralType(next);
+    if (!current) return widened;
+    const std::string a = current->toString(), b = widened->toString();
+    if (a == "f64" || b == "f64") return std::make_shared<SimpleTypeNode>("f64");
+    if (a == "i64" || b == "i64") return std::make_shared<SimpleTypeNode>("i64");
+    return current;
+}
+
+// Сопоставляет тип параметра с типом аргумента и находит T. Несовпадение остального проверит обычная проверка вызова
+static void unifyTypes(const std::shared_ptr<TypeNode>& parameter, const std::shared_ptr<TypeNode>& argument,
+                       const std::vector<std::string>& names, std::map<std::string, std::string>& bindings,
+                       bool fromLiteral, std::string& conflict) {
+    if (!parameter || !argument) return;
+
+    if (auto simple = std::dynamic_pointer_cast<SimpleTypeNode>(parameter)) {
+        if (std::find(names.begin(), names.end(), simple->name) == names.end()) return;
+
+        auto bound = bindings.find(simple->name);
+        if (bound == bindings.end())
+            bindings[simple->name] = argument->toString();
+        else if (!fromLiteral && bound->second != argument->toString())
+            conflict = simple->name + " is both " + bound->second + " and " + argument->toString();
+        return;
+    }
+
+    auto generic = std::dynamic_pointer_cast<GenericTypeNode>(parameter);
+    auto other = std::dynamic_pointer_cast<GenericTypeNode>(argument);
+    if (generic && other && generic->baseName == other->baseName && generic->typeParameters.size() == other->typeParameters.size())
+        for (size_t i = 0; i < generic->typeParameters.size(); i++)
+            unifyTypes(generic->typeParameters[i], other->typeParameters[i], names, bindings, fromLiteral, conflict);
+}
+
+static TypeSymbolVisitor* literalVisitor = nullptr;
+
+static std::shared_ptr<TypeNode> literalCollectionType(const std::shared_ptr<BlockNode>& block) {
+    if (!block || block->statements.empty()) return nullptr;
+
+    if (std::dynamic_pointer_cast<KeyValueNode>(block->statements[0])) {
+        std::shared_ptr<TypeNode> key, value;
+        bool haveKey = false, haveValue = false;
+        for (const auto& statement : block->statements) {
+            auto pair = std::dynamic_pointer_cast<KeyValueNode>(statement);
+            if (!pair) return nullptr;
+            key = mergeElementType(key, literalValueType(pair->key, *literalVisitor), isLiteralExpression(pair->key), haveKey);
+            value = mergeElementType(value, literalValueType(pair->value, *literalVisitor), isLiteralExpression(pair->value), haveValue);
+        }
+        if (!key || !value) return nullptr;
+        auto map = std::make_shared<GenericTypeNode>("map");
+        map->typeParameters = {key, value};
+        return map;
+    }
+
+    std::shared_ptr<TypeNode> element;
+    bool haveValue = false;
+    for (const auto& statement : block->statements) {
+        element = mergeElementType(element, literalValueType(statement, *literalVisitor), isLiteralExpression(statement), haveValue);
+    }
+    if (!element) return nullptr;
+    auto array = std::make_shared<GenericTypeNode>("array");
+    array->typeParameters = {element};
+    return array;
+}
+
+std::string TypeSymbolVisitor::instantiateGeneric(const std::shared_ptr<FunctionNode>& generic, CallNode& call,
+                                                  const std::vector<std::shared_ptr<TypeNode>>& argTypes)
+{
+    if (call.arguments.size() != generic->parameters.size()) {
+        LogError("Function " + generic->name + " expects " + std::to_string(generic->parameters.size()) + " arguments, got " + std::to_string(call.arguments.size()), call.shared_from_this());
+    }
+
+    // Сначала значения с настоящим типом, потом литералы: в max(big, 1) при i64 big литерал подстроится
+    std::map<std::string, std::string> bindings;
+    std::string conflict;
+    for (size_t i = 0; i < call.arguments.size(); i++) {
+        if (!isLiteralExpression(call.arguments[i]) && !std::dynamic_pointer_cast<BlockNode>(call.arguments[i]))
+            unifyTypes(generic->parameters[i].first, argTypes[i], generic->typeParameters, bindings, false, conflict);
+    }
+    if (!conflict.empty()) {
+        LogError("Cannot call " + generic->name + ": " + conflict, call.shared_from_this());
+    }
+    for (size_t i = 0; i < call.arguments.size(); i++) {
+        std::shared_ptr<TypeNode> literalType;
+        if (auto block = std::dynamic_pointer_cast<BlockNode>(call.arguments[i])) {
+            literalVisitor = this;
+            literalType = literalCollectionType(block);
+        } else if (isLiteralExpression(call.arguments[i])) {
+            literalType = argTypes[i];
+        }
+        if (literalType)
+            {
+            auto number = std::dynamic_pointer_cast<NumberNode>(call.arguments[i]);
+            unifyTypes(generic->parameters[i].first, number && number->isBoolLiteral ? literalType : widenLiteralType(literalType),
+                       generic->typeParameters, bindings, true, conflict);
+        }
+    }
+
+    std::string suffix;
+    for (const auto& name : generic->typeParameters) {
+        auto bound = bindings.find(name);
+        if (bound == bindings.end()) {
+            LogError("Cannot infer type " + name + " of " + generic->name + " from its arguments", call.shared_from_this());
+        }
+        suffix += (suffix.empty() ? "" : ",") + bound->second;
+    }
+    suffix.erase(std::remove(suffix.begin(), suffix.end(), ' '), suffix.end());
+
+    const std::string instanceName = generic->name + "<" + suffix + ">";
+    if (declaredFunctions.count(instanceName)) return instanceName;
+
+    auto instance = generic->instantiate(bindings);
+    instance->name = instanceName;
+    instance->inferredType = instance->returnType;
+    declaredFunctions[instanceName] = instance; // До проверки тела: копия может вызывать сама себя
+    genericInstances.push_back(instance);
+
+    // Тело проверяется как функция верхнего уровня, а не как часть той функции, откуда вызвали
+    std::vector<Context> callerContexts(contexts.begin() + 1, contexts.end());
+    contexts.resize(1);
+    const int outerLoopDepth = loopDepth;
+    const bool outerInMethod = insideMethod;
+    const bool outerIndexedString = lastAccessIndexedString;
+    const std::string outerModule = currentModuleName;
+    loopDepth = 0;
+    insideMethod = false;
+    if (auto module = genericModules.find(generic->name); module != genericModules.end())
+        currentModuleName = module->second;
+
+    try {
+        instance->accept(*this);
+    } catch (const std::exception&) {
+        // Ошибка в теле уже напечатана: добавляем, откуда взялись такие типы
+        std::string description;
+        for (const auto& name : generic->typeParameters)
+            description += (description.empty() ? "" : ", ") + name + " = " + bindings[name];
+        std::cerr << "    in generic function " << generic->name << " with " << description
+                  << ", called at line " << ErrorEngine::getInstance().displayLine(call.line) << std::endl;
+        throw;
+    }
+
+    contexts.insert(contexts.end(), callerContexts.begin(), callerContexts.end());
+    loopDepth = outerLoopDepth;
+    insideMethod = outerInMethod;
+    lastAccessIndexedString = outerIndexedString;
+    currentModuleName = outerModule;
+    return instanceName;
+}
 #include "../../includes/ASTDebugger.hpp"
 #include <string_view>
 #include <filesystem>
@@ -35,12 +225,26 @@ void TypeSymbolVisitor::collectDeclarations(ProgramNode &node)
                 registry.addStruct(structure->name, std::make_shared<StructNode>(structure->name, structure->body));
         }
         else if (auto function = std::dynamic_pointer_cast<FunctionNode>(statement); function && function->associated.empty()) {
+            // У шаблона каждый тип должен выводиться из аргументов: при вызове тип не пишется
+            if (!function->typeParameters.empty()) {
+                if (hasLabel(function, "@entry") || function->name == "main")
+                    LogError("Entry function " + function->name + " cannot be generic", function);
+                for (const auto& name : function->typeParameters) {
+                    bool mentioned = false;
+                    for (const auto& parameter : function->parameters)
+                        mentioned = mentioned || typeMentions(parameter.first, name);
+                    if (!mentioned)
+                        LogError("Type " + name + " of generic function " + function->name + " must appear in its parameters", function);
+                }
+            }
+
             ownFunctions[module].emplace(function->name, function);
 
             // Внутреннее имя, чтобы одинаковые функции разных модулей не мешали друг другу
             if (module != mainModule)
                 function->name = module + "::" + function->name;
             declaredFunctions.emplace(function->name, function);
+            if (!function->typeParameters.empty()) genericModules[function->name] = module;
         }
     }
 
@@ -97,10 +301,14 @@ void TypeSymbolVisitor::visit(ProgramNode &node)
     for (const auto& statement : node.body) {
         statement->accept(*this);
     }
+
+    // Кодгену копии шаблонов нужны как обычные функции
+    node.body.insert(node.body.end(), genericInstances.begin(), genericInstances.end());
 }
 
 void TypeSymbolVisitor::visit(FunctionNode &node)
 {
+    if (!node.typeParameters.empty()) return; // Проверяются только копии шаблона
     ui::stageDetail(node.name);
     // Проверяем, существует ли функция в реестре(в текущем контексте или глобальном)
     // Если вызов выше определения уже положил сюда эту же функцию, это не повтор
@@ -840,6 +1048,12 @@ void TypeSymbolVisitor::visit(CallNode& node) {
         }
         node.inferredType = std::make_shared<SimpleTypeNode>(node.callee);
         return;
+    }
+
+    // Вызов шаблона становится вызовом его копии для этих типов
+    if (auto declared = declaredFunctions.find(node.callee); declared != declaredFunctions.end()) {
+        if (auto generic = std::dynamic_pointer_cast<FunctionNode>(declared->second); generic && !generic->typeParameters.empty())
+            node.callee = instantiateGeneric(generic, node, argTypes);
     }
 
     // Проверяем, существует ли функция в реестре
