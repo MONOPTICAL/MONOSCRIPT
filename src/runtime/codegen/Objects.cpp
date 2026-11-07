@@ -17,8 +17,11 @@ namespace Objects
         std::vector<llvm::Type*> fieldTypes;
         if (auto body = std::dynamic_pointer_cast<BlockNode>(node.body)) {
             for (const auto& statement : body->statements) {
+                if (auto method = std::dynamic_pointer_cast<FunctionNode>(statement))
+                    layout.methods[method->name] = method;
+
                 auto field = std::dynamic_pointer_cast<VariableAssignNode>(statement);
-                if (!field) continue; // Методы отложены
+                if (!field) continue;
 
                 llvm::Type* type = context.getLLVMType(fieldType(*field), context.TheContext);
                 layout.fieldIndex[field->name] = fieldTypes.size();

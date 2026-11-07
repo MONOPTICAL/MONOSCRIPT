@@ -20,15 +20,6 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
     std::string functionName = current().value; // Сохраняем имя функции
     consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора
 
-    if (check(TokenType::Colon))
-    {
-        consume(TokenType::Colon, "Expected '::' when associating function to class");
-        consume(TokenType::Colon, "Expected '::' when associating function to class");
-        association = current().value;
-        std::swap(functionName, association);
-        consume(TokenType::Identifier, "Class identifier expected after association");
-    }
-    
     if (check(TokenType::LeftParen)) // Если следующий токен - это левая скобка, то это функция с параметрами
     {
         advance(); // Переходим к следующему токену
@@ -105,12 +96,9 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
         
         int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока if
         
-        const bool noDecl = // Проверяем наличие метки @decl
-            std::find(labels.begin(), labels.end(), "@decl") != labels.end();
 
         std::shared_ptr<BlockNode> body = nullptr; 
-        // Если не помечено как @decl, тело не парсим
-        if (!noDecl)
+        
         {
             const int declIndent = getIndentLevel(lines[lineIndex]);
             const int expectedIndent = declIndent + 1;
@@ -130,12 +118,6 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
                 throwError("Expected indentation after function declaration");
             }
         }
-        else
-        {
-            body = std::make_shared<BlockNode>(); // Создаём тело функции
-            body->line = lineIndex; body->column = tokenIndex; // Устанавливаем строку и колонку для узла
-        }
-
 
         auto func = std::make_shared<FunctionNode>(functionName, association, returnType, parameters, labels, body); // Создаём узел функции
         func->line = line; func->column = token; // Устанавливаем строку и колонку для узла
@@ -516,6 +498,16 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
     
     lineIndex--; // Без этого он скипает 2 линии а не одну    
     
+    // Метод это обычная функция, у которой первым параметром идёт сам объект
+    if (auto block = std::dynamic_pointer_cast<BlockNode>(body)) {
+        for (const auto& statement : block->statements) {
+            if (auto method = std::dynamic_pointer_cast<FunctionNode>(statement)) {
+                method->associated = name;
+                method->parameters.insert(method->parameters.begin(), {std::make_shared<SimpleTypeNode>(name), "self"});
+            }
+        }
+    }
+
     auto structNode = std::make_shared<StructNode>(name, body); // Создаём узел структуры
     structNode->line = line; structNode->column = token; // Устанавливаем строку и колонку для узла
     return structNode; // Возвращаем узел структуры

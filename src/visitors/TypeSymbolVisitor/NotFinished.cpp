@@ -54,6 +54,7 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
                 [&](const auto& stmt) {
                     if (auto var = std::dynamic_pointer_cast<VariableAssignNode>(stmt)) return var->name == accessNode->memberName;
                     if (auto str = std::dynamic_pointer_cast<StructNode>(stmt)) return str->name == accessNode->memberName;
+                    if (auto method = std::dynamic_pointer_cast<FunctionNode>(stmt)) return method->name == accessNode->memberName;
                     return false;
                 });
 
@@ -62,9 +63,44 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
                 return;
             }
 
+            auto memberLink = std::dynamic_pointer_cast<AccessExpression>(accessNode->nextAccess);
+            auto call = memberLink ? std::dynamic_pointer_cast<CallNode>(memberLink->expression) : nullptr;
+            auto method = std::dynamic_pointer_cast<FunctionNode>(*fieldIt);
+            if (call && !method)
+                LogError("'" + accessNode->memberName + "' is a field of struct '" + currentStructDef->name + "', not a method", accessNode);
+            if (method && !call)
+                LogError("Method '" + accessNode->memberName + "' of struct '" + currentStructDef->name + "' must be called with ()", accessNode);
+
+            const std::string structName = currentStructDef->name;
             currentType = nullptr;
             currentStructDef = nullptr;
-            if (auto var = std::dynamic_pointer_cast<VariableAssignNode>(*fieldIt)) {
+            if (method) {
+                const std::string methodName = structName + "." + method->name;
+                const bool methodIsPure = std::find(method->labels.begin(), method->labels.end(), "@pure") != method->labels.end();
+
+                if (checkLabels("@pure") && !methodIsPure)
+                    LogError("Pure function cannot call impure method: " + methodName, accessNode);
+
+                // const запрещает менять объект через эту переменную, а метод может его поменять
+                if (!methodIsPure) {
+                    if (auto baseId = std::dynamic_pointer_cast<IdentifierNode>(node.expression)) {
+                        auto base = contexts.back().variables.find(baseId->name);
+                        if (base != contexts.back().variables.end())
+                            if (auto var = std::dynamic_pointer_cast<VariableAssignNode>(base->second); var && var->isConst)
+                                LogError("Constant '" + baseId->name + "' can only call @pure methods, not " + methodName, accessNode);
+                    }
+                }
+
+                if (call->arguments.size() + 1 != method->parameters.size())
+                    LogError("Method " + methodName + " expects " + std::to_string(method->parameters.size() - 1) + " arguments, got " + std::to_string(call->arguments.size()), accessNode);
+                for (const auto& argument : call->arguments) argument->accept(*this);
+                checkCallArguments(call->arguments, method->parameters, 1, "Method " + methodName);
+
+                currentType = method->returnType;
+                currentStructDef = registry.findStruct(currentType->toString());
+                memberLink->inferredType = currentType;
+            }
+            else if (auto var = std::dynamic_pointer_cast<VariableAssignNode>(*fieldIt)) {
                 currentType = var->type;
                 currentStructDef = registry.findStruct(currentType->toString()); 
                 // Кодгену нужен тип на каждом звене: сам он типы не выводит

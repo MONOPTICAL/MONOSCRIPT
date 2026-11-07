@@ -32,6 +32,10 @@ private:
     std::vector<Context>                                            contexts;
     bool                                                            lastAccessIndexedString = false; // Последнее звено цепочки это s[i]: писать туда нельзя
     void                                                            checkCharCast(ASTNode& node);
+    bool                                                            insideMethod = false;
+    void                                                            checkCallArguments(std::vector<std::shared_ptr<ASTNode>>& arguments,
+                                                                        const std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>>& parameters,
+                                                                        size_t firstParameter, const std::string& name);
     // final без значения: присвоена точно, присвоена хотя бы на одном пути, и в каком цикле объявлена
     std::set<const ASTNode*>                                        assignedFinals;
     std::set<const ASTNode*>                                        maybeAssignedFinals;

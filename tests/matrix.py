@@ -37,6 +37,7 @@ def sources(t):
         'field': (f'[struct]S\n|   {t} f = {value}\n\n', '|   S s = S()', 's.f'),
         'field_array': (f'[struct]S\n|   array<{t}> f = [{value}]\n\n', '|   S s = S()', 's.f[0]'),
         'call': (f'[{t}]g()\n|   return {value}\n\n', '', 'g()'),
+        'method': (f'[struct]S\n|   {t} f = {value}\n|   [{t}]get()\n|   |   return self.f\n\n', '|   S s = S()', 's.get()'),
     }
     if t not in ('i1', 'float', 'f64'):  # x ^= 1 выводит i1, а x ^= 0.1 выводит f64
         result['inferred'] = ('', f'|   v ^= {value}', 'v')
@@ -54,6 +55,7 @@ def contexts(t, src):
         'assign_inferred': ('', f'|   r ^= {src}\n|   echo("=" + r)', f'={text}'),
         'reassign': ('', f'|   {t} r = {src}\n|   r = {src}\n|   echo("=" + r)', f'={text}'),
         'param': (f'[{t}]id({t}: x)\n|   return x\n\n', f'|   echo("=" + id({src}))', f'={text}'),
+        'method_arg': (f'[struct]Y\n|   [{t}]id({t}: x)\n|   |   return x\n\n', f'|   Y y = Y()\n|   echo("=" + y.id({src}))', f'={text}'),
         'in_array': ('', f'|   array<{t}> b = [{src}]\n|   echo("=" + b[0])', f'={text}'),
         'in_map': ('', f'|   map<string,{t}> b = {{"z": {src}}}\n|   echo("=" + b["z"])', f'={text}'),
         'to_element': ('', f'|   array<{t}> b = [{value}]\n|   b[0] = {src}\n|   echo("=" + b[0])', f'={text}'),

@@ -42,8 +42,10 @@ void ASTGen::visit(GenericTypeNode& node) {
 }
 
 // Объявляет функцию в модуле или возвращает уже объявленную
-static llvm::Function* declareUserFunction(CodeGenContext& context, FunctionNode& node) {
-    if (llvm::Function* existing = context.TheModule->getFunction(node.name)) {
+llvm::Function* declareUserFunction(CodeGenContext& context, FunctionNode& node) {
+    // Метод P.get не конфликтует ни с функцией get, ни с get другой структуры
+    const std::string symbol = node.associated.empty() ? node.name : node.associated + "." + node.name;
+    if (llvm::Function* existing = context.TheModule->getFunction(symbol)) {
         return existing;
     }
 
@@ -52,7 +54,7 @@ static llvm::Function* declareUserFunction(CodeGenContext& context, FunctionNode
         paramTypes.push_back(context.getLLVMType(param.first, context.TheContext));
     }
 
-    bool isMain = (node.name == "main" || std::find(node.labels.begin(), node.labels.end(), "@entry") != node.labels.end());
+    bool isMain = node.associated.empty() && (node.name == "main" || std::find(node.labels.begin(), node.labels.end(), "@entry") != node.labels.end());
     llvm::Type* returnLLVMType = llvm::Type::getVoidTy(context.TheContext);
     if (node.returnType) {
         returnLLVMType = context.getLLVMType(node.returnType, context.TheContext);
@@ -62,7 +64,7 @@ static llvm::Function* declareUserFunction(CodeGenContext& context, FunctionNode
     }
 
     llvm::FunctionType* funcType = llvm::FunctionType::get(returnLLVMType, paramTypes, false);
-    return llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, node.name, context.TheModule.get());
+    return llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, symbol, context.TheModule.get());
 }
 
 // Завершает стартовую функцию: вызывает функцию пользователя и возвращает её код.
@@ -100,6 +102,13 @@ void ASTGen::visit(ProgramNode& node) {
     for (auto& n : node.body) {
         if (auto structure = std::dynamic_pointer_cast<StructNode>(n)) {
             Objects::registerStruct(context, *structure);
+        }
+    }
+
+    // Методы можно вызывать до определения, как и функции
+    for (auto& [name, layout] : context.Structs) {
+        for (auto& [methodName, method] : layout.methods) {
+            declareUserFunction(context, *method);
         }
     }
 
@@ -156,7 +165,7 @@ void ASTGen::visit(FunctionNode& node) {
         currentFunction = currentBlock->getParent();
     }
 
-    bool isMain = (node.name == "main" || std::find(node.labels.begin(), node.labels.end(), "@entry") != node.labels.end());
+    bool isMain = node.associated.empty() && (node.name == "main" || std::find(node.labels.begin(), node.labels.end(), "@entry") != node.labels.end());
 
     // Создаем минимальную заглушку функции
     llvm::Function* func = declareUserFunction(context, node);
@@ -229,6 +238,9 @@ void ASTGen::visit(FunctionNode& node) {
 
 void ASTGen::visit(StructNode& node) {
     Objects::emitConstructor(context, node);
+    for (auto& [name, method] : context.Structs.at(node.name).methods) {
+        method->accept(*this);
+    }
     result = nullptr;
 }
 
@@ -908,6 +920,11 @@ void ASTGen::visit(ContinueNode& node) {
 void ASTGen::visit(AccessExpression& node) {
     llvm::Type* elementType = nullptr;
     llvm::Value* elementPtr = Arrays::emitElementPtr(context, node, elementType);
+    // Метод без результата: p.birthday()
+    if (!elementPtr) {
+        result = nullptr;
+        return;
+    }
     result = TypeConversions::applyCharCast(context, node, context.Builder.CreateLoad(elementType, elementPtr, "element"));
 }
 
