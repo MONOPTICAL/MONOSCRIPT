@@ -1,7 +1,7 @@
 #include "../headers/TypeSymbolVisitor.h"
 
 // Только литералы: они принимают нужный тип сами, каст им не нужен
-static bool isLiteralExpression(const std::shared_ptr<ASTNode>& node) {
+bool isLiteralExpression(const std::shared_ptr<ASTNode>& node) {
     if (auto number = std::dynamic_pointer_cast<NumberNode>(node)) return !number->isCharLiteral;
     if (std::dynamic_pointer_cast<FloatNumberNode>(node)) return true;
     if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) return isLiteralExpression(unary->operand);

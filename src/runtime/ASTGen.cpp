@@ -114,7 +114,7 @@ void ASTGen::visit(ProgramNode& node) {
 
     // Сначала объявляем все функции, чтобы их можно было вызывать до определения
     for (auto& n : node.body) {
-        if (auto function = std::dynamic_pointer_cast<FunctionNode>(n); function && function->associated.empty()) {
+        if (auto function = std::dynamic_pointer_cast<FunctionNode>(n); function && function->associated.empty() && function->typeParameters.empty()) {
             declareUserFunction(context, *function);
         }
     }
@@ -154,6 +154,7 @@ void ASTGen::visit(ProgramNode& node) {
 }
 
 void ASTGen::visit(FunctionNode& node) {
+    if (!node.typeParameters.empty()) return; // Генерируются только копии шаблона
     LogWarning("visit не полностью реализован для FunctionNode: " + node.name);
     ui::stageDetail(node.name);
 

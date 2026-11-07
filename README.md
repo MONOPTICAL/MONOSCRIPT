@@ -226,6 +226,24 @@ Labels go after the function declaration:
 |`@private`|Hidden from imports|
 |`@overwrite`|Replaces an imported function on purpose|
 
+### 🧩 Generic Functions
+
+A function can work with any type. The types are worked out from the arguments, and the compiler checks and generates a separate copy for each set of types:
+
+```go
+[T]first<T>(array<T>: items)
+|   return items[0]
+
+[array<T>]pair<T>(T: a, T: b)
+|   return [a, b]
+
+[i32]main()
+|   echo(first(["a", "b"]))     // T is string
+|   echo("" + first([1, 2]))    // T is i32
+|   array<f64> p = pair(0.5, 1.5)
+|   return 0
+```
+
 ### 🧰 Structs
 
 ```go

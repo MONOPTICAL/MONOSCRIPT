@@ -1,5 +1,7 @@
 #ifndef AST_H
 #define AST_H
+#include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -41,6 +43,7 @@ class ASTNodeVisitor {
 };
 
 class TypeNode;
+class FunctionNode;
 
 class ASTNode : public std::enable_shared_from_this<ASTNode> {
     public:
@@ -145,6 +148,12 @@ class FunctionNode : public ASTNode {
 
         std::vector<std::string> labels; // @strict, @pure, @entry, @public, @private, @test
         std::shared_ptr<ASTNode> body; // BlockNode
+
+        // Шаблон: [T]first<T>(array<T>: a). Сам он не проверяется и не генерируется.
+        // instantiate заново разбирает функцию из токенов, подставляя вместо T конкретный тип:
+        // копия получается как только что разобранный код, и семантика может свободно её менять
+        std::vector<std::string> typeParameters;
+        std::function<std::shared_ptr<FunctionNode>(const std::map<std::string, std::string>&)> instantiate;
         
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);

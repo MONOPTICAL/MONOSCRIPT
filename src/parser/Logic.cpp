@@ -1,4 +1,5 @@
 #include "headers/Parser.h"
+#include "../visitors/headers/TomlType.h"
 /*
 Тут все логические и вспомогательные функции
 По типу getIndentLevel, getLastTokenInCurrentLine и т.д.
@@ -175,6 +176,13 @@ std::shared_ptr<TypeNode> Parser::getFullType()
     
     std::string baseName = current().value;
     advance();
+
+    // В копии шаблона T это уже конкретный тип
+    if (auto substituted = typeSubstitution.find(baseName); substituted != typeSubstitution.end()) {
+        auto type = parseTomlType(substituted->second);
+        type->line = lineIndex; type->column = tokenIndex;
+        return type;
+    }
     
     // Проверяем, является ли это параметризованным типом (generic)
     if (check(TokenType::Operator) && current().value == "<") {
