@@ -1,4 +1,5 @@
 #include "headers/BuiltIn.h"
+#include "headers/TomlType.h"
 #include "../includes/toml.hpp" // путь к toml11
 #include <iostream>
 void registerBuiltInFunctions(Registry& registry, const std::string& tomlPath) 
@@ -16,7 +17,7 @@ void registerBuiltInFunctions(Registry& registry, const std::string& tomlPath)
         std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> args;
         for (size_t i = 0; i < argsArr.size(); ++i) {
             args.emplace_back(
-                std::make_shared<SimpleTypeNode>(argsArr[i]),
+                parseTomlType(argsArr[i]),
                 "arg" + std::to_string(i + 1)
             );
         }
@@ -31,7 +32,7 @@ void registerBuiltInFunctions(Registry& registry, const std::string& tomlPath)
             std::make_shared<FunctionNode>(
                 name,
                 "",
-                std::make_shared<SimpleTypeNode>(retStr),
+                parseTomlType(retStr),
                 args,
                 labels,
                 nullptr

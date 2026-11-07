@@ -1,4 +1,4 @@
-module mono.rt;
+module mono.std.core.rt;
 
 import core.stdc.stdio : fflush, fprintf, snprintf, stderr, stdout;
 import core.stdc.stdlib : exit, getenv;

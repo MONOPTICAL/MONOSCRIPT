@@ -1,9 +1,9 @@
-module mono.strings;
+module mono.std.strings.strings;
 
-extern(C) nothrow @nogc
-{
-    void* GC_malloc_atomic(size_t size);
-}
+import mono.std.core.abi : MsArray, newArray;
+import mono.std.core.rt : ms_panic, ms_panic_index;
+
+import mono.std.core.abi : GC_malloc_atomic;
 
 extern(C) char* scat(const char* a, const char* b) nothrow @nogc
 {
@@ -17,6 +17,84 @@ extern(C) char* scat(const char* a, const char* b) nothrow @nogc
     strcpy(result, a);
     strcat(result, b);
 
+    return result;
+}
+
+// Настоящий strlen из libc не перекрываем: символ из этой библиотеки попал бы во все вызовы в процессе
+extern(C) int str_len(const char* str) nothrow @nogc
+{
+    import core.stdc.string : strlen;
+    return cast(int) strlen(str);
+}
+
+extern(C) char* getIndex(const char* str, int index) nothrow @nogc
+{
+    import core.stdc.string : strlen;
+
+    const int length = cast(int) strlen(str);
+    if (index < 0 || index >= length) ms_panic_index(index, length, 0);
+
+    char* result = cast(char*) GC_malloc_atomic(2);
+    result[0] = str[index];
+    result[1] = 0;
+    return result;
+}
+
+extern(C) char* substr(const char* str, int start, int length) nothrow @nogc
+{
+    import core.stdc.string : memcpy, strlen;
+
+    const int total = cast(int) strlen(str);
+    if (start < 0 || length < 0 || start > total || length > total - start)
+        ms_panic("substr: range is outside the string", 0);
+
+    char* result = cast(char*) GC_malloc_atomic(length + 1);
+    memcpy(result, str + start, length);
+    result[length] = 0;
+    return result;
+}
+
+extern(C) int toInt(const char* str) nothrow @nogc
+{
+    import core.stdc.stdlib : strtol;
+    return cast(int) strtol(str, null, 10);
+}
+
+extern(C) int strfind(const char* str, const char* substr) nothrow @nogc
+{
+    import core.stdc.string : strstr;
+    const char* pos = strstr(str, substr);
+    if (pos is null) return -1;
+    return cast(int)(pos - str);
+}
+
+// Пустые части сохраняются: "a,,b" это три строки, как в Python
+extern(C) MsArray* split(const char* str, const char* delim) nothrow @nogc
+{
+    import core.stdc.string : memcpy, strlen, strstr;
+
+    const size_t delimLength = strlen(delim);
+    if (delimLength == 0) ms_panic("split: empty delimiter", 0);
+
+    int count = 1;
+    for (const(char)* found = strstr(str, delim); found !is null; found = strstr(found + delimLength, delim))
+        count++;
+
+    auto result = newArray((char*).sizeof, count, true);
+    auto parts = cast(char**) result.data;
+
+    const(char)* start = str;
+    for (int i = 0; i < count; i++)
+    {
+        const(char)* end = strstr(start, delim);
+        const size_t length = end !is null ? end - start : strlen(start);
+
+        parts[i] = cast(char*) GC_malloc_atomic(length + 1);
+        memcpy(parts[i], start, length);
+        parts[i][length] = 0;
+
+        start += length + delimLength;
+    }
     return result;
 }
 
