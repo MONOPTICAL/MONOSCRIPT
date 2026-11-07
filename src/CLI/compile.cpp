@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Target/TargetMachine.h>
+#include <llvm/Support/Program.h>
 
 bool emitExecutable(llvm::Module* module, const std::string& outputPath) {
     llvm::InitializeNativeTarget();
@@ -40,13 +41,14 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath) {
         llcTool = std::string(LLVM_TOOLS_PATH) + "/llc";
 #endif
     // pic нужен, потому что gcc по умолчанию собирает PIE, а без него не линкуются строки
-    std::string llcCmd = llcTool + " -filetype=obj -relocation-model=pic -o " + objPath + " " + irPath;
-    
-#if DEBUG
-    std::cout << "Запуск команды: " << llcCmd << std::endl;
-#endif
     ui::stage("llc: generating machine code");
-    int llcRet = std::system(llcCmd.c_str());
+    auto llc = llvm::sys::findProgramByName(llcTool);
+    if (!llc) {
+        std::cerr << "Could not find llc: " << llc.getError().message() << std::endl;
+        return false;
+    }
+    int llcRet = llvm::sys::ExecuteAndWait(*llc,
+        {*llc, "-filetype=obj", "-relocation-model=pic", "-o", objPath, irPath});
     if (llcRet != 0) {
         ui::pipelineStop();
         std::cerr << "llc failed with code " << llcRet << std::endl;
@@ -70,16 +72,15 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath) {
     }
     
     // Компилируем и линкуем
-    std::string gccCmd = "gcc -g -o " + outputPath + " " + objPath;
-    
-    // mono
-    gccCmd += " " + stdlibPath + " -lgc -lm -ldl -Wl,-rpath," + stdlibDir;
-    
-#if DEBUG
-    std::cout << "Запуск команды: " << gccCmd << std::endl;
-#endif
+    auto gcc = llvm::sys::findProgramByName("gcc");
+    if (!gcc) {
+        std::cerr << "Could not find gcc: " << gcc.getError().message() << std::endl;
+        return false;
+    }
+    const std::string rpath = "-Wl,-rpath," + stdlibDir;
     ui::stage("gcc: linking the executable");
-    int gccRet = std::system(gccCmd.c_str());
+    int gccRet = llvm::sys::ExecuteAndWait(*gcc,
+        {*gcc, "-g", "-o", outputPath, objPath, stdlibPath, "-lgc", "-lm", "-ldl", rpath});
     if (gccRet != 0) {
         ui::pipelineStop();
         std::cerr << "gcc failed with code " << gccRet << std::endl;

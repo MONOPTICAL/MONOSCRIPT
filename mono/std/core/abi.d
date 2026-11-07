@@ -48,7 +48,7 @@ MsResult!T* resultOk(T)(T value) nothrow @nogc
 {
     auto result = cast(MsResult!T*) GC_malloc(MsResult!T.sizeof);
     result.ok = true;
-    result.error = "";
+    result.error = stringFromCString("");
     result.value = value;
     return result;
 }
@@ -58,7 +58,7 @@ MsResult!T* resultErr(T)(int code, const(char)* message) nothrow @nogc
     auto result = cast(MsResult!T*) GC_malloc(MsResult!T.sizeof);
     result.ok = false;
     result.code = code;
-    result.error = message;
+    result.error = stringFromCString(message);
     return result;
 }
 
@@ -66,7 +66,7 @@ MsResultVoid* resultVoidOk() nothrow @nogc
 {
     auto result = cast(MsResultVoid*) GC_malloc(MsResultVoid.sizeof);
     result.ok = true;
-    result.error = "";
+    result.error = stringFromCString("");
     return result;
 }
 
@@ -75,6 +75,36 @@ MsResultVoid* resultVoidErr(int code, const(char)* message) nothrow @nogc
     auto result = cast(MsResultVoid*) GC_malloc(MsResultVoid.sizeof);
     result.ok = false;
     result.code = code;
-    result.error = message;
+    result.error = stringFromCString(message);
     return result;
+}
+
+// A language string points to bytes following a u64 length. The trailing NUL
+// preserves interoperability with libc; embedded NUL bytes are rejected.
+char* newString(size_t length) nothrow @nogc
+{
+    import mono.std.core.rt : ms_panic;
+    if (length > int.max) ms_panic("string is too long", 0);
+    auto allocation = cast(ulong*) GC_malloc_atomic(ulong.sizeof + length + 1);
+    *allocation = length;
+    auto data = cast(char*) (allocation + 1);
+    data[length] = 0;
+    return data;
+}
+
+char* stringFromBytes(const char* bytes, size_t length) nothrow @nogc
+{
+    import core.stdc.string : memcpy, memchr;
+    import mono.std.core.rt : ms_panic;
+    if (length && memchr(bytes, 0, length) !is null)
+        ms_panic("strings cannot contain a NUL byte", 0);
+    auto data = newString(length);
+    if (length) memcpy(data, bytes, length);
+    return data;
+}
+
+char* stringFromCString(const char* text) nothrow @nogc
+{
+    import core.stdc.string : strlen;
+    return stringFromBytes(text, strlen(text));
 }

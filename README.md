@@ -134,7 +134,7 @@ use
 - `i8`, `i16`, `i32`, `i64` — signed integers
 - `float` — 32-bit floating-point numbers
 - `f64` — 64-bit floating-point numbers
-- `string` — text values, immutable, bytes in UTF-8
+- `string` — immutable UTF-8 bytes with a stored length; embedded NUL bytes are rejected
 - `char` — one byte: `'a'`, `'\\n'`. `s[i]`, `for c in s` and `len(s)` work in bytes
 - `void` — absence of value (used for functions)
 
@@ -144,7 +144,7 @@ use
 - `map<K, V>` — key-value mappings
 - `struct` — user-defined structures
 
-Like in Python, numbers are copied, while objects are passed by reference. Use `copy(x)` when you need a separate shallow copy. Objects live on a garbage-collected heap, and a reference is never null.
+Like in Python, numbers are copied, while objects are passed by reference. Use `copy(x)` when you need a separate shallow copy. In `@pure` functions, copies that still share nested mutable objects with an argument are rejected. Returning or wrapping borrowed mutable objects is also rejected; this check is conservative. Objects live on a garbage-collected heap, and a reference is never null.
 
 ```go
 [i32]main()
@@ -288,7 +288,11 @@ Something that can fail returns `result<T>`. The caller checks it, and the progr
 |   return 0
 ```
 
+`toInt(s)` returns `result<i32>`: it accepts decimal digits with an optional leading `+` or `-`. Empty input, whitespace, trailing characters and values outside the `i32` range return errors (code 1 for syntax, 2 for range). Check `.ok` before reading `.value`.
+
 Reading `r.value` from an error stops the program with the original message. A result that is never read is a compile error, write `_ ^= save()` to ignore one on purpose. Use `result<void>` and `return ok()` when there is no value. A native function in D returns the same layout with `resultOk`, `resultErr`, `resultVoidOk` and `resultVoidErr` from `mono/std/core/abi.d`.
+
+Native string returns must use `newString(length)`, `stringFromBytes(data, length)` or `stringFromCString(text)` from the same ABI module. Strings still pass a C-compatible data pointer, but now carry a `u64` byte length immediately before it. Do not return raw C/D literals or `malloc` buffers as language strings. `resultErr` copies native error messages into this format. Rebuild native extensions and executables against the updated runtime.
 
 ### 🧰 Structs
 

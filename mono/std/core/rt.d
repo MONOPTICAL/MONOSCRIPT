@@ -39,16 +39,14 @@ extern(C) void ms_panic_index(long index, int length, int line) nothrow @nogc
 
 extern(C) int ms_str_len(const char* text) nothrow @nogc
 {
-    import core.stdc.string : strlen;
-    return cast(int) strlen(text);
+    return cast(int) *(cast(const ulong*) text - 1);
 }
 
-// Адрес байта строки. Длина нигде не хранится, поэтому проверка границ идёт до этого индекса
+// Length metadata makes both len(s) and checked s[i] constant time.
 extern(C) const(char)* ms_str_at(const char* text, long index, int line) nothrow @nogc
 {
-    if (index < 0) ms_panic_index(index, ms_str_len(text), line);
-    for (long i = 0; i <= index; i++)
-        if (text[i] == 0) ms_panic_index(index, cast(int) i, line);
+    const int length = ms_str_len(text);
+    if (index < 0 || index >= length) ms_panic_index(index, length, line);
     return text + index;
 }
 

@@ -7,5 +7,6 @@
 |   echo(substr(s, 2, 3))
 |   echo(cstr(strfind(s, "b")))
 |   echo(cstr(strfind(s, "z")))
-|   echo(cstr(toInt("42")))
+|   result<i32> parsed = toInt("42")
+|   echo(cstr(parsed.value))
 |   return 0

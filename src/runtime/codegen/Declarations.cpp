@@ -7,7 +7,7 @@ namespace Declarations
     {
         auto declared = node.inferredType ? node.inferredType : node.type;
         if (declared && declared->toString() == "string")
-            return context.Builder.CreateGlobalString("", "empty_string");
+            return context.createString("", "empty_string");
         return llvm::Constant::getNullValue(varType);
     }
 

@@ -652,6 +652,7 @@ void TypeSymbolVisitor::visit(ReturnNode &node)
         }
     }
 
+    checkPureAlias(node.expression);
     contexts.back().returnedValue = true; // Устанавливаем, что функция вернула значение
 }
 

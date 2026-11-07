@@ -35,9 +35,15 @@ ret = "array<string>"
 args = ["string", "string"]
 
 [[function]]
+name = "reverse"
+pure = true
+ret = "string"
+args = ["string"]
+
+[[function]]
 name = "toInt"
 pure = true
-ret = "i32"
+ret = "result<i32>"
 args = ["string"]
 
 [[function]]
