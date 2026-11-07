@@ -1,5 +1,13 @@
 #include "../headers/TypeSymbolVisitor.h"
 
+// Только литералы: они принимают нужный тип сами, каст им не нужен
+static bool isLiteralExpression(const std::shared_ptr<ASTNode>& node) {
+    if (std::dynamic_pointer_cast<NumberNode>(node) || std::dynamic_pointer_cast<FloatNumberNode>(node)) return true;
+    if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) return isLiteralExpression(unary->operand);
+    if (auto binary = std::dynamic_pointer_cast<BinaryOpNode>(node)) return isLiteralExpression(binary->left) && isLiteralExpression(binary->right);
+    return false;
+}
+
 void TypeSymbolVisitor::visit(BinaryOpNode& node) {
     node.left->accept(*this);
     node.right->accept(*this);
@@ -8,6 +16,13 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
     std::shared_ptr<TypeNode> leftType = node.left->implicitCastTo ? node.left->implicitCastTo : node.left->inferredType;
     std::shared_ptr<TypeNode> rightType = node.right->implicitCastTo ? node.right->implicitCastTo : node.right->inferredType;
     
+    // @strict обещает, что неявных приведений нет: разные числовые типы в одной операции требуют каста
+    if (checkLabels("@strict") && leftType && rightType && leftType->toString() != rightType->toString()
+        && getTypeRank(leftType->toString()) > 0 && getTypeRank(rightType->toString()) > 0
+        && !isLiteralExpression(node.left) && !isLiteralExpression(node.right)) {
+        LogError("Implicit cast is not allowed in @strict mode: " + leftType->toString() + " and " + rightType->toString() + ", use ->", node.right);
+    }
+
     std::shared_ptr<BinaryOpNode> root = std::make_shared<BinaryOpNode>(node.left, node.op, node.right);
     root->implicitCastTo = node.implicitCastTo; // Явный каст (a + b)->i32 не должен потеряться
     root->line = node.line; root->column = node.column;
