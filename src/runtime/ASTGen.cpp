@@ -7,6 +7,8 @@
 #include <llvm/IR/Type.h>           // <<< Убедитесь, что этот include есть
 #include <llvm/IR/DerivedTypes.h>   // <<< И этот тоже
 #include <llvm/Support/raw_ostream.h> // <<< Добавлено для преобразования типа в строку
+#include <cmath>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <vector>                   // <<< Добавлено для std::vector
@@ -770,8 +772,7 @@ void ASTGen::visit(NumberNode& node) {
     else if (targetLLVMType && targetLLVMType->isFloatingPointTy()) 
     {
         LogWarning("Неявное приведение NumberNode к типу с плавающей точкой. Создается ConstantFP.");
-        double floatValue = static_cast<double>(node.value);
-        result = llvm::ConstantFP::get(llvm::Type::getFloatTy(context.TheContext), llvm::APFloat(static_cast<float>(floatValue)));
+        result = llvm::ConstantFP::get(targetLLVMType, static_cast<double>(node.value));
     }
     else {
         // Обработка других типов или если targetLLVMType все еще nullptr
@@ -783,7 +784,12 @@ void ASTGen::visit(NumberNode& node) {
 
 void ASTGen::visit(FloatNumberNode& node) {
     LogWarning("visit для FloatNumberNode: " + std::to_string(node.value));
-    result = llvm::ConstantFP::get(context.TheContext, llvm::APFloat(node.value));
+    // Литерал сразу становится значением нужного типа: 0.1 в f64 точнее, чем float, расширенный потом
+    const bool isDouble = node.implicitCastTo && node.implicitCastTo->toString() == "f64";
+    if (!isDouble && std::abs(node.value) > std::numeric_limits<float>::max())
+        throw std::runtime_error("Codegen Error: literal does not fit in float, use ->f64");
+
+    result = llvm::ConstantFP::get(isDouble ? llvm::Type::getDoubleTy(context.TheContext) : llvm::Type::getFloatTy(context.TheContext), node.value);
 }
 
 void ASTGen::visit(StringNode& node) {

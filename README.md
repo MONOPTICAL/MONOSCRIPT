@@ -132,7 +132,8 @@ use
 
 - `i1` — boolean, `true` and `false`
 - `i8`, `i16`, `i32`, `i64` — signed integers
-- `float` — floating-point numbers
+- `float` — 32-bit floating-point numbers
+- `f64` — 64-bit floating-point numbers
 - `string` — text values
 - `void` — absence of value (used for functions)
 

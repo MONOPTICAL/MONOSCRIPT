@@ -129,6 +129,7 @@ int TypeSymbolVisitor::getTypeRank(const std::string& type) {
     if (type == "i32") return 4;
     if (type == "i64") return 5;
     if (type == "float") return 6;
+    if (type == "f64") return 7;
     return 0;
 }
 
@@ -140,12 +141,13 @@ std::string TypeSymbolVisitor::getTypeByRank(int rank) {
         case 4: return "i32";
         case 5: return "i64";
         case 6: return "float";
+        case 7: return "f64";
         default: return "";
     }
 }
 
 static std::string getOperation(const std::string& op, const std::string& type) {
-    if (type == "float") {
+    if (isFloatType(type)) {
         if (op == "add") return "fadd";
         if (op == "sub") return "fsub";
         if (op == "mul") return "fmul";
@@ -168,6 +170,11 @@ void TypeSymbolVisitor::castAllNumbersToType(const std::shared_ptr<ASTNode>& nod
         }
         return;
     }
+    // Литерал 0.1 должен стать точным значением нужного типа, а не float, расширенным потом
+    if (auto number = std::dynamic_pointer_cast<FloatNumberNode>(node)) {
+        if (targetType == "f64") number->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
+        return;
+    }
     if (auto ident = std::dynamic_pointer_cast<IdentifierNode>(node)) {
         if (ident->inferredType->toString() != targetType)
             if (getTypeRank(ident->inferredType->toString()) > 0)
@@ -187,10 +194,10 @@ void TypeSymbolVisitor::castAllNumbersToType(const std::shared_ptr<ASTNode>& nod
             auto leftType = std::dynamic_pointer_cast<BinaryOpNode>(bin->left);
             implicitCast = leftType ? leftType->inferredType->toString() : bin->left->inferredType->toString();
         }
-        if (implicitCast == "float")
+        if (isFloatType(implicitCast))
         {
-            bin->op = getOperation(bin->op, "float");
-            bin->inferredType = std::make_shared<SimpleTypeNode>("float");
+            bin->op = getOperation(bin->op, implicitCast);
+            bin->inferredType = std::make_shared<SimpleTypeNode>(implicitCast);
         }
         else
         {
@@ -220,10 +227,14 @@ static bool checkIntLimits(const std::string& type, int64_t value) {
 // Второй проход: кастим и валидируем (для не-auto)
 void TypeSymbolVisitor::castAndValidate(const std::shared_ptr<ASTNode>& node, const std::string& targetType, TypeSymbolVisitor* visitor) {
     if (!node) return;
+    if (auto number = std::dynamic_pointer_cast<FloatNumberNode>(node)) {
+        if (targetType == "f64") number->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
+        return;
+    }
     if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
         int64_t value = num->value;
         std::string fromType = num->inferredType ? num->inferredType->toString() : (num->type ? num->type->toString() : "");
-        if (targetType != "float" && !checkIntLimits(targetType, value)) {
+        if (!isFloatType(targetType) && !checkIntLimits(targetType, value)) {
             visitor->LogError("Value " + std::to_string(value) + " does not fit in type " + targetType, node);
         }
         if (fromType != targetType) {
@@ -247,7 +258,7 @@ void TypeSymbolVisitor::castAndValidate(const std::shared_ptr<ASTNode>& node, co
     if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
         // У отрицательного литерала диапазон проверяем вместе с минусом: i8 x = -128
         auto number = std::dynamic_pointer_cast<NumberNode>(unary->operand);
-        if (number && unary->op == "neg" && targetType != "float") {
+        if (number && unary->op == "neg" && !isFloatType(targetType)) {
             if (!checkIntLimits(targetType, -number->value))
                 visitor->LogError("Value " + std::to_string(-number->value) + " does not fit in type " + targetType, node);
             number->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
@@ -494,6 +505,7 @@ void TypeSymbolVisitor::validateCollectionElements(
         if (type == "i32") { if (maxRank < 4) maxRank = 4; return 4; }
         if (type == "i64") { if (maxRank < 5) maxRank = 5; return 5; }
         if (type == "float") { if (maxRank < 6) maxRank = 6; return 6; }
+        if (type == "f64") { if (maxRank < 7) maxRank = 7; return 7; }
         return 0; // unknown type
     };
 
@@ -648,11 +660,11 @@ void TypeSymbolVisitor::applyImplicitCastToNumeric(
             } else if (auto floatNode = std::dynamic_pointer_cast<FloatNumberNode>(expr)){
                  // Аналогично для float
                  std::string actualType = floatNode->inferredType ? floatNode->inferredType->toString() : "";
-                 if (currentTargetType != "float" && actualType == "float"){
+                 if (!isFloatType(currentTargetType) && actualType == "float"){
                      LogError("Type mismatch: expected integer type " + currentTargetType + " but got float", expr);
-                 } else if (currentTargetType == "float" && actualType != "float" && getTypeRank(actualType) > 0){
-                     // Приведение целого к float
-                     floatNode->implicitCastTo = std::make_shared<SimpleTypeNode>("float");
+                 } else if (isFloatType(currentTargetType) && actualType != currentTargetType && getTypeRank(actualType) > 0){
+                     // Приведение к нужному вещественному типу
+                     floatNode->implicitCastTo = std::make_shared<SimpleTypeNode>(currentTargetType);
                  } // else если оба float или оба не float - ничего не делаем или ошибка
             }
             // Добавить обработку других узлов, если они могут быть числовыми (например, IdentifierNode, CallNode)

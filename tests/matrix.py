@@ -15,11 +15,11 @@ import subprocess
 import sys
 import tempfile
 
-LITERAL = {'i1': '1', 'i8': '5', 'i16': '300', 'i32': '70000', 'i64': '5000000000', 'float': '1.5', 'string': '"s"'}
-TEXT = {'i1': 'true', 'i8': '5', 'i16': '300', 'i32': '70000', 'i64': '5000000000', 'float': '1.500000', 'string': 's'}
-DOUBLED = {'i8': '10', 'i16': '600', 'i32': '140000', 'i64': '10000000000', 'float': '3.000000'}
-NEGATED = {'i8': '-5', 'i16': '-300', 'i32': '-70000', 'i64': '-5000000000', 'float': '-1.500000'}
-AS_I32 = {'i1': '1', 'i8': '5', 'i16': '300', 'i32': '70000', 'i64': '705032704', 'float': '1'}
+LITERAL = {'i1': '1', 'i8': '5', 'i16': '300', 'i32': '70000', 'i64': '5000000000', 'float': '1.5', 'f64': '0.1', 'string': '"s"'}
+TEXT = {'i1': 'true', 'i8': '5', 'i16': '300', 'i32': '70000', 'i64': '5000000000', 'float': '1.500000', 'f64': '0.1', 'string': 's'}
+DOUBLED = {'i8': '10', 'i16': '600', 'i32': '140000', 'i64': '10000000000', 'float': '3.000000', 'f64': '0.2'}
+NEGATED = {'i8': '-5', 'i16': '-300', 'i32': '-70000', 'i64': '-5000000000', 'float': '-1.500000', 'f64': '-0.1'}
+AS_I32 = {'i1': '1', 'i8': '5', 'i16': '300', 'i32': '70000', 'i64': '705032704', 'float': '1', 'f64': '0'}
 INT_VALUE = {'i1': 1, 'i8': 5, 'i16': 300, 'i32': 70000, 'i64': 5000000000}
 PROGRAM_LINES = ('=', )
 PROGRAM_WORDS = ('yes', 'no', 'v', 'BAD')
@@ -38,7 +38,7 @@ def sources(t):
         'field_array': (f'[struct]S\n|   array<{t}> f = [{value}]\n\n', '|   S s = S()', 's.f[0]'),
         'call': (f'[{t}]g()\n|   return {value}\n\n', '', 'g()'),
     }
-    if t != 'i1':  # x ^= 1 выводит i1, у остальных типов литерал сам говорит о типе
+    if t not in ('i1', 'f64'):  # x ^= 1 выводит i1, а x ^= 0.1 выводит float
         result['inferred'] = ('', f'|   v ^= {value}', 'v')
     return result
 
@@ -66,9 +66,20 @@ def contexts(t, src):
     }
 
     if t != 'string':
-        if t not in ('i64', 'float'):
+        if t not in ('i64', 'float', 'f64'):
             result['to_i64'] = ('', f'|   i64 w = {src}\n|   echo("=" + w)', f'={AS_I32[t]}')
-        if t != 'float':
+        # f64 хранит всё точнее, чем float: в обратную сторону нужен каст
+        if t not in ('float', 'f64'):
+            as_f64 = '5000000000.0' if t == 'i64' else AS_I32[t] + '.0'
+            result['to_f64'] = ('', f'|   f64 w = {src}\n|   echo("=" + w)', f'={as_f64}')
+            result['param_f64'] = ('[f64]pd(f64: x)\n|   return x\n\n', f'|   echo("=" + pd({src}))', f'={as_f64}')
+            result['element_f64'] = ('', f'|   array<f64> b = [0.5]\n|   b[0] = {src}\n|   echo("=" + b[0])', f'={as_f64}')
+            result['add_f64'] = ('', f'|   f64 d = 0.5\n|   f64 r = {src} + d\n|   echo("=" + r)', f'={as_f64[:-2]}.5')
+        if t == 'float':
+            result['to_f64'] = ('', f'|   f64 w = {src}\n|   echo("=" + w)', '=1.5')
+            result['param_f64'] = ('[f64]pd(f64: x)\n|   return x\n\n', f'|   echo("=" + pd({src}))', '=1.5')
+            result['add_f64'] = ('', f'|   f64 d = 0.25\n|   f64 r = {src} + d\n|   echo("=" + r)', '=1.75')
+        if t not in ('float', 'f64'):
             whole = '5000000000' if t == 'i64' else AS_I32[t]
             result['to_float'] = ('', f'|   float w = {src}\n|   echo("=" + w)', f'={whole}.000000')
             result['cast_i32'] = ('', f'|   echo("=" + ({src})->i32)', f'={AS_I32[t]}')
@@ -93,7 +104,7 @@ def contexts(t, src):
 
     if t != 'string':
         # Каст сразу после значения и он же внутри выражения
-        cast_value = 1 if t == 'float' else INT_VALUE[t] if t != 'i64' else 705032704
+        cast_value = 1 if t == 'float' else 0 if t == 'f64' else INT_VALUE[t] if t != 'i64' else 705032704
         result['cast_then_add'] = ('', f'|   i32 r = ({src}->i32) + 1\n|   echo("=" + r)', f'={cast_value + 1}')
         result['cast_argument'] = ('[i32]ic(i32: x)\n|   return x\n\n', f'|   echo("=" + ic({src}->i32))', f'={cast_value}')
 

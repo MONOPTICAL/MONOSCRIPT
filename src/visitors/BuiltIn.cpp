@@ -68,6 +68,7 @@ void registerBuiltInTypes(Registry& registry)
     registry.addBuiltinType("i32", std::make_shared<SimpleTypeNode>("i32"));
     registry.addBuiltinType("i64", std::make_shared<SimpleTypeNode>("i64"));
     registry.addBuiltinType("float", std::make_shared<SimpleTypeNode>("float"));
+    registry.addBuiltinType("f64", std::make_shared<SimpleTypeNode>("f64"));
     registry.addBuiltinType("string", std::make_shared<SimpleTypeNode>("string"));
     registry.addBuiltinType("null", std::make_shared<SimpleTypeNode>("null"));
     registry.addBuiltinType("none", std::make_shared<SimpleTypeNode>("none"));

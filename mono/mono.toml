@@ -29,6 +29,12 @@ ret = "string"
 args = ["float"]
 
 [[function]]
+name = "toString_f64"
+pure = true
+ret = "string"
+args = ["f64"]
+
+[[function]]
 name = "toString_long"
 pure = true
 ret = "string"

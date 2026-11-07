@@ -617,7 +617,7 @@ void TypeSymbolVisitor::visit(ForNode& node) {
         auto limit = range->arguments[0];
         limit->accept(*this);
         auto limitType = limit->implicitCastTo ? limit->implicitCastTo : limit->inferredType;
-        if (!limitType || getTypeRank(limitType->toString()) == 0 || limitType->toString() == "float") {
+        if (!limitType || getTypeRank(limitType->toString()) == 0 || isFloatType(limitType->toString())) {
             LogError("range expects an integer, got " + (limitType ? limitType->toString() : std::string("unknown")), limit);
         }
 

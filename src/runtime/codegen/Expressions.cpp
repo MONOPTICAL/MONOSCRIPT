@@ -74,6 +74,10 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
                 right = TypeConversions::convertValueToType(context, right, left->getType(), "implicit_cast_right");
             else
                 left = TypeConversions::convertValueToType(context, left, right->getType(), "implicit_cast_left");
+        } else if (left->getType()->isFloatTy() && right->getType()->isDoubleTy()) {
+            left = TypeConversions::convertValueToType(context, left, right->getType(), "implicit_cast_left");
+        } else if (left->getType()->isDoubleTy() && right->getType()->isFloatTy()) {
+            right = TypeConversions::convertValueToType(context, right, left->getType(), "implicit_cast_right");
         } else if (left->getType()->isIntegerTy() && right->getType()->isFloatingPointTy()) {
             left = TypeConversions::convertValueToType(context, left, right->getType(), "implicit_cast_left");
         } else if (left->getType()->isFloatingPointTy() && right->getType()->isIntegerTy()) {
