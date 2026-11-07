@@ -103,6 +103,12 @@ def contexts(t, src):
         result['less'] = ('', f'|   if {src} < {src}\n|   |   echo("BAD")\n|   else\n|   |   echo("no")', 'no')
 
     if t == 'i1':
+        result['bool_add'] = ('', f'|   r ^= {src} + {src}\n|   echo("=" + r)', '=2')
+        result['bool_sub'] = ('', f'|   i32 r = {src} - {src}\n|   echo("=" + r)', '=0')
+        result['bool_mul'] = ('', f'|   i32 r = {src} * {src}\n|   echo("=" + r)', '=1')
+        result['bool_div'] = ('', f'|   i32 r = {src} / {src}\n|   echo("=" + r)', '=1')
+        result['bool_rem'] = ('', f'|   i32 r = {src} % {src}\n|   echo("=" + r)', '=0')
+        result['bool_compare'] = ('', f'|   if {src} + {src} == 2\n|   |   echo("yes")', 'yes')
         result['condition'] = ('', f'|   if {src}\n|   |   echo("yes")', 'yes')
         result['not'] = ('', f'|   if !{src}\n|   |   echo("BAD")\n|   else\n|   |   echo("no")', 'no')
         result['and'] = ('', f'|   if {src} and {src}\n|   |   echo("yes")', 'yes')
@@ -180,3 +186,5 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+    
+#cmake --build build --target test-matrix

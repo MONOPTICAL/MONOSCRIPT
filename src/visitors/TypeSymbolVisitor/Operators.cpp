@@ -101,6 +101,30 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
     return callNode;
 }
 
+// Над двумя i1 считаем как над числами: 1 + 1 это 2, а в самом i1 получился бы 0.
+// Сравнения и логика остаются на i1
+static std::shared_ptr<TypeNode> resultOfIntegerOperation(std::shared_ptr<BinaryOpNode>& node, const std::shared_ptr<TypeNode>& leftType, const std::shared_ptr<TypeNode>& rightType, Registry& registry) {
+    if (leftType->toString() != "i1" || rightType->toString() != "i1") return leftType;
+
+    auto leftLiteral = std::dynamic_pointer_cast<NumberNode>(node->left);
+    auto rightLiteral = std::dynamic_pointer_cast<NumberNode>(node->right);
+
+    // Только литералы: тип результата решит то, куда их присвоят, поэтому каста тут быть не должно. i8 b = 1 + 1 законно
+    if (leftLiteral && rightLiteral) {
+        auto i8Type = registry.findType("i8");
+        leftLiteral->inferredType = i8Type;
+        rightLiteral->inferredType = i8Type;
+        return i8Type;
+    }
+
+    auto i32Type = registry.findType("i32");
+    if (leftLiteral) leftLiteral->inferredType = i32Type;
+    else node->left->implicitCastTo = i32Type;
+    if (rightLiteral) rightLiteral->inferredType = i32Type;
+    else node->right->implicitCastTo = i32Type;
+    return i32Type;
+}
+
 void TypeSymbolVisitor::handlePlusOperator(std::shared_ptr<BinaryOpNode>& node, std::shared_ptr<TypeNode> leftType, std::shared_ptr<TypeNode> rightType)
 {
     std::string left = leftType->toString();
@@ -158,7 +182,7 @@ void TypeSymbolVisitor::handlePlusOperator(std::shared_ptr<BinaryOpNode>& node, 
     // int(i32, i64, i8, i1)
     if (isIntType(left) && isIntType(right)) {
         { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "add", node->right); node->implicitCastTo = cast; }
-        node->inferredType = leftType;
+        node->inferredType = resultOfIntegerOperation(node, leftType, rightType, registry);
         return;
     }
 
@@ -204,7 +228,7 @@ void TypeSymbolVisitor::handleMinusOperator(std::shared_ptr<BinaryOpNode>& node,
     // int(i32, i64, i8, i1)
     if (isIntType(left) && isIntType(right)) {
         { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "sub", node->right); node->implicitCastTo = cast; }
-        node->inferredType = leftType;
+        node->inferredType = resultOfIntegerOperation(node, leftType, rightType, registry);
         return;
     }
 
@@ -249,7 +273,7 @@ void TypeSymbolVisitor::handleMulOperator(std::shared_ptr<BinaryOpNode>& node, s
     // int(i32, i64, i8, i1)
     if (isIntType(left) && isIntType(right)) {
         { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "mul", node->right); node->implicitCastTo = cast; }
-        node->inferredType = leftType;
+        node->inferredType = resultOfIntegerOperation(node, leftType, rightType, registry);
         return;
     }
 
@@ -291,7 +315,7 @@ void TypeSymbolVisitor::handleDivOperator(std::shared_ptr<BinaryOpNode>& node, s
 
     if (isIntType(left) && isIntType(right)) {
         { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "sdiv", node->right); node->implicitCastTo = cast; }
-        node->inferredType = leftType;
+        node->inferredType = resultOfIntegerOperation(node, leftType, rightType, registry);
         return;
     }
 
@@ -333,7 +357,7 @@ void TypeSymbolVisitor::handleModOperator(std::shared_ptr<BinaryOpNode>& node, s
 
     if (isIntType(left) && isIntType(right)) {
         { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "srem", node->right); node->implicitCastTo = cast; }
-        node->inferredType = leftType;
+        node->inferredType = resultOfIntegerOperation(node, leftType, rightType, registry);
         return;
     }
 

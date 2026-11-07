@@ -121,6 +121,9 @@ llvm::Value* TypeConversions::convertValueToType(CodeGenContext& context, llvm::
         if (value->getType()->isIntegerTy(1)) {
             return context.Builder.CreateZExt(value, targetType, castName + "_i1toint");
         }
+        // В i1 истина это всё, что не ноль: обрезка превратила бы 2 в ложь
+        if (targetType->isIntegerTy(1))
+            return context.Builder.CreateICmpNE(value, llvm::ConstantInt::get(value->getType(), 0), castName + "_int2bool");
         return context.Builder.CreateIntCast(value, targetType, true, castName + "_int2int");
     }
     // Плавающая точка в плавающую точку
