@@ -21,6 +21,7 @@ class ASTNodeVisitor {
         virtual void visit(class ReassignMemberNode& node) = 0;
         virtual void visit(class VariableReassignNode& node) = 0;
         virtual void visit(class IfNode& node) = 0;
+        virtual void visit(class AttemptNode& node) = 0;
         virtual void visit(class ForNode& node) = 0;
         virtual void visit(class WhileNode& node) = 0;
         virtual void visit(class ReturnNode& node) = 0;
@@ -253,6 +254,16 @@ class IfNode : public ASTNode {
         }
 };
     
+class AttemptNode : public ASTNode {
+public:
+    std::shared_ptr<BlockNode> body;
+    std::shared_ptr<BlockNode> errorBody;
+    std::shared_ptr<BlockNode> panicBody;
+    std::string errorName;
+    std::string panicName;
+    void accept(ASTNodeVisitor& visitor) override { visitor.visit(*this); }
+};
+
 class ForNode : public ASTNode {
     public:
         ForNode() = default;
@@ -327,6 +338,9 @@ class UnaryOpNode : public ASTNode {
             : op(op), operand(operand) {}
         std::string op;
         std::shared_ptr<ASTNode> operand;
+        // Only postfix try: lazy replacement value or a terminating local handler.
+        std::shared_ptr<ASTNode> fallback;
+        std::shared_ptr<BlockNode> errorBody;
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);

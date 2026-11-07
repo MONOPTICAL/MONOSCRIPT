@@ -1181,3 +1181,50 @@ void TypeSymbolVisitor::visit(CallNode& node) {
 
     node.inferredType = func->returnType; // Устанавливаем тип функции
 }
+
+
+void TypeSymbolVisitor::visit(AttemptNode& node) {
+    if (contexts.back().currentFunctionName.empty())
+        LogError("attempt outside of function", node.shared_from_this());
+    const auto assignedBefore = assignedFinals, maybeBefore = maybeAssignedFinals;
+    contexts.push_back(contexts.back());
+    contexts.back().returnedValue = false;
+    if (node.errorBody) ++contexts.back().resultHandlerDepth;
+    node.body->accept(*this);
+    bool allReturned = contexts.back().returnedValue;
+    contexts.pop_back();
+    const auto assignedBody = assignedFinals, maybeBody = maybeAssignedFinals;
+    auto definite = assignedBody;
+    auto possible = maybeBody;
+    bool hasContinuation = !allReturned;
+    auto handler = [&](const std::shared_ptr<BlockNode>& body, const std::string& name, std::shared_ptr<TypeNode> type) {
+        if (!body) return;
+        assignedFinals = assignedBefore;
+        // Failure may occur after any assignment in the body.
+        maybeAssignedFinals = maybeBody;
+        contexts.push_back(contexts.back());
+        contexts.back().returnedValue = false;
+        auto binding = std::make_shared<VariableAssignNode>(name, true, type, nullptr);
+        binding->inferredType = type;
+        contexts.back().variables[name] = binding;
+        body->accept(*this);
+        const bool returned = contexts.back().returnedValue;
+        allReturned = allReturned && returned;
+        if (!returned) {
+            if (!hasContinuation) definite = assignedFinals;
+            else for (auto it = definite.begin(); it != definite.end();) {
+                if (!assignedFinals.count(*it)) it = definite.erase(it); else ++it;
+            }
+            possible.insert(maybeAssignedFinals.begin(), maybeAssignedFinals.end());
+            hasContinuation = true;
+        }
+        contexts.pop_back();
+    };
+    auto errorType = std::make_shared<GenericTypeNode>("result");
+    errorType->typeParameters.push_back(std::make_shared<SimpleTypeNode>("void"));
+    handler(node.errorBody, node.errorName, errorType);
+    handler(node.panicBody, node.panicName, registry.findType("panic_info"));
+    assignedFinals = definite;
+    maybeAssignedFinals = possible;
+    if (allReturned) contexts.back().returnedValue = true;
+}

@@ -104,6 +104,16 @@ public:
     // Имя функции, с которой начинается программа: помеченная @entry или main
     static std::string                  findEntryName(const ProgramNode& program);
 
+    struct ResultHandler { llvm::BasicBlock* block; llvm::Value* slot; };
+    std::vector<ResultHandler> ResultHandlers;
+    std::vector<llvm::BasicBlock*> PanicHandlers;
+    llvm::Value* PanicContext = nullptr;
+    llvm::StructType* getPanicStruct();
+    llvm::Value* emitCall(llvm::Function* function, std::vector<llvm::Value*> arguments = {}, const std::string& name = "");
+    void checkPanic();
+    void propagatePanic();
+    llvm::Function* functionAdapter(llvm::Function* function);
+
     void LogError(const std::string& message);
     void LogWarning(const std::string& message);
 

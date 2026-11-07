@@ -372,7 +372,7 @@ std::shared_ptr<ASTNode> Parser::parseReturn()
 
     consume(TokenType::Keyword, "Expected 'return' keyword"); // Проверяем наличие ключевого слова return
     std::shared_ptr<ASTNode> expression;
-    if(current().column != -1)
+    if(current().column != -1 && !check(TokenType::Semicolon))
         expression = parseExpression(); 
     else
         expression = std::make_shared<NullNode>();
@@ -609,4 +609,54 @@ std::shared_ptr<ASTNode> Parser::parseUse()
     auto importNode = std::make_shared<ImportNode>(paths);
     importNode->line = line; importNode->column = token; // Устанавливаем строку и колонку для узла
     return importNode; // Возвращаем узел импорта
+}
+
+std::shared_ptr<BlockNode> Parser::parseInlineHandler() {
+    auto body = std::make_shared<BlockNode>();
+    body->line = lineIndex; body->column = tokenIndex;
+    do {
+        if (isEndOfLine()) throwError("Expected statement in local error handler");
+        if (check(TokenType::LeftBracket) || (check(TokenType::Keyword) &&
+            current().value != "return" && current().value != "break" &&
+            current().value != "continue" && current().value != "const" && current().value != "final"))
+            throwError("Local error handler requires simple statements");
+        const int line = lineIndex;
+        body->statements.push_back(parseStatement());
+        if (line != lineIndex) throwError("Local error handler must stay on one line");
+    } while (match(TokenType::Semicolon));
+    return body;
+}
+
+std::shared_ptr<ASTNode> Parser::parseAttempt() {
+    auto node = std::make_shared<AttemptNode>();
+    node->line = lineIndex; node->column = tokenIndex;
+    const int indent = getIndentLevel(lines[lineIndex]);
+    advance();
+    auto body = [&]() {
+        if (!isEndOfLine()) throwError("Expected end of line before attempt/handler body");
+        nextLine();
+        if (isEndOfFile() || getIndentLevel(lines[lineIndex]) != indent + 1)
+            throwError("Expected indented attempt/handler body");
+        return parseBlock(indent + 1);
+    };
+    node->body = body();
+    while (!isEndOfFile() && getIndentLevel(lines[lineIndex]) == indent) {
+        tokenIndex = indent;
+        const std::string kind = current().value;
+        if (kind != "else" && kind != "panic") break;
+        advance();
+        std::string name = current().value;
+        consume(TokenType::Identifier, "Expected error binding after '" + kind + "'");
+        if (kind == "else") {
+            if (node->errorBody) throwError("Duplicate else handler");
+            node->errorName = name; node->errorBody = body();
+        } else {
+            if (node->panicBody) throwError("Duplicate panic handler");
+            node->panicName = name; node->panicBody = body();
+        }
+    }
+    if (!node->errorBody && !node->panicBody) throwError("attempt requires an else or panic handler");
+    --lineIndex;
+    tokenIndex = lines[lineIndex].size();
+    return node;
 }

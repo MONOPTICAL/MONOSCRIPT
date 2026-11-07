@@ -183,7 +183,7 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
             return nullptr;
         }
         std::vector<llvm::Value*> args = {left, right};
-        return context.Builder.CreateCall(concatFunc, args, "concat_result");
+        return context.emitCall(concatFunc, args, "concat_result");
     }
     else if (node.op == "and") {
         return context.Builder.CreateAnd(left, right, "andtmp");
@@ -286,16 +286,47 @@ llvm::Value* Expressions::handleUnaryOperation(CodeGenContext& context, UnaryOpN
         context.Builder.SetInsertPoint(errorBlock);
         auto code = context.Builder.CreateLoad(context.Builder.getInt32Ty(), context.Builder.CreateStructGEP(sourceLayout, operand, 1));
         auto error = context.Builder.CreateLoad(context.Builder.getPtrTy(), context.Builder.CreateStructGEP(sourceLayout, operand, 2));
+        llvm::Value* fallback = nullptr;
+        llvm::BasicBlock* fallbackEnd = nullptr;
+        llvm::BasicBlock* merge = nullptr;
+        if (node.fallback) {
+            fallback = Arrays::emitValue(context, node.fallback, node.inferredType);
+            fallbackEnd = context.Builder.GetInsertBlock();
+            merge = llvm::BasicBlock::Create(context.TheContext, "try.merge", function);
+            context.Builder.CreateBr(merge);
+        } else if (node.errorBody) {
+            auto names = context.NamedValues;
+            auto slot = context.createEntryAlloca(context.Builder.getPtrTy(), "error");
+            context.Builder.CreateStore(operand, slot);
+            context.NamedValues["error"] = slot;
+            ASTGen gen(context);
+            node.errorBody->accept(gen);
+            context.NamedValues = names;
+            if (!context.Builder.GetInsertBlock()->getTerminator()) context.Builder.CreateUnreachable();
+        } else if (!context.ResultHandlers.empty()) {
+            const auto handler = context.ResultHandlers.back();
+            context.Builder.CreateStore(operand, handler.slot);
+            context.Builder.CreateBr(handler.block);
+        } else {
         auto size = context.TheModule->getDataLayout().getTypeAllocSize(destinationLayout);
         auto propagated = context.allocateObject(context.Builder.getInt64(size), true, "propagated_error");
         context.Builder.CreateStore(context.Builder.getInt8(0), context.Builder.CreateStructGEP(destinationLayout, propagated, 0));
         context.Builder.CreateStore(code, context.Builder.CreateStructGEP(destinationLayout, propagated, 1));
         context.Builder.CreateStore(error, context.Builder.CreateStructGEP(destinationLayout, propagated, 2));
         context.Builder.CreateRet(propagated);
+        }
         context.Builder.SetInsertPoint(okBlock);
         if (node.inferredType->toString() == "void") return nullptr;
-        return context.Builder.CreateLoad(context.getLLVMType(node.inferredType, context.TheContext),
+        auto value = context.Builder.CreateLoad(context.getLLVMType(node.inferredType, context.TheContext),
             context.Builder.CreateStructGEP(sourceLayout, operand, 3), "unwrapped");
+        if (!merge) return value;
+        auto successEnd = context.Builder.GetInsertBlock();
+        context.Builder.CreateBr(merge);
+        context.Builder.SetInsertPoint(merge);
+        auto phi = context.Builder.CreatePHI(value->getType(), 2, "try.value");
+        phi->addIncoming(value, successEnd);
+        phi->addIncoming(fallback, fallbackEnd);
+        return phi;
     }
 
     // ?r: байт ok объекта result

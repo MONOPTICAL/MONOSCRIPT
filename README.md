@@ -299,7 +299,7 @@ Something that can fail returns `result<T>`. The caller checks it, and the progr
 |   return 0
 ```
 
-Postfix `r?` unwraps a successful result. On error it immediately returns the original error code and message from the enclosing function, which must return `result<U>`; `U` may differ from the unwrapped type. Prefix `?r` remains a boolean success check. The operand is evaluated once; postfix `?` binds before arithmetic and works with `result<void>` as a standalone statement.
+Postfix `r?` unwraps a successful result. Without a local handler, an error immediately returns the original error code and message from the enclosing function, which must return `result<U>`; `U` may differ from the unwrapped type. Prefix `?r` remains a boolean success check. The operand is evaluated once; postfix `?` binds before arithmetic and works with `result<void>` as a standalone statement.
 
 ```go
 [result<i32>]sumNumbers(string: a, string: b)
@@ -312,7 +312,35 @@ Use `r?->i64` for a cast after unwrapping. A nested result can be unwrapped with
 
 `toInt(s)` returns `result<i32>`: it accepts decimal digits with an optional leading `+` or `-`. Empty input, whitespace, trailing characters and values outside the `i32` range return errors (code 1 for syntax, 2 for range). Check `.ok` before reading `.value`.
 
-Reading `r.value` from an error stops the program with the original message. A result that is never read is a compile error, write `_ ^= save()` to ignore one on purpose. Use `result<void>` and `return ok()` when there is no value. A native function in D returns the same layout with `resultOk`, `resultErr`, `resultVoidOk` and `resultVoidErr` from `mono/std/core/abi.d`.
+Reading `r.value` from an error raises a runtime panic with the original message; it exits with code 101 if no panic handler catches it. A result that is never read is a compile error, write `_ ^= save()` to ignore one on purpose. Use `result<void>` and `return ok()` when there is no value. A native function in D returns the same layout with `resultOk`, `resultErr`, `resultVoidOk` and `resultVoidErr` from `mono/std/core/abi.d`.
+
+Local handling also works in ordinary functions such as `[i32]main()`:
+
+```ms
+[i32]main()
+|   port ^= toInt("invalid")? else 8080
+|   n ^= toInt("42")? else: echo(error.error); return error.code
+|
+|   attempt
+|   |   value ^= toInt("7")?
+|   |   array<i32> rows = [value]
+|   |   echo("" + rows[9])
+|   else error
+|   |   echo(error.error)
+|   panic info
+|   |   echo(info.message + " at line " + info.line)
+|   return 0
+```
+
+`? else expression` evaluates the result once and evaluates the replacement only on error. The replacement must fit the unwrapped type; use parentheses to delimit it inside a larger expression. `result<void>` has no replacement value. `? else: statements` binds the original error as `error` (`result<void>`, read-only `.ok`, `.code`, `.error`) and must end in `return`, `break` or `continue`; semicolons separate statements in this inline handler. Its binding is scoped to the handler. The action form consumes the remainder of the line and should be used as the final expression of a statement.
+
+Within an `attempt`, bare `?` sends an error to the nearest enclosing `else name` handler in the **same function**. Called functions still propagate their results through their own return values. An attempt may have an error handler, a panic handler, or both; duplicate handlers are rejected. Body variables are not visible in its handlers or after the attempt. After a handler finishes, execution continues after the entire attempt. A failure inside a handler targets an outer handler, never another handler of the same attempt.
+
+`panic info` catches controlled runtime failures, including those in deeper calls: integer division by zero/overflow, invalid numeric casts, array/string bounds, empty `pop`, missing map keys, map mutation during iteration, erroneous `.value` access, and checked standard-library string operations. It binds an immutable `panic_info` snapshot with `.message` and `.line` (0 if unknown). `? else` handles returned result errors only: a panic while evaluating the operand or replacement still goes to a surrounding panic handler. Side effects are not rolled back. OOM and arbitrary native crashes remain fatal. There is no `defer` or automatic resource cleanup yet; catching a panic does not close files, release locks, or undo a partial response.
+
+The compiler passes an explicit hidden `MsPanicContext*` through language calls, including methods, constructors and `func<>` calls; ordinary values keep their existing layouts. After a failed call, the compiler checks the channel before using its return value. Each program invocation owns its context; there is no global error flag. Language function symbols are internal to the compiled module, so their private calling convention cannot override C runtime functions with the same name.
+
+Native functions opt in with `panic_context = true` in `mono.toml` and accept a final `MsPanicContext*` argument, in addition to their declared language arguments. They report a controlled failure with `ms_raise(message, line, context)` and **return immediately**. They must also propagate failures from their own helpers before using any placeholder return value. `ms_raise` copies the message into a language string. A native function without this contract remains an ordinary C call; calling `ms_panic` still exits. Rebuild executables and native libraries after this calling-convention change; an old binary is not compatible with the updated checked standard-library entry points.
 
 Native string returns must use `newString(length)`, `stringFromBytes(data, length)` or `stringFromCString(text)` from the same ABI module. Strings still pass a C-compatible data pointer, but now carry a `u64` byte length immediately before it. Do not return raw C/D literals or `malloc` buffers as language strings. `resultErr` copies native error messages into this format. Rebuild native extensions and executables against the updated runtime.
 
@@ -355,7 +383,8 @@ Inside a method, `self` is the object. A constant object can only call `@pure` m
 |Runtime errors with line numbers|✅ Working|
 |Struct methods|✅ Working|
 |Lambdas and pipes (`\|>`)|📅 Planned|
-|Errors as values: `result<T>`, `ok()`, `err()`, `?r`|✅ Working|
+|Errors as values: `result<T>`, `ok()`, `err()`, `?r`, `r?`|✅ Working|
+|Local `? else`, `attempt`, result and panic handlers|✅ Working|
 |Generic functions and passing functions by name|✅ Working|
 |Null safety|📅 Planned|
 |Embedding and sandboxing|📅 Planned|

@@ -68,6 +68,10 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         // if [expression] or if [expression]
         // if 2 > 0
         // ↑ if we have keyword if, we have if statement
+    else if (currentToken.type == TokenType::Keyword && currentToken.value == "attempt")
+    {
+        return parseAttempt();
+    }
     else if (currentToken.type == TokenType::Keyword && currentToken.value == "if")
     {
         return parseIf();

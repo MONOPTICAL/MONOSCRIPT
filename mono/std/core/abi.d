@@ -2,6 +2,15 @@ module mono.std.core.abi;
 
 // Как объекты языка лежат в памяти. Раскладка совпадает с кодгеном (CodeGenContext::getArrayStruct):
 // функция на D, которая принимает или возвращает array<T>, работает с этим заголовком
+// Explicit per-call panic channel; no process-wide or thread-local error state.
+// LLVM layout: { i8 pending, i32 line, ptr message }.
+struct MsPanicContext
+{
+    bool pending;
+    int line;
+    const(char)* message;
+}
+
 struct MsArray
 {
     void* data;
@@ -81,10 +90,10 @@ MsResultVoid* resultVoidErr(int code, const(char)* message) nothrow @nogc
 
 // A language string points to bytes following a u64 length. The trailing NUL
 // preserves interoperability with libc; embedded NUL bytes are rejected.
-char* newString(size_t length) nothrow @nogc
+char* newString(size_t length, MsPanicContext* panic = null) nothrow @nogc
 {
-    import mono.std.core.rt : ms_panic;
-    if (length > int.max) ms_panic("string is too long", 0);
+    import mono.std.core.rt : ms_raise;
+    if (length > int.max) { ms_raise("string is too long", 0, panic); return null; }
     auto allocation = cast(ulong*) GC_malloc_atomic(ulong.sizeof + length + 1);
     *allocation = length;
     auto data = cast(char*) (allocation + 1);
@@ -92,19 +101,20 @@ char* newString(size_t length) nothrow @nogc
     return data;
 }
 
-char* stringFromBytes(const char* bytes, size_t length) nothrow @nogc
+char* stringFromBytes(const char* bytes, size_t length, MsPanicContext* panic = null) nothrow @nogc
 {
     import core.stdc.string : memcpy, memchr;
-    import mono.std.core.rt : ms_panic;
+    import mono.std.core.rt : ms_raise;
     if (length && memchr(bytes, 0, length) !is null)
-        ms_panic("strings cannot contain a NUL byte", 0);
-    auto data = newString(length);
+        { ms_raise("strings cannot contain a NUL byte", 0, panic); return null; }
+    auto data = newString(length, panic);
+    if (data is null) return null;
     if (length) memcpy(data, bytes, length);
     return data;
 }
 
-char* stringFromCString(const char* text) nothrow @nogc
+char* stringFromCString(const char* text, MsPanicContext* panic = null) nothrow @nogc
 {
     import core.stdc.string : strlen;
-    return stringFromBytes(text, strlen(text));
+    return stringFromBytes(text, strlen(text), panic);
 }

@@ -48,7 +48,7 @@ namespace Maps
         const bool keyIsString = generic->typeParameters[0]->toString() == "string";
         const bool valueIsReference = context.getLLVMType(generic->typeParameters[1], context.TheContext)->isPointerTy();
 
-        return context.Builder.CreateCall(
+        return context.emitCall(
             runtime(context, "ms_map_new", ptrType(context), {i32Type, i32Type}),
             {context.Builder.getInt32(keyIsString), context.Builder.getInt32(keyIsString || valueIsReference)},
             "map"
@@ -80,34 +80,34 @@ namespace Maps
     {
         llvm::Type* i64Type = context.Builder.getInt64Ty();
         if (forWrite)
-            return context.Builder.CreateCall(
+            return context.emitCall(
                 runtime(context, "ms_map_insert", ptrType(context), {ptrType(context), i64Type}), {map, key}, "map_slot");
 
-        return context.Builder.CreateCall(
+        return context.emitCall(
             runtime(context, "ms_map_get", ptrType(context), {ptrType(context), i64Type, context.Builder.getInt32Ty()}),
             {map, key, sourceLine(context, line)}, "map_slot");
     }
 
     llvm::Value* emitLen(CodeGenContext& context, llvm::Value* map)
     {
-        return context.Builder.CreateCall(runtime(context, "ms_map_len", context.Builder.getInt32Ty(), {ptrType(context)}), {map}, "map_len");
+        return context.emitCall(runtime(context, "ms_map_len", context.Builder.getInt32Ty(), {ptrType(context)}), {map}, "map_len");
     }
 
     llvm::Value* emitCopy(CodeGenContext& context, llvm::Value* map)
     {
-        return context.Builder.CreateCall(runtime(context, "ms_map_copy", ptrType(context), {ptrType(context)}), {map}, "map_copy");
+        return context.emitCall(runtime(context, "ms_map_copy", ptrType(context), {ptrType(context)}), {map}, "map_copy");
     }
 
     llvm::Value* emitHas(CodeGenContext& context, llvm::Value* map, llvm::Value* key)
     {
-        llvm::Value* found = context.Builder.CreateCall(
+        llvm::Value* found = context.emitCall(
             runtime(context, "ms_map_has", context.Builder.getInt32Ty(), {ptrType(context), context.Builder.getInt64Ty()}), {map, key}, "map_has");
         return context.Builder.CreateICmpNE(found, context.Builder.getInt32(0), "map_found");
     }
 
     void emitDel(CodeGenContext& context, llvm::Value* map, llvm::Value* key, int line)
     {
-        context.Builder.CreateCall(
+        context.emitCall(
             runtime(context, "ms_map_del", context.Builder.getVoidTy(), {ptrType(context), context.Builder.getInt64Ty(), context.Builder.getInt32Ty()}),
             {map, key, sourceLine(context, line)});
     }
@@ -121,7 +121,7 @@ namespace Maps
 
         node.iterable->accept(codeGen);
         llvm::Value* map = TypeConversions::loadValueIfPointer(context, codeGen.getResult(), "for.map");
-        llvm::Value* version = context.Builder.CreateCall(runtime(context, "ms_map_version", i32Type, {ptrType(context)}), {map}, "for.version");
+        llvm::Value* version = context.emitCall(runtime(context, "ms_map_version", i32Type, {ptrType(context)}), {map}, "for.version");
 
         llvm::AllocaInst* position = context.createEntryAlloca(i32Type, "for.position");
         llvm::AllocaInst* keySlot = context.createEntryAlloca(i64Type, "for.key");
@@ -137,7 +137,7 @@ namespace Maps
         context.Builder.CreateBr(condBlock);
 
         context.Builder.SetInsertPoint(condBlock);
-        llvm::Value* hasNext = context.Builder.CreateCall(
+        llvm::Value* hasNext = context.emitCall(
             runtime(context, "ms_map_next", i32Type, {ptrType(context), ptrType(context), i32Type, i32Type, ptrType(context)}),
             {map, position, version, sourceLine(context, node.line), keySlot}, "for.next");
         context.Builder.CreateCondBr(context.Builder.CreateICmpNE(hasNext, context.Builder.getInt32(0)), bodyBlock, endBlock);

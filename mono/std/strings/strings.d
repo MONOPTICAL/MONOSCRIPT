@@ -1,20 +1,22 @@
 module mono.std.strings.strings;
 
 import mono.std.core.abi : MsArray, newArray, stringFromCString;
-import mono.std.core.rt : ms_panic;
+import mono.std.core.rt : ms_raise;
+import mono.std.core.abi : MsPanicContext;
 
 import mono.std.core.abi : newString, stringFromBytes, MsResult, resultOk, resultErr;
 
 // Склейка и поиск
 
-extern(C) char* scat(const char* a, const char* b) nothrow @nogc
+extern(C) char* scat(const char* a, const char* b, MsPanicContext* panic) nothrow @nogc
 {
     import core.stdc.string : strlen, strcpy, strcat;
 
     size_t len_a = strlen(a);
     size_t len_b = strlen(b);
 
-    char* result = newString(len_a + len_b);
+    char* result = newString(len_a + len_b, panic);
+    if (result is null) return null;
 
     strcpy(result, a);
     strcat(result, b);
@@ -22,15 +24,16 @@ extern(C) char* scat(const char* a, const char* b) nothrow @nogc
     return result;
 }
 
-extern(C) char* substr(const char* str, int start, int length) nothrow @nogc
+extern(C) char* substr(const char* str, int start, int length, MsPanicContext* panic) nothrow @nogc
 {
     import core.stdc.string : memcpy, strlen;
 
     const int total = cast(int) strlen(str);
     if (start < 0 || length < 0 || start > total || length > total - start)
-        ms_panic("substr: range is outside the string", 0);
+        { ms_raise("substr: range is outside the string", 0, panic); return null; }
 
-    char* result = newString(length);
+    char* result = newString(length, panic);
+    if (result is null) return null;
     memcpy(result, str + start, length);
     result[length] = 0;
     return result;
@@ -62,12 +65,12 @@ extern(C) bool endsWith(const char* str, const char* suffix) nothrow @nogc
 }
 
 
-extern(C) MsArray* split(const char* str, const char* delim) nothrow @nogc
+extern(C) MsArray* split(const char* str, const char* delim, MsPanicContext* panic) nothrow @nogc
 {
     import core.stdc.string : memcpy, strlen, strstr;
 
     const size_t delimLength = strlen(delim);
-    if (delimLength == 0) ms_panic("split: empty delimiter", 0);
+    if (delimLength == 0) { ms_raise("split: empty delimiter", 0, panic); return null; }
 
     int count = 1;
     for (const(char)* found = strstr(str, delim); found !is null; found = strstr(found + delimLength, delim))
@@ -82,7 +85,8 @@ extern(C) MsArray* split(const char* str, const char* delim) nothrow @nogc
         const(char)* end = strstr(start, delim);
         const size_t length = end !is null ? end - start : strlen(start);
 
-        parts[i] = newString(length);
+        parts[i] = newString(length, panic);
+        if (parts[i] is null) return null;
         memcpy(parts[i], start, length);
         parts[i][length] = 0;
 
@@ -125,11 +129,11 @@ extern(C) MsArray* toArray(const char* str) nothrow @nogc
     return array;
 }
 
-extern(C) char* joinChars(MsArray* array) nothrow @nogc
+extern(C) char* joinChars(MsArray* array, MsPanicContext* panic) nothrow @nogc
 {
     import core.stdc.string : memcpy;
 
-    return stringFromBytes(cast(const char*) array.data, array.length);
+    return stringFromBytes(cast(const char*) array.data, array.length, panic);
 }
 
 // Разбор
@@ -155,12 +159,13 @@ extern(C) MsResult!int* toInt(const char* str) nothrow @nogc
     return resultOk!int(negative ? cast(int)(0u - value) : cast(int) value);
 }
 
-extern(C) char* reverse(const char* str) nothrow @nogc
+extern(C) char* reverse(const char* str, MsPanicContext* panic) nothrow @nogc
 {
     import core.stdc.string : strlen, memcpy;
 
     size_t length = strlen(str);
-    char* result = newString(length);
+    char* result = newString(length, panic);
+    if (result is null) return null;
     for (size_t i = 0; i < length; i++)
         result[i] = str[length - 1 - i];
     result[length] = 0;
@@ -169,7 +174,7 @@ extern(C) char* reverse(const char* str) nothrow @nogc
 
 // В строку
 
-extern(C) char* toString_int(const int a) nothrow @nogc
+extern(C) char* toString_int(const int a, MsPanicContext* panic) nothrow @nogc
 {
     import core.stdc.stdio : sprintf;
     import core.stdc.string : strlen, strcpy;
@@ -179,14 +184,15 @@ extern(C) char* toString_int(const int a) nothrow @nogc
 
     size_t len_a = strlen(buffer.ptr);
 
-    char* result = newString(len_a);
+    char* result = newString(len_a, panic);
+    if (result is null) return null;
 
     strcpy(result, buffer.ptr);
 
     return result;
 }
 
-extern(C) char* toString_long(const long a) nothrow @nogc
+extern(C) char* toString_long(const long a, MsPanicContext* panic) nothrow @nogc
 {
     import core.stdc.stdio : sprintf;
     import core.stdc.string : strlen, strcpy;
@@ -196,28 +202,30 @@ extern(C) char* toString_long(const long a) nothrow @nogc
 
     size_t len_a = strlen(buffer.ptr);
 
-    char* result = newString(len_a);
+    char* result = newString(len_a, panic);
+    if (result is null) return null;
 
     strcpy(result, buffer.ptr);
 
     return result;
 }
 
-extern(C) char* toString_bool(const bool a) nothrow @nogc
+extern(C) char* toString_bool(const bool a, MsPanicContext* panic) nothrow @nogc
 {
     import core.stdc.string : strlen, strcpy;
 
     const char* str = a ? "true" : "false";
     size_t len_a = strlen(str);
 
-    char* result = newString(len_a);
+    char* result = newString(len_a, panic);
+    if (result is null) return null;
 
     strcpy(result, str);
 
     return result;
 }
 
-extern(C) char* toString_float(const float a) nothrow @nogc
+extern(C) char* toString_float(const float a, MsPanicContext* panic) nothrow @nogc
 {
     import core.stdc.stdio : snprintf;
     import core.stdc.stdlib : strtof;
@@ -239,14 +247,15 @@ extern(C) char* toString_float(const float a) nothrow @nogc
         buffer[length] = 0;
     }
 
-    char* result = newString(length);
+    char* result = newString(length, panic);
+    if (result is null) return null;
     strcpy(result, buffer.ptr);
     return result;
 }
 
 // Самая короткая запись, которая читается обратно в то же число: 0.1, а не 0.100000 и не 0.10000000000000001.
 // Целое значение пишем с .0, чтобы было видно, что это не i64
-extern(C) char* toString_f64(const double a) nothrow @nogc
+extern(C) char* toString_f64(const double a, MsPanicContext* panic) nothrow @nogc
 {
     import core.stdc.stdio : snprintf;
     import core.stdc.stdlib : strtod;
@@ -268,16 +277,18 @@ extern(C) char* toString_f64(const double a) nothrow @nogc
         buffer[length] = 0;
     }
 
-    char* result = newString(length);
+    char* result = newString(length, panic);
+    if (result is null) return null;
     strcpy(result, buffer.ptr);
     return result;
 }
 
 
-extern(C) char* toString_char(const char c) nothrow @nogc
+extern(C) char* toString_char(const char c, MsPanicContext* panic) nothrow @nogc
 {
-    if (c == 0) ms_panic("strings cannot contain a NUL byte", 0);
-    char* result = newString(1);
+    if (c == 0) { ms_raise("strings cannot contain a NUL byte", 0, panic); return null; }
+    char* result = newString(1, panic);
+    if (result is null) return null;
     result[0] = c;
     result[1] = 0;
     return result;

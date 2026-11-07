@@ -2,7 +2,7 @@ module mono.std.core.rt;
 
 import core.stdc.stdio : fflush, fprintf, snprintf, stderr, stdout;
 import core.stdc.stdlib : exit, getenv;
-import mono.std.core.abi : MsArray;
+import mono.std.core.abi : MsArray, MsPanicContext, stringFromCString;
 import core.sys.posix.unistd : isatty;
 
 extern(C) nothrow @nogc
@@ -30,11 +30,22 @@ extern(C) void ms_panic(const char* message, int line) nothrow @nogc
     exit(PANIC_EXIT_CODE);
 }
 
-extern(C) void ms_panic_index(long index, int length, int line) nothrow @nogc
+// A controlled failure returns normally; callers must check pending before using a value.
+// The message is copied because callers may pass a stack buffer.
+extern(C) void ms_raise(const char* message, int line, MsPanicContext* panic) nothrow @nogc
+{
+    if (panic is null) { ms_panic(message, line); return; }
+    if (panic.pending) return;
+    panic.message = stringFromCString(message);
+    panic.line = line;
+    panic.pending = true;
+}
+
+extern(C) void ms_panic_index(long index, int length, int line, MsPanicContext* panic) nothrow @nogc
 {
     char[64] message;
     snprintf(message.ptr, message.length, "index %lld out of bounds (len %d)", index, length);
-    ms_panic(message.ptr, line);
+    ms_raise(message.ptr, line, panic);
 }
 
 extern(C) int ms_str_len(const char* text) nothrow @nogc
@@ -43,10 +54,10 @@ extern(C) int ms_str_len(const char* text) nothrow @nogc
 }
 
 // Length metadata makes both len(s) and checked s[i] constant time.
-extern(C) const(char)* ms_str_at(const char* text, long index, int line) nothrow @nogc
+extern(C) const(char)* ms_str_at(const char* text, long index, int line, MsPanicContext* panic) nothrow @nogc
 {
     const int length = ms_str_len(text);
-    if (index < 0 || index >= length) ms_panic_index(index, length, line);
+    if (index < 0 || index >= length) { ms_panic_index(index, length, line, panic); return null; }
     return text + index;
 }
 
@@ -63,11 +74,11 @@ extern(C) void ms_array_reserve(MsArray* array, size_t elementSize, int hasRefer
     array.capacity = capacity;
 }
 
-extern(C) void ms_panic_result(const char* error, int line) nothrow @nogc
+extern(C) void ms_panic_result(const char* error, int line, MsPanicContext* panic) nothrow @nogc
 {
     char[512] message;
     snprintf(message.ptr, message.length, "result has no value: %s", error);
-    ms_panic(message.ptr, line);
+    ms_raise(message.ptr, line, panic);
 }
 
 private extern(C) void* ms_out_of_memory(size_t) nothrow @nogc
@@ -211,10 +222,10 @@ extern(C) void* ms_map_new(int keyIsString, int hasReferences) nothrow @nogc
 }
 
 // Адрес значения. Ключа нет: программа останавливается
-extern(C) void* ms_map_get(MsMap* map, ulong key, int line) nothrow @nogc
+extern(C) void* ms_map_get(MsMap* map, ulong key, int line, MsPanicContext* panic) nothrow @nogc
 {
     const int position = findPosition(map, key, hashKey(map, key));
-    if (position < 0) ms_panic("key not found", line);
+    if (position < 0) { ms_raise("key not found", line, panic); return null; }
     return &map.entries[map.index[position]].value;
 }
 
@@ -246,10 +257,10 @@ extern(C) int ms_map_has(MsMap* map, ulong key) nothrow @nogc
     return findPosition(map, key, hashKey(map, key)) >= 0;
 }
 
-extern(C) void ms_map_del(MsMap* map, ulong key, int line) nothrow @nogc
+extern(C) void ms_map_del(MsMap* map, ulong key, int line, MsPanicContext* panic) nothrow @nogc
 {
     const int position = findPosition(map, key, hashKey(map, key));
-    if (position < 0) ms_panic("key not found", line);
+    if (position < 0) { ms_raise("key not found", line, panic); return; }
 
     const int slot = map.index[position];
     // Обнуляем, чтобы сборщик не держал удалённые объекты
@@ -270,9 +281,9 @@ extern(C) int ms_map_version(MsMap* map) nothrow @nogc
 }
 
 // Следующий ключ в порядке вставки. Вернёт 0, когда ключи кончились
-extern(C) int ms_map_next(MsMap* map, int* position, int version_, int line, ulong* key) nothrow @nogc
+extern(C) int ms_map_next(MsMap* map, int* position, int version_, int line, ulong* key, MsPanicContext* panic) nothrow @nogc
 {
-    if (map.version_ != version_) ms_panic("map changed during iteration", line);
+    if (map.version_ != version_) { ms_raise("map changed during iteration", line, panic); return 0; }
 
     while (*position < map.used)
     {

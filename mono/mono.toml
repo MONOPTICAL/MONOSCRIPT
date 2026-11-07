@@ -1,11 +1,13 @@
 [[function]]
 name = "scat"
+panic_context = true
 pure = true
 ret = "string"
 args = ["string", "string"]
 
 [[function]]
 name = "substr"
+panic_context = true
 pure = true
 ret = "string"
 args = ["string", "i32", "i32"]
@@ -30,12 +32,14 @@ args = ["string", "string"]
 
 [[function]]
 name = "split"
+panic_context = true
 pure = true
 ret = "array<string>"
 args = ["string", "string"]
 
 [[function]]
 name = "reverse"
+panic_context = true
 pure = true
 ret = "string"
 args = ["string"]
@@ -48,36 +52,42 @@ args = ["string"]
 
 [[function]]
 name = "toString_int"
+panic_context = true
 pure = true
 ret = "string"
 args = ["i32"]
 
 [[function]]
 name = "toString_char"
+panic_context = true
 pure = true
 ret = "string"
 args = ["char"]
 
 [[function]]
 name = "toString_bool"
+panic_context = true
 pure = true
 ret = "string"
 args = ["i1"]
 
 [[function]]
 name = "toString_float"
+panic_context = true
 pure = true
 ret = "string"
 args = ["float"]
 
 [[function]]
 name = "toString_f64"
+panic_context = true
 pure = true
 ret = "string"
 args = ["f64"]
 
 [[function]]
 name = "toString_long"
+panic_context = true
 pure = true
 ret = "string"
 args = ["i64"]
@@ -90,6 +100,7 @@ args = ["string"]
 
 [[function]]
 name = "joinChars"
+panic_context = true
 pure = true
 ret = "string"
 args = ["array<char>"]
@@ -101,6 +112,7 @@ args = ["string"]
 
 [[function]]
 name = "input"
+panic_context = true
 ret = "string"
 args = []
 

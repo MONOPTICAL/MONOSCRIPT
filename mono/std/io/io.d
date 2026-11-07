@@ -1,7 +1,7 @@
 module mono.std.io.io;
 
 import core.stdc.stdio : FILE, stdin;
-import mono.std.core.abi : GC_malloc_atomic, stringFromBytes;
+import mono.std.core.abi : GC_malloc_atomic, stringFromBytes, MsPanicContext;
 
 extern(C) void echo(const char* str) nothrow
 {
@@ -10,7 +10,7 @@ extern(C) void echo(const char* str) nothrow
     printf("%s\n", str);
 }
 
-char* readline(FILE* file) nothrow @nogc
+char* readline(FILE* file, MsPanicContext* panic) nothrow @nogc
 {
     import core.stdc.stdio : fgetc, ungetc, EOF;
     import core.stdc.string : memcpy;
@@ -42,10 +42,10 @@ char* readline(FILE* file) nothrow @nogc
     }
 
     buffer[length] = 0;
-    return stringFromBytes(buffer, length);
+    return stringFromBytes(buffer, length, panic);
 }
 
-extern(C) char* input() nothrow
+extern(C) char* input(MsPanicContext* panic) nothrow
 {
-    return readline(stdin);
+    return readline(stdin, panic);
 }

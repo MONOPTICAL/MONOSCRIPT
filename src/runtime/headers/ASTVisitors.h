@@ -30,6 +30,7 @@ public:
     void                visit(ReassignMemberNode& node) override;
     void                visit(VariableReassignNode& node) override;
     void                visit(IfNode& node) override;
+    void visit(AttemptNode& node) override;
     void                visit(ForNode& node) override;
     void                visit(WhileNode& node) override;
     void                visit(ReturnNode& node) override;
