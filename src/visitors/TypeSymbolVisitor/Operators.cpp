@@ -5,7 +5,7 @@ static std::string floatTypeOf(const std::string& left, const std::string& right
     return left == "f64" || right == "f64" ? "f64" : "float";
 }
 
-static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSymbolVisitor& visitor)
+std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSymbolVisitor& visitor)
 {
     std::shared_ptr<CallNode> callNode;
     std::shared_ptr<TypeNode> type;

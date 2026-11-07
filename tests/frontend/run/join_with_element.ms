@@ -1,5 +1,5 @@
 // expect-output: a=5
-// expect-output: f=1.500000
+// expect-output: f=1.5
 // expect-output: b=true
 // expect-output: w=5000000000
 // expect-output: 5=l

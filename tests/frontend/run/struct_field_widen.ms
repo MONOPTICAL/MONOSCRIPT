@@ -1,5 +1,5 @@
 // expect-output: 7
-// expect-output: 2.000000
+// expect-output: 2.0
 [struct]T
 |   i64 big = 1
 |   float f = 1

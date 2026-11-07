@@ -1,4 +1,4 @@
-// expect-output: =7.000000
+// expect-output: =7.0
 // expect-output: =300
 // Переменная в параметре float: раньше в регистр уходило целое как есть
 [float]pf(float: x)

@@ -16,9 +16,9 @@ import sys
 import tempfile
 
 LITERAL = {'i1': '1', 'i8': '5', 'i16': '300', 'i32': '70000', 'i64': '5000000000', 'float': '1.5', 'f64': '0.1', 'string': '"s"'}
-TEXT = {'i1': 'true', 'i8': '5', 'i16': '300', 'i32': '70000', 'i64': '5000000000', 'float': '1.500000', 'f64': '0.1', 'string': 's'}
-DOUBLED = {'i8': '10', 'i16': '600', 'i32': '140000', 'i64': '10000000000', 'float': '3.000000', 'f64': '0.2'}
-NEGATED = {'i8': '-5', 'i16': '-300', 'i32': '-70000', 'i64': '-5000000000', 'float': '-1.500000', 'f64': '-0.1'}
+TEXT = {'i1': 'true', 'i8': '5', 'i16': '300', 'i32': '70000', 'i64': '5000000000', 'float': '1.5', 'f64': '0.1', 'string': 's'}
+DOUBLED = {'i8': '10', 'i16': '600', 'i32': '140000', 'i64': '10000000000', 'float': '3.0', 'f64': '0.2'}
+NEGATED = {'i8': '-5', 'i16': '-300', 'i32': '-70000', 'i64': '-5000000000', 'float': '-1.5', 'f64': '-0.1'}
 AS_I32 = {'i1': '1', 'i8': '5', 'i16': '300', 'i32': '70000', 'i64': '705032704', 'float': '1', 'f64': '0'}
 INT_VALUE = {'i1': 1, 'i8': 5, 'i16': 300, 'i32': 70000, 'i64': 5000000000}
 PROGRAM_LINES = ('=', )
@@ -38,7 +38,7 @@ def sources(t):
         'field_array': (f'[struct]S\n|   array<{t}> f = [{value}]\n\n', '|   S s = S()', 's.f[0]'),
         'call': (f'[{t}]g()\n|   return {value}\n\n', '', 'g()'),
     }
-    if t not in ('i1', 'f64'):  # x ^= 1 выводит i1, а x ^= 0.1 выводит float
+    if t not in ('i1', 'float', 'f64'):  # x ^= 1 выводит i1, а x ^= 0.1 выводит f64
         result['inferred'] = ('', f'|   v ^= {value}', 'v')
     return result
 
@@ -59,6 +59,7 @@ def contexts(t, src):
         'to_element': ('', f'|   array<{t}> b = [{value}]\n|   b[0] = {src}\n|   echo("=" + b[0])', f'={text}'),
         'to_map': ('', f'|   map<string,{t}> b = {{}}\n|   b["z"] = {src}\n|   echo("=" + b["z"])', f'={text}'),
         'to_field': (f'[struct]Z\n|   {t} q = {value}\n\n', f'|   Z z = Z()\n|   z.q = {src}\n|   echo("=" + z.q)', f'={text}'),
+        'cstr': ('', f'|   echo(cstr({src}))', text),
         'equal': ('', f'|   if {src} == {src}\n|   |   echo("yes")', 'yes'),
         'not_equal': ('', f'|   if {src} != {src}\n|   |   echo("BAD")\n|   else\n|   |   echo("no")', 'no'),
         'for_element': ('', f'|   array<{t}> b = [{src}, {src}]\n|   for e in b\n|   |   echo("=" + e)', f'={text}'),
@@ -80,8 +81,8 @@ def contexts(t, src):
             result['param_f64'] = ('[f64]pd(f64: x)\n|   return x\n\n', f'|   echo("=" + pd({src}))', '=1.5')
             result['add_f64'] = ('', f'|   f64 d = 0.25\n|   f64 r = {src} + d\n|   echo("=" + r)', '=1.75')
         if t not in ('float', 'f64'):
-            whole = '5000000000' if t == 'i64' else AS_I32[t]
-            result['to_float'] = ('', f'|   float w = {src}\n|   echo("=" + w)', f'={whole}.000000')
+            whole = '5e+09' if t == 'i64' else AS_I32[t] + '.0'
+            result['to_float'] = ('', f'|   float w = {src}\n|   echo("=" + w)', f'={whole}')
             result['cast_i32'] = ('', f'|   echo("=" + ({src})->i32)', f'={AS_I32[t]}')
 
     number = INT_VALUE.get(t)
@@ -96,8 +97,8 @@ def contexts(t, src):
         result['compare_i64'] = ('', f'|   i64 big = 0\n|   if {src} > big\n|   |   echo("yes")', 'yes')
         result['map_key'] = ('', f'|   map<i64,string> b = {{}}\n|   b[{src}] = "v"\n|   echo(b[{number}])', 'v')
         if number < 1000000:  # Дальше float теряет точность и точного ответа нет
-            whole = f'{number}.000000'
-            result['add_float'] = ('', f'|   float f = 0.5\n|   float r = {src} + f\n|   echo("=" + r)', f'={number}.500000')
+            whole = f'{number}.0'
+            result['add_float'] = ('', f'|   float f = 0.5\n|   float r = {src} + f\n|   echo("=" + r)', f'={number}.5')
             result['param_float'] = ('[float]pf(float: x)\n|   return x\n\n', f'|   echo("=" + pf({src}))', f'={whole}')
             result['element_float'] = ('', f'|   array<float> b = [0.5]\n|   b[0] = {src}\n|   echo("=" + b[0])', f'={whole}')
             result['field_float'] = ('[struct]W\n|   float q = 0.5\n\n', f'|   W z = W()\n|   z.q = {src}\n|   echo("=" + z.q)', f'={whole}')

@@ -2,7 +2,7 @@
 // expect-output: =45
 // expect-output: =4000000000
 // expect-output: =3
-// expect-output: =3.500000
+// expect-output: =3.5
 // Операция смотрит на тип после каста
 [i32]main()
 |   float a = 2.5

@@ -474,13 +474,17 @@ void ASTGen::visit(ForNode& node) {
 
     llvm::Type* counterType = context.getLLVMType(node.varType, context.TheContext);
 
-    // Граница считается один раз, до начала цикла
-    range->arguments[0]->accept(*this);
-    llvm::Value* limit = TypeConversions::loadValueIfPointer(context, getResult(), "limit");
-    limit = TypeConversions::convertValueToType(context, limit, counterType, "limit_cast");
+    // Границы считаются один раз, до начала цикла, слева направо. range(n) это range(0, n)
+    auto emitBound = [&](const std::shared_ptr<ASTNode>& bound) {
+        bound->accept(*this);
+        llvm::Value* value = TypeConversions::loadValueIfPointer(context, getResult(), "bound");
+        return TypeConversions::convertValueToType(context, value, counterType, "bound_cast");
+    };
+    llvm::Value* first = range->arguments.size() == 2 ? emitBound(range->arguments[0]) : llvm::ConstantInt::get(counterType, 0);
+    llvm::Value* limit = emitBound(range->arguments.back());
 
     llvm::AllocaInst* counter = context.createEntryAlloca(counterType, node.varName);
-    context.Builder.CreateStore(llvm::ConstantInt::get(counterType, 0), counter);
+    context.Builder.CreateStore(first, counter);
 
     llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
     llvm::BasicBlock* condBlock = llvm::BasicBlock::Create(context.TheContext, "for.cond", function);
@@ -590,6 +594,13 @@ void ASTGen::visit(CallNode& node) {
         node.arguments[0]->accept(*this);
         llvm::Value* collection = TypeConversions::loadValueIfPointer(context, getResult());
         result = Maps::isMap(node.arguments[0]->inferredType) ? Maps::emitLen(context, collection) : context.getArrayLength(collection);
+        return;
+    }
+
+    // cstr от строки это сама строка, от числа семантика заменила вызов на нужный toString_*
+    if (!calleeFunc && node.callee == "cstr") {
+        node.arguments[0]->accept(*this);
+        result = TypeConversions::loadValueIfPointer(context, getResult());
         return;
     }
 
@@ -787,9 +798,9 @@ void ASTGen::visit(NumberNode& node) {
 void ASTGen::visit(FloatNumberNode& node) {
     LogWarning("visit для FloatNumberNode: " + std::to_string(node.value));
     // Литерал сразу становится значением нужного типа: 0.1 в f64 точнее, чем float, расширенный потом
-    const bool isDouble = node.implicitCastTo && node.implicitCastTo->toString() == "f64";
+    const bool isDouble = !(node.implicitCastTo && node.implicitCastTo->toString() == "float");
     if (!isDouble && std::abs(node.value) > std::numeric_limits<float>::max())
-        throw std::runtime_error("Codegen Error: literal does not fit in float, use ->f64");
+        throw std::runtime_error("Codegen Error: literal does not fit in float, use f64");
 
     result = llvm::ConstantFP::get(isDouble ? llvm::Type::getDoubleTy(context.TheContext) : llvm::Type::getFloatTy(context.TheContext), node.value);
 }

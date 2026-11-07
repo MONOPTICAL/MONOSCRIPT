@@ -10,6 +10,6 @@
 |   if a[0] == "7"
 |   |   echo("ok2")
 |   float f = 1.5
-|   if "1.500000" == f
+|   if "1.5" == f
 |   |   echo("ok3")
 |   return 0

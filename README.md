@@ -209,7 +209,7 @@ The return type goes in square brackets, and the parameter type goes before its 
 ### ⚖️ Control Structures
 
 - `if`, `else if`, `else`
-- `for i in range(n)`, `for x in array`, `for key in map`
+- `for i in range(n)`, `for i in range(a, b)`, `for x in array`, `for key in map`
 - `while ...`
 - `break`, `continue`
 

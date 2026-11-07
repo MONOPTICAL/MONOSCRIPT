@@ -1,6 +1,6 @@
 // expect-output: 1
 // expect-output: 7
-// expect-output: 2.000000
+// expect-output: 2.0
 [i32]main()
 |   i32 x = 7
 |   map<string,i64> a = {"k": 1, "v": x}

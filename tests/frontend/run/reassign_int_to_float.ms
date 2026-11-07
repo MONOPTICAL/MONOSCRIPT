@@ -1,5 +1,5 @@
-// expect-output: 5.000000
-// expect-output: 2.000000
+// expect-output: 5.0
+// expect-output: 2.0
 [i32]main()
 |   float f = 1.5
 |   i32 y = 5

@@ -1,5 +1,5 @@
 // expect-output: 0.1
-// expect-output: 0.100000
+// expect-output: 0.1
 // expect-output: 0.10000000149011612
 // Литерал в f64 точный, а float, расширенный в f64, хранит то, что смог
 [i32]main()

@@ -1,6 +1,6 @@
 // expect-output: =2
 // expect-output: =2
-// expect-output: =2.000000
+// expect-output: =2.0
 // expect-output: =2
 // Литералы 1 и 0 это тоже i1
 [i32]main()

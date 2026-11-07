@@ -1,6 +1,6 @@
 // expect-output: =2
 // expect-output: =6
-// expect-output: =1.500000
+// expect-output: =1.5
 [i32]main()
 |   x ^= 1
 |   i32 n = 1

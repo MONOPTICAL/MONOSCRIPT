@@ -1,4 +1,4 @@
-// expect-output: 2.500000
+// expect-output: 2.5
 // expect-output: 5000000000
 // expect-output: true
 [void]f(float: a, i64: b, i1: c)

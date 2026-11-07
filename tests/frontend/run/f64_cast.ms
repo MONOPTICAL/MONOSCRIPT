@@ -1,5 +1,5 @@
 // expect-output: =2
-// expect-output: =0.500000
+// expect-output: =0.5
 // expect-output: =0.5
 // expect-output: =5000000000
 [i32]main()

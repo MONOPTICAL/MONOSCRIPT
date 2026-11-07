@@ -33,9 +33,8 @@ namespace Statements {
             // Переменную загружаем, а ссылка на объект в куче останется как есть
             result = TypeConversions::loadValueIfPointer(context, result, "return_load");
             
-            if(node.expression->implicitCastTo) 
-                result = TypeConversions::convertValueToType(context, result, 
-                         context.Builder.GetInsertBlock()->getParent()->getReturnType(), "return_cast");
+            result = TypeConversions::convertValueToType(context, result, 
+                     context.Builder.GetInsertBlock()->getParent()->getReturnType(), "return_cast");
             
             return context.Builder.CreateRet(result);
         }

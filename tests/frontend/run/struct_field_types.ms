@@ -1,5 +1,5 @@
 // expect-output: 5000000000
-// expect-output: 1.500000
+// expect-output: 1.5
 // expect-output: true
 // expect-output: -3
 // expect-output: 300
