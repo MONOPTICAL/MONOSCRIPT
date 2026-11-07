@@ -48,24 +48,18 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
         right = TypeConversions::applyImplicitCast(context, right, node.right->implicitCastTo, "right");
     }
     
+    // Семантика приводит не всё: элемент массива или вызов могут прийти с другим типом.
+    // Через convertValueToType, чтобы i1 расширялся как 0 или 1
     if (left->getType() != right->getType()) {
         if (left->getType()->isIntegerTy() && right->getType()->isIntegerTy()) {
-            unsigned leftWidth = left->getType()->getIntegerBitWidth();
-            unsigned rightWidth = right->getType()->getIntegerBitWidth();
-            
-            if (leftWidth > rightWidth) {
-                right = context.Builder.CreateIntCast(
-                    right, left->getType(), true, "implicit_cast_right"
-                );
-            } else {
-                left = context.Builder.CreateIntCast(
-                    left, right->getType(), true, "implicit_cast_left"
-                );
-            }
-            
-#if DEBUG
-            std::cerr << "Это нихуя не правильный подход и надо исправлять TypeSymbolVisitor, это временное решение" << std::endl;
-#endif
+            if (left->getType()->getIntegerBitWidth() > right->getType()->getIntegerBitWidth())
+                right = TypeConversions::convertValueToType(context, right, left->getType(), "implicit_cast_right");
+            else
+                left = TypeConversions::convertValueToType(context, left, right->getType(), "implicit_cast_left");
+        } else if (left->getType()->isIntegerTy() && right->getType()->isFloatingPointTy()) {
+            left = TypeConversions::convertValueToType(context, left, right->getType(), "implicit_cast_left");
+        } else if (left->getType()->isFloatingPointTy() && right->getType()->isIntegerTy()) {
+            right = TypeConversions::convertValueToType(context, right, left->getType(), "implicit_cast_right");
         }
     }
 

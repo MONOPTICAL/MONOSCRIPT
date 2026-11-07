@@ -73,7 +73,7 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
                 std::make_shared<CallNode>(call->callee, call->arguments)
             }
         );
-    } else if (std::dynamic_pointer_cast<IdentifierNode>(node)) {
+    } else if (std::dynamic_pointer_cast<IdentifierNode>(node) || std::dynamic_pointer_cast<AccessExpression>(node)) {
         std::string toStringMethod;
         const std::string typeName = type->toString();
 
@@ -114,6 +114,10 @@ void TypeSymbolVisitor::handlePlusOperator(std::shared_ptr<BinaryOpNode>& node, 
     if (left == "string" || right == "string") {
         if (checkLabels("@strict") && !(left == "string" && right == "string"))
             LogError("Implicit type casting is not allowed for '+' in @strict mode: " + left + " and " + right, node->right->shared_from_this());
+
+        // У объекта нет текста: без проверки ссылка ушла бы в scat как строка
+        if ((left != "string" && getTypeRank(left) == 0) || (right != "string" && getTypeRank(right) == 0))
+            LogError("Cannot join string with " + (left == "string" ? right : left), node->right->shared_from_this());
         
         // Операнды внутри выражения приводим друг к другу до превращения в строку
         if (left != "string") {
@@ -363,12 +367,16 @@ void TypeSymbolVisitor::handleCompareOperator(std::shared_ptr<BinaryOpNode>& nod
 
     // string
     if (left == "string" || right == "string") {
+        if ((left != "string" && getTypeRank(left) == 0) || (right != "string" && getTypeRank(right) == 0))
+            LogError("Unsupported operand types for comparison: " + left + " and " + right, node->right->shared_from_this());
+
+        // Число сравнивается со строкой как текст, тем же способом, что и в склейке
         if (left != "string") {
-            node->left = std::make_shared<CallNode>("toString_int", std::vector{node->left});
+            node->left = toStringHandler(node->left, *this);
             node->left->accept(*this);
         }
         if (right != "string") {
-            node->right = std::make_shared<CallNode>("toString_int", std::vector{node->right});
+            node->right = toStringHandler(node->right, *this);
             node->right->accept(*this);
         }
         { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "strcmp_" + cmpOp, node->right); node->implicitCastTo = cast; }

@@ -71,6 +71,9 @@ llvm::Value* TypeConversions::convertValueToType(CodeGenContext& context, llvm::
 
     // Целое в плавающую точку
     if (value->getType()->isIntegerTy() && targetType->isFloatingPointTy()) {
+        // i1 это 0 или 1, со знаком истина превратилась бы в -1
+        if (value->getType()->isIntegerTy(1))
+            return context.Builder.CreateUIToFP(value, targetType, castName + "_i1tofp");
         return context.Builder.CreateSIToFP(value, targetType, castName + "_int2fp");
     } 
     // Плавающая точка в целое
