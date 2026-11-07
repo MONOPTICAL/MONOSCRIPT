@@ -52,6 +52,8 @@ namespace Expressions {
 
 namespace TypeConversions {
     llvm::Value*                    convertValueToType(CodeGenContext& context, llvm::Value* value, llvm::Type* targetType, const std::string& name = "");
+    // char хранится как байт без знака: явный каст в целое расширяет нулями. Вызывается там, где значение появляется
+    llvm::Value*                    applyCharCast(CodeGenContext& context, ASTNode& node, llvm::Value* value);
     llvm::Value*                    applyImplicitCast(CodeGenContext& context, llvm::Value* value, std::shared_ptr<TypeNode> targetTypeNode, const std::string& name = "");
     llvm::Value*                    loadValueIfPointer(CodeGenContext& context, llvm::Value* value, const std::string& name = "");
 }

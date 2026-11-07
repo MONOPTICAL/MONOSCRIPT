@@ -30,6 +30,8 @@ private:
     std::unique_ptr<ErrorEngine>                                    errorEngine;
 
     std::vector<Context>                                            contexts;
+    bool                                                            lastAccessIndexedString = false; // Последнее звено цепочки это s[i]: писать туда нельзя
+    void                                                            checkCharCast(ASTNode& node);
     // final без значения: присвоена точно, присвоена хотя бы на одном пути, и в каком цикле объявлена
     std::set<const ASTNode*>                                        assignedFinals;
     std::set<const ASTNode*>                                        maybeAssignedFinals;

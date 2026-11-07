@@ -1,5 +1,6 @@
 #include "../headers/CodeGenHandlers.h"
 #include "../headers/ASTVisitors.h"
+#include "../../errors/headers/ErrorEngine.h"
 
 namespace Arrays
 {
@@ -90,6 +91,16 @@ namespace Arrays
                 // Только последнее звено записи создаёт ключ: в m[k][0] = x ключ k должен уже быть
                 const bool createKey = forWrite && !next->nextAccess;
                 elementPtr = Maps::emitSlot(context, base, Maps::emitKey(context, next->expression, currentType), createKey, next->line);
+            } else if (link->notation == "[]" && currentType && currentType->toString() == "string") {
+                next->expression->accept(codeGen);
+                llvm::Value* index = TypeConversions::loadValueIfPointer(context, codeGen.getResult());
+                index = TypeConversions::applyImplicitCast(context, index, next->expression->implicitCastTo);
+                llvm::Value* wideIndex = index->getType()->isIntegerTy(1)
+                    ? context.Builder.CreateZExt(index, context.Builder.getInt64Ty(), "index")
+                    : context.Builder.CreateSExt(index, context.Builder.getInt64Ty(), "index");
+                elementPtr = context.Builder.CreateCall(context.getOrDeclareFunction("ms_str_at",
+                    llvm::FunctionType::get(context.Builder.getPtrTy(), {context.Builder.getPtrTy(), context.Builder.getInt64Ty(), context.Builder.getInt32Ty()}, false)),
+                    {base, wideIndex, context.Builder.getInt32(ErrorEngine::getInstance().displayLine(next->line))}, "char_ptr");
             } else if (link->notation == "[]") {
                 next->expression->accept(codeGen);
                 llvm::Value* index = TypeConversions::loadValueIfPointer(context, codeGen.getResult());

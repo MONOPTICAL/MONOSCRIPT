@@ -5,18 +5,6 @@ ret = "string"
 args = ["string", "string"]
 
 [[function]]
-name = "str_len"
-pure = true
-ret = "i32"
-args = ["string"]
-
-[[function]]
-name = "getIndex"
-pure = true
-ret = "string"
-args = ["string", "i32"]
-
-[[function]]
 name = "substr"
 pure = true
 ret = "string"
@@ -45,6 +33,12 @@ name = "toString_int"
 pure = true
 ret = "string"
 args = ["i32"]
+
+[[function]]
+name = "toString_char"
+pure = true
+ret = "string"
+args = ["char"]
 
 [[function]]
 name = "toString_bool"

@@ -163,6 +163,7 @@ static std::string getOperation(const std::string& op, const std::string& type) 
 void TypeSymbolVisitor::castAllNumbersToType(const std::shared_ptr<ASTNode>& node, const std::string& targetType) {
     if (!node) return;
     if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
+        if (num->isCharLiteral) return;
         std::string fromType = num->inferredType ? num->inferredType->toString() : (num->type ? num->type->toString() : "");
         if (fromType != targetType) {
             num->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
@@ -232,6 +233,7 @@ void TypeSymbolVisitor::castAndValidate(const std::shared_ptr<ASTNode>& node, co
         return;
     }
     if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
+        if (num->isCharLiteral) return;
         int64_t value = num->value;
         std::string fromType = num->inferredType ? num->inferredType->toString() : (num->type ? num->type->toString() : "");
         if (!isFloatType(targetType) && !checkIntLimits(targetType, value)) {
@@ -276,6 +278,7 @@ static bool isBooleanOperator(const std::string& op) {
 
 std::string TypeSymbolVisitor::resolveExprType(const std::shared_ptr<ASTNode>& node) {
     if (node->implicitCastTo) return node->implicitCastTo->toString();
+    if (auto number = std::dynamic_pointer_cast<NumberNode>(node); number && number->isCharLiteral) return "char";
     if (std::dynamic_pointer_cast<NumberNode>(node)) return "";
     // Литерал подстраивается под то, куда его присваивают: float x = 0.1 это не сужение
     if (std::dynamic_pointer_cast<FloatNumberNode>(node)) return "float";

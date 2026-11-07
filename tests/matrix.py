@@ -15,8 +15,8 @@ import subprocess
 import sys
 import tempfile
 
-LITERAL = {'i1': '1', 'i8': '5', 'i16': '300', 'i32': '70000', 'i64': '5000000000', 'float': '1.5', 'f64': '0.1', 'string': '"s"'}
-TEXT = {'i1': 'true', 'i8': '5', 'i16': '300', 'i32': '70000', 'i64': '5000000000', 'float': '1.5', 'f64': '0.1', 'string': 's'}
+LITERAL = {'i1': '1', 'i8': '5', 'i16': '300', 'i32': '70000', 'i64': '5000000000', 'float': '1.5', 'f64': '0.1', 'char': "'x'", 'string': '"s"'}
+TEXT = {'i1': 'true', 'i8': '5', 'i16': '300', 'i32': '70000', 'i64': '5000000000', 'float': '1.5', 'f64': '0.1', 'char': 'x', 'string': 's'}
 DOUBLED = {'i8': '10', 'i16': '600', 'i32': '140000', 'i64': '10000000000', 'float': '3.0', 'f64': '0.2'}
 NEGATED = {'i8': '-5', 'i16': '-300', 'i32': '-70000', 'i64': '-5000000000', 'float': '-1.5', 'f64': '-0.1'}
 AS_I32 = {'i1': '1', 'i8': '5', 'i16': '300', 'i32': '70000', 'i64': '705032704', 'float': '1', 'f64': '0'}
@@ -63,10 +63,17 @@ def contexts(t, src):
         'equal': ('', f'|   if {src} == {src}\n|   |   echo("yes")', 'yes'),
         'not_equal': ('', f'|   if {src} != {src}\n|   |   echo("BAD")\n|   else\n|   |   echo("no")', 'no'),
         'for_element': ('', f'|   array<{t}> b = [{src}, {src}]\n|   for e in b\n|   |   echo("=" + e)', f'={text}'),
-        'equal_text': ('', f'|   if {src} == "{text}"\n|   |   echo("yes")', 'yes'),
     }
 
-    if t != 'string':
+    if t != 'char':
+        result['equal_text'] = ('', f'|   if {src} == "{text}"\n|   |   echo("yes")', 'yes')
+
+    if t == 'char':
+        result['cast_int'] = ('', f'|   echo("=" + {src}->i32)', '=120')
+        result['less'] = ('', f'|   if {src} < {src}\n|   |   echo("BAD")\n|   else\n|   |   echo("no")', 'no')
+        result['map_key'] = ('', f'|   map<char,string> b = {{}}\n|   b[{src}] = "v"\n|   echo(b[{src}])', 'v')
+
+    if t not in ('string', 'char'):
         if t not in ('i64', 'float', 'f64'):
             result['to_i64'] = ('', f'|   i64 w = {src}\n|   echo("=" + w)', f'={AS_I32[t]}')
         # f64 хранит всё точнее, чем float: в обратную сторону нужен каст
@@ -103,7 +110,7 @@ def contexts(t, src):
             result['element_float'] = ('', f'|   array<float> b = [0.5]\n|   b[0] = {src}\n|   echo("=" + b[0])', f'={whole}')
             result['field_float'] = ('[struct]W\n|   float q = 0.5\n\n', f'|   W z = W()\n|   z.q = {src}\n|   echo("=" + z.q)', f'={whole}')
 
-    if t != 'string':
+    if t not in ('string', 'char'):
         # Каст сразу после значения и он же внутри выражения
         cast_value = 1 if t == 'float' else 0 if t == 'f64' else INT_VALUE[t] if t != 'i64' else 705032704
         result['cast_then_add'] = ('', f'|   i32 r = ({src}->i32) + 1\n|   echo("=" + r)', f'={cast_value + 1}')

@@ -2,7 +2,8 @@
 
 // Только литералы: они принимают нужный тип сами, каст им не нужен
 static bool isLiteralExpression(const std::shared_ptr<ASTNode>& node) {
-    if (std::dynamic_pointer_cast<NumberNode>(node) || std::dynamic_pointer_cast<FloatNumberNode>(node)) return true;
+    if (auto number = std::dynamic_pointer_cast<NumberNode>(node)) return !number->isCharLiteral;
+    if (std::dynamic_pointer_cast<FloatNumberNode>(node)) return true;
     if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) return isLiteralExpression(unary->operand);
     if (auto binary = std::dynamic_pointer_cast<BinaryOpNode>(node)) return isLiteralExpression(binary->left) && isLiteralExpression(binary->right);
     return false;
@@ -110,6 +111,10 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
 void TypeSymbolVisitor::visit(UnaryOpNode& node) {
     node.operand->accept(*this);
     std::shared_ptr<TypeNode> operandType = node.operand->inferredType;
+
+    // char не число: сначала каст
+    if (operandType && operandType->toString() == "char" && !node.operand->implicitCastTo)
+        LogError("Unsupported operand type for unary operator: char, use ->i32", node.shared_from_this());
 
     // Узел уже обходили и переименовали оператор, второй обход ничего не меняет
     if (node.op == "neg" || node.op == "not" || node.op == "nullcheck")

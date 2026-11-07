@@ -143,6 +143,14 @@ llvm::Value* TypeConversions::convertValueToType(CodeGenContext& context, llvm::
     return value;
 }
 
+llvm::Value* TypeConversions::applyCharCast(CodeGenContext& context, ASTNode& node, llvm::Value* value) {
+    if (!value || !node.inferredType || !node.implicitCastTo || node.inferredType->toString() != "char") return value;
+
+    llvm::Type* target = context.getLLVMType(node.implicitCastTo, context.TheContext);
+    if (!target->isIntegerTy() || target->isIntegerTy(8) || target->isIntegerTy(1)) return value;
+    return context.Builder.CreateZExt(loadValueIfPointer(context, value), target, "char_to_int");
+}
+
 llvm::Value* TypeConversions::applyImplicitCast(CodeGenContext& context, llvm::Value* value, std::shared_ptr<TypeNode> targetTypeNode, const std::string& name) {
     if (!targetTypeNode || !value) {
         return value;

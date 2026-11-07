@@ -4,6 +4,7 @@
 // Заглушки для visit-методов
 
 void TypeSymbolVisitor::visit(AccessExpression& node) {
+    lastAccessIndexedString = false;
     std::shared_ptr<TypeNode> currentType = nullptr;
     std::shared_ptr<StructNode> currentStructDef = nullptr;
     auto currentLink = node.shared_from_this();
@@ -79,6 +80,27 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
                  LogError("Index access '[]' attempted on a static type, not an instance.", accessNode);
                  return;
             }
+
+            // s[i] это один байт строки
+            if (currentType->toString() == "string") {
+                auto indexNode = std::dynamic_pointer_cast<AccessExpression>(accessNode->nextAccess);
+                if (indexNode && indexNode->expression) {
+                    indexNode->expression->accept(*this);
+                    auto indexType = indexNode->expression->implicitCastTo ? indexNode->expression->implicitCastTo
+                                                                           : indexNode->expression->inferredType;
+                    if (!indexType || getTypeRank(indexType->toString()) == 0 || isFloatType(indexType->toString()))
+                        LogError("String index must be an integer, got " + (indexType ? indexType->toString() : std::string("unknown")), indexNode->expression);
+                    if (resolveExprType(indexNode->expression).empty())
+                        castAllNumbersToType(indexNode->expression, "i64");
+                    indexNode->inferredType = registry.findType("char");
+                }
+                currentType = registry.findType("char");
+                currentStructDef = nullptr;
+                lastAccessIndexedString = true;
+                currentLink = accessNode->nextAccess;
+                continue;
+            }
+            lastAccessIndexedString = false;
             auto genericType = std::dynamic_pointer_cast<GenericTypeNode>(currentType);
             if (!genericType || (genericType->baseName != "array" && genericType->baseName != "map")) {
                 LogError("Index access '[]' attempted on non-collection type '" + currentType->toString() + "'.", accessNode);
@@ -126,6 +148,7 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
 
     if (currentType) {
         node.inferredType = currentType;
+        checkCharCast(node);
     } else if (currentStructDef) {
         LogError("Access expression resulted in a type ('" + currentStructDef->name + "'), not a value.", node.shared_from_this());
     }
@@ -184,6 +207,8 @@ void TypeSymbolVisitor::visit(ReassignMemberNode& node) {
     auto targetType = access->inferredType;
     if (!targetType)
         LogError("Could not resolve type of assignment target", node.accessExpression);
+    if (lastAccessIndexedString)
+        LogError("Strings are immutable, build a new string instead", node.accessExpression);
     std::string targetTypeStr = targetType->toString();
 
     if (std::dynamic_pointer_cast<BlockNode>(node.expression)) {

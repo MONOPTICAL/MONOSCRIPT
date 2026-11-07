@@ -43,6 +43,34 @@ void Lexer::tokenize()
                     currentTokenValue += y;
                 continue;
             }
+            else if (isCharNotFinished)
+            {
+                // Как у строк: кавычка экранирована, только если перед ней нечётное число обратных слешей
+                size_t backslashes = 0;
+                while (backslashes < currentTokenValue.size() && currentTokenValue[currentTokenValue.size()-1-backslashes] == '\\')
+                    backslashes++;
+
+                currentTokenValue += y;
+                if (y == '\'' && backslashes % 2 == 0)
+                {
+                    isCharNotFinished = false;
+                    addToken(TokenType::Char, currentTokenValue);
+                    resetValues();
+                }
+                continue;
+            }
+            else if (y == '\'' && currentTokenType != TokenType::String)
+            {
+                if (currentTokenValue != "")
+                {
+                    TokenType keyword = IsKeyword(currentTokenValue);
+                    keyword == TokenType::Identifier ? addToken(currentTokenType, currentTokenValue) : addToken(keyword, currentTokenValue);
+                    resetValues();
+                }
+                currentTokenValue = "'";
+                isCharNotFinished = true;
+                continue;
+            }
 
             TokenType type = IdentifyTokenType(y);
             TokenType keywordCheck;
@@ -237,6 +265,8 @@ void Lexer::tokenize()
             addToken(currentTokenType, currentTokenValue); // Add the token to the current line
             resetValues();
         }
+        if (isCharNotFinished)
+            throw std::runtime_error("Lexer Error: char literal is not closed: " + currentTokenValue);
         if(currentTokenType != TokenType::None)
             if (currentTokenType == TokenType::Identifier)
                 addToken(IsKeyword(currentTokenValue), currentTokenValue); // Add the token to the current line
@@ -352,7 +382,7 @@ TokenType Lexer::IsKeyword(const std::string &value) const
     }; 
 
     std::vector<std::string> builtinTypes = {
-        "i1", "i8", "i16","i32", "i64", "string", "void", "array", "map", "float", "f64", "struct", "func"
+        "i1", "i8", "i16","i32", "i64", "string", "void", "array", "map", "float", "f64", "char", "struct", "func"
     };
 
     std::vector<std::string> labels = {

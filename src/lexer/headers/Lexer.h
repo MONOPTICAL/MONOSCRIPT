@@ -54,6 +54,7 @@ private:
     int currentIndex;
     TokenType currentTokenType;
     std::string currentTokenValue;
+    bool isCharNotFinished = false;
     bool isStringnotFinished = false;
     bool isInMultilineComment = false;
     bool isInMultilineExpression = false;
