@@ -7,6 +7,7 @@
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Intrinsics.h>
 #include <cmath>
+#include <limits>
 #include <string>
 
 // float в целое. Значение, которое не помещается, и NaN для LLVM это неопределённое поведение: получался мусор
@@ -128,6 +129,10 @@ llvm::Value* TypeConversions::convertValueToType(CodeGenContext& context, llvm::
     }
     // Плавающая точка в плавающую точку
     else if (value->getType()->isFloatingPointTy() && targetType->isFloatingPointTy()) {
+        // Литерал, который не помещается в float, это ошибка, а не бесконечность
+        if (auto* literal = llvm::dyn_cast<llvm::ConstantFP>(value); literal && targetType->isFloatTy()
+            && std::abs(literal->getValueAPF().convertToDouble()) > std::numeric_limits<float>::max() && !literal->isInfinity())
+            throw std::runtime_error("Codegen Error: literal does not fit in float, use f64");
         return context.Builder.CreateFPCast(value, targetType, castName + "_fp2fp");
     }
     // Указатель в указатель

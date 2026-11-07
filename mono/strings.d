@@ -70,18 +70,28 @@ extern(C) char* toString_bool(const bool a) nothrow @nogc
 
 extern(C) char* toString_float(const float a) nothrow @nogc
 {
-    import core.stdc.stdio : sprintf;
-    import core.stdc.string : strlen, strcpy;
+    import core.stdc.stdio : snprintf;
+    import core.stdc.stdlib : strtof;
+    import core.stdc.string : strlen, strcpy, strpbrk;
 
-    char[32] buffer;
-    sprintf(buffer.ptr, "%f", a);
+    // Самая короткая запись, которая читается обратно в то же число, как у toString_f64
+    char[40] buffer;
+    foreach (precision; 6 .. 10)
+    {
+        snprintf(buffer.ptr, buffer.length, "%.*g", precision, cast(double) a);
+        if (strtof(buffer.ptr, null) == a) break;
+    }
 
-    size_t len_a = strlen(buffer.ptr);
+    size_t length = strlen(buffer.ptr);
+    if (strpbrk(buffer.ptr, ".eEn") is null)
+    {
+        buffer[length++] = '.';
+        buffer[length++] = '0';
+        buffer[length] = 0;
+    }
 
-    char* result = cast(char*)GC_malloc_atomic(len_a + 1);
-
+    char* result = cast(char*)GC_malloc_atomic(length + 1);
     strcpy(result, buffer.ptr);
-
     return result;
 }
 

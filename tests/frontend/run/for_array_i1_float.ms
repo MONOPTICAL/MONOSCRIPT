@@ -1,6 +1,6 @@
 // expect-output: true
 // expect-output: false
-// expect-output: 1.500000
+// expect-output: 1.5
 [i32]main()
 |   array<i1> a = [1,0]
 |   for b in a

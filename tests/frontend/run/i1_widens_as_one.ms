@@ -1,4 +1,4 @@
-// expect-output: =1.000000
+// expect-output: =1.0
 // expect-output: =2
 // expect-output: yes
 // expect-output: =1

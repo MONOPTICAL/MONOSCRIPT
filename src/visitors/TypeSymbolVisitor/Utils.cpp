@@ -172,7 +172,7 @@ void TypeSymbolVisitor::castAllNumbersToType(const std::shared_ptr<ASTNode>& nod
     }
     // Литерал 0.1 должен стать точным значением нужного типа, а не float, расширенным потом
     if (auto number = std::dynamic_pointer_cast<FloatNumberNode>(node)) {
-        if (targetType == "f64") number->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
+        if (isFloatType(targetType)) number->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
         return;
     }
     if (auto ident = std::dynamic_pointer_cast<IdentifierNode>(node)) {
@@ -228,7 +228,7 @@ static bool checkIntLimits(const std::string& type, int64_t value) {
 void TypeSymbolVisitor::castAndValidate(const std::shared_ptr<ASTNode>& node, const std::string& targetType, TypeSymbolVisitor* visitor) {
     if (!node) return;
     if (auto number = std::dynamic_pointer_cast<FloatNumberNode>(node)) {
-        if (targetType == "f64") number->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
+        if (isFloatType(targetType)) number->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
         return;
     }
     if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
@@ -277,6 +277,8 @@ static bool isBooleanOperator(const std::string& op) {
 std::string TypeSymbolVisitor::resolveExprType(const std::shared_ptr<ASTNode>& node) {
     if (node->implicitCastTo) return node->implicitCastTo->toString();
     if (std::dynamic_pointer_cast<NumberNode>(node)) return "";
+    // Литерал подстраивается под то, куда его присваивают: float x = 0.1 это не сужение
+    if (std::dynamic_pointer_cast<FloatNumberNode>(node)) return "float";
 
     if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
         if (isBooleanOperator(bin->op)) return "i1";

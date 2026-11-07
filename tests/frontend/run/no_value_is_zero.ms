@@ -1,5 +1,5 @@
 // expect-output: =0
-// expect-output: =0.000000
+// expect-output: =0.0
 // expect-output: =!
 // expect-output: =false
 // expect-output: =0

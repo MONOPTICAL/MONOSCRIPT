@@ -1,6 +1,8 @@
 #include <algorithm>
 #include "../headers/TypeSymbolVisitor.h"
 #include "../../CLI/headers/ui.h"
+
+std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSymbolVisitor& visitor);
 #include "../../includes/ASTDebugger.hpp"
 #include <string_view>
 #include <filesystem>
@@ -217,6 +219,10 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
     if(std::find(labels.begin(), labels.end(), "@entry") != labels.end() || node.name == "main")
         if(node.returnType->toString() != "i32" && node.returnType->toString() != "void")
             LogError("Function " + node.name + " must return i32 or void");
+
+    // Аргументов программы пока нет: параметры пришлось бы заполнять нулями, а пустая ссылка это падение
+    if((std::find(labels.begin(), labels.end(), "@entry") != labels.end() || node.name == "main") && !node.parameters.empty())
+        LogError("Entry function " + node.name + " cannot have parameters yet", node.shared_from_this());
 
     // Если не вывилась ошибка, добавляем функцию в реестр
     Context currentFunction = {
@@ -612,20 +618,24 @@ void TypeSymbolVisitor::visit(ForNode& node) {
     // range это конструкция языка, а не функция: for i in range(n)
     auto range = std::dynamic_pointer_cast<CallNode>(node.iterable);
     if (range && range->callee == "range") {
-        if (range->arguments.size() != 1) {
-            LogError("range expects 1 argument, got " + std::to_string(range->arguments.size()), node.iterable);
-        }
-
-        auto limit = range->arguments[0];
-        limit->accept(*this);
-        auto limitType = limit->implicitCastTo ? limit->implicitCastTo : limit->inferredType;
-        if (!limitType || getTypeRank(limitType->toString()) == 0 || isFloatType(limitType->toString())) {
-            LogError("range expects an integer, got " + (limitType ? limitType->toString() : std::string("unknown")), limit);
+        if (range->arguments.empty() || range->arguments.size() > 2) {
+            LogError("range expects 1 or 2 arguments, got " + std::to_string(range->arguments.size()), node.iterable);
         }
 
         // Счётчик i32, если значение не требует i64
-        const std::string counterType = limitType->toString() == "i64" ? "i64" : "i32";
-        checkConversion(limit, counterType);
+        std::shared_ptr<TypeNode> limitType;
+        std::string counterType = "i32";
+        for (const auto& bound : range->arguments) {
+            bound->accept(*this);
+            limitType = bound->implicitCastTo ? bound->implicitCastTo : bound->inferredType;
+            if (!limitType || getTypeRank(limitType->toString()) == 0 || isFloatType(limitType->toString())) {
+                LogError("range expects an integer, got " + (limitType ? limitType->toString() : std::string("unknown")), bound);
+            }
+            if (limitType->toString() == "i64") counterType = "i64";
+        }
+        for (const auto& bound : range->arguments) {
+            checkConversion(bound, counterType);
+        }
         node.varType = registry.findType(counterType);
         node.iterable->inferredType = limitType;
     }
@@ -787,6 +797,31 @@ void TypeSymbolVisitor::visit(CallNode& node) {
             LogError("len expects an array or map, got " + argTypes[0]->toString(), node.arguments[0]);
         }
         node.inferredType = registry.findType("i32");
+        return;
+    }
+
+    // cstr(x): значение в строку, тем же способом, что и в склейке "x=" + n. Функция с таким же именем важнее
+    if (node.callee == "cstr"
+        && contexts.back().functions.find(node.callee) == contexts.back().functions.end()
+        && declaredFunctions.find(node.callee) == declaredFunctions.end()) {
+        if (node.arguments.size() != 1) {
+            LogError("cstr expects 1 argument, got " + std::to_string(node.arguments.size()), node.shared_from_this());
+        }
+        const std::string argumentType = argTypes[0] ? argTypes[0]->toString() : "a literal";
+        if (argumentType == "string") {
+            node.inferredType = registry.findType("string");
+            return;
+        }
+        if (getTypeRank(argumentType) == 0) {
+            LogError("cstr expects a number or string, got " + argumentType, node.arguments[0]);
+        }
+        if (std::dynamic_pointer_cast<BinaryOpNode>(node.arguments[0]) || std::dynamic_pointer_cast<UnaryOpNode>(node.arguments[0])) {
+            castNumbersInBinaryTree(node.arguments[0], "auto");
+        }
+        auto converted = std::dynamic_pointer_cast<CallNode>(toStringHandler(node.arguments[0], *this));
+        node.callee = converted->callee;
+        node.arguments = converted->arguments;
+        visit(node);
         return;
     }
 

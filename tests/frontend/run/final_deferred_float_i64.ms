@@ -1,4 +1,4 @@
-// expect-output: 1.500000
+// expect-output: 1.5
 // expect-output: 5000000000
 [i32]main()
 |   final float f

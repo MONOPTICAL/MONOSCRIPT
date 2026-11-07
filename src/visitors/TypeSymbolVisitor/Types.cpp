@@ -68,7 +68,7 @@ void TypeSymbolVisitor::visit(NumberNode& node)
 
 void TypeSymbolVisitor::visit(FloatNumberNode& node)
 {
-    node.inferredType = registry.findType("float");
+    node.inferredType = registry.findType("f64"); // Без указания типа самый точный, x ^= 0.1 это f64
 }
 
 void TypeSymbolVisitor::visit(StringNode& node)

@@ -16,6 +16,15 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
     std::shared_ptr<TypeNode> leftType = node.left->implicitCastTo ? node.left->implicitCastTo : node.left->inferredType;
     std::shared_ptr<TypeNode> rightType = node.right->implicitCastTo ? node.right->implicitCastTo : node.right->inferredType;
     
+    // Литерал рядом с float становится float: иначе f == 0.1 сравнивало бы f с более точным 0.1 и было бы ложью
+    if (rightType && rightType->toString() == "float" && isLiteralExpression(node.left) && !isLiteralExpression(node.right)) {
+        castAllNumbersToType(node.left, "float");
+        leftType = rightType;
+    } else if (leftType && leftType->toString() == "float" && isLiteralExpression(node.right) && !isLiteralExpression(node.left)) {
+        castAllNumbersToType(node.right, "float");
+        rightType = leftType;
+    }
+
     // @strict обещает, что неявных приведений нет: разные числовые типы в одной операции требуют каста
     if (checkLabels("@strict") && leftType && rightType && leftType->toString() != rightType->toString()
         && getTypeRank(leftType->toString()) > 0 && getTypeRank(rightType->toString()) > 0

@@ -74,6 +74,8 @@ static const std::vector<std::vector<std::string>> TIPS = {
     {"An index out of bounds stops the program with its line number and exit code 101."},
     {"has(m, k) checks a map key. Reading a missing key stops the program."},
     {"for k in m walks map keys in insertion order."},
+    {"range(n) counts from 0, range(a, b) counts from a. The end is never included."},
+    {"cstr(x) turns a number into a string, the same way \"x=\" + n does."},
     {"Narrowing always needs a cast: i8 small = big->i8"},
     {"f64 holds about 15 digits, float about 7. Keep timestamps and totals in f64 or i64."},
     {"Blocks start with |, so nesting stays visible instead of hiding in whitespace."},

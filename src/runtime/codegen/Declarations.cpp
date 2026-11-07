@@ -47,12 +47,8 @@ namespace Declarations
         }
 
         value = TypeConversions::loadValueIfPointer(context, value);
-        if(node.expression->implicitCastTo)
-        {
-            // Приведение типов
-            value = TypeConversions::convertValueToType(context, value, varType);
-            valueType = value->getType();
-        }
+        // Значение всегда приводим к типу переменной: иначе в ячейку запишется не столько байт, сколько в ней есть
+        value = TypeConversions::convertValueToType(context, value, varType);
 
         // Создаем переменную в таблице символов
         llvm::AllocaInst* alloca = context.createEntryAlloca(varType, node.name);
