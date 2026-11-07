@@ -244,6 +244,28 @@ A function can work with any type. The types are worked out from the arguments, 
 |   return 0
 ```
 
+### 🔁 Passing Functions
+
+A function can be passed by name to a parameter of type `func`. Together with generic functions this is enough to write `filter`, `map` or `sort` in the language itself:
+
+```go
+[array<T>]filter<T>(array<T>: items, func: keep(T: x) -> i1)
+|   array<T> out = []
+|   for x in items
+|   |   if keep(x)
+|   |   |   push(out, x)
+|   return out
+
+[i1]isEven(i32: x)
+|   return x % 2 == 0
+
+[i32]main()
+|   array<i32> even = filter([1, 2, 3, 4], isEven)
+|   return len(even)
+```
+
+A function can only be passed as an argument, not stored in a variable. `push(a, x)` and `pop(a)` grow and shrink an array.
+
 ### 🧰 Structs
 
 ```go
