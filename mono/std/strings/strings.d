@@ -1,7 +1,7 @@
 module mono.std.strings.strings;
 
 import mono.std.core.abi : MsArray, newArray;
-import mono.std.core.rt : ms_panic, ms_panic_index;
+import mono.std.core.rt : ms_panic;
 
 import mono.std.core.abi : GC_malloc_atomic;
 
@@ -17,26 +17,6 @@ extern(C) char* scat(const char* a, const char* b) nothrow @nogc
     strcpy(result, a);
     strcat(result, b);
 
-    return result;
-}
-
-// Настоящий strlen из libc не перекрываем: символ из этой библиотеки попал бы во все вызовы в процессе
-extern(C) int str_len(const char* str) nothrow @nogc
-{
-    import core.stdc.string : strlen;
-    return cast(int) strlen(str);
-}
-
-extern(C) char* getIndex(const char* str, int index) nothrow @nogc
-{
-    import core.stdc.string : strlen;
-
-    const int length = cast(int) strlen(str);
-    if (index < 0 || index >= length) ms_panic_index(index, length, 0);
-
-    char* result = cast(char*) GC_malloc_atomic(2);
-    result[0] = str[index];
-    result[1] = 0;
     return result;
 }
 
@@ -199,5 +179,14 @@ extern(C) char* toString_f64(const double a) nothrow @nogc
 
     char* result = cast(char*)GC_malloc_atomic(length + 1);
     strcpy(result, buffer.ptr);
+    return result;
+}
+
+
+extern(C) char* toString_char(const char c) nothrow @nogc
+{
+    char* result = cast(char*) GC_malloc_atomic(2);
+    result[0] = c;
+    result[1] = 0;
     return result;
 }

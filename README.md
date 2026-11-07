@@ -134,7 +134,8 @@ use
 - `i8`, `i16`, `i32`, `i64` — signed integers
 - `float` — 32-bit floating-point numbers
 - `f64` — 64-bit floating-point numbers
-- `string` — text values
+- `string` — text values, immutable, bytes in UTF-8
+- `char` — one byte: `'a'`, `'\\n'`. `s[i]`, `for c in s` and `len(s)` work in bytes
 - `void` — absence of value (used for functions)
 
 ### 📦 Containers and Structs

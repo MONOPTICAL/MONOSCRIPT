@@ -461,10 +461,58 @@ static void emitArrayFor(CodeGenContext& context, ASTGen& codeGen, ForNode& node
     context.popLoopContext();
 }
 
+// for c in s: строка не меняется, поэтому просто идём по байтам до нуля
+static void emitStringFor(CodeGenContext& context, ASTGen& codeGen, ForNode& node) {
+    llvm::Type* i8Type = context.Builder.getInt8Ty();
+    llvm::Type* ptrType = context.Builder.getPtrTy();
+
+    node.iterable->accept(codeGen);
+    llvm::Value* text = TypeConversions::loadValueIfPointer(context, codeGen.getResult(), "for.string");
+
+    llvm::AllocaInst* cursor = context.createEntryAlloca(ptrType, "for.cursor");
+    llvm::AllocaInst* element = context.createEntryAlloca(i8Type, node.varName);
+    context.Builder.CreateStore(text, cursor);
+
+    llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
+    llvm::BasicBlock* condBlock = llvm::BasicBlock::Create(context.TheContext, "for.cond", function);
+    llvm::BasicBlock* bodyBlock = llvm::BasicBlock::Create(context.TheContext, "for.body", function);
+    llvm::BasicBlock* stepBlock = llvm::BasicBlock::Create(context.TheContext, "for.step", function);
+    llvm::BasicBlock* endBlock = llvm::BasicBlock::Create(context.TheContext, "for.end", function);
+
+    context.pushLoopContext(stepBlock, endBlock);
+    context.Builder.CreateBr(condBlock);
+
+    context.Builder.SetInsertPoint(condBlock);
+    llvm::Value* current = context.Builder.CreateLoad(ptrType, cursor, "for.current");
+    llvm::Value* byte = context.Builder.CreateLoad(i8Type, current, "for.byte");
+    context.Builder.CreateCondBr(context.Builder.CreateICmpNE(byte, context.Builder.getInt8(0)), bodyBlock, endBlock);
+
+    auto outerNamedValues = context.NamedValues;
+    context.NamedValues[node.varName] = element;
+
+    context.Builder.SetInsertPoint(bodyBlock);
+    context.Builder.CreateStore(byte, element);
+    node.body->accept(codeGen);
+    if (!context.Builder.GetInsertBlock()->getTerminator())
+        context.Builder.CreateBr(stepBlock);
+
+    context.NamedValues = outerNamedValues;
+
+    context.Builder.SetInsertPoint(stepBlock);
+    llvm::Value* step = context.Builder.CreateLoad(ptrType, cursor, "for.step.current");
+    context.Builder.CreateStore(context.Builder.CreateConstGEP1_64(i8Type, step, 1, "for.next"), cursor);
+    context.Builder.CreateBr(condBlock);
+
+    context.Builder.SetInsertPoint(endBlock);
+    context.popLoopContext();
+}
+
 void ASTGen::visit(ForNode& node) {
     auto range = std::dynamic_pointer_cast<CallNode>(node.iterable);
     if (!range || range->callee != "range") {
-        if (Maps::isMap(node.iterable->inferredType))
+        if (node.iterable->inferredType && node.iterable->inferredType->toString() == "string")
+            emitStringFor(context, *this, node);
+        else if (Maps::isMap(node.iterable->inferredType))
             Maps::emitFor(context, *this, node);
         else
             emitArrayFor(context, *this, node);
@@ -593,7 +641,13 @@ void ASTGen::visit(CallNode& node) {
     if (!calleeFunc && node.callee == "len") {
         node.arguments[0]->accept(*this);
         llvm::Value* collection = TypeConversions::loadValueIfPointer(context, getResult());
-        result = Maps::isMap(node.arguments[0]->inferredType) ? Maps::emitLen(context, collection) : context.getArrayLength(collection);
+        auto lengthType = node.arguments[0]->inferredType;
+        if (lengthType && lengthType->toString() == "string") {
+            result = context.Builder.CreateCall(context.getOrDeclareFunction("ms_str_len",
+                llvm::FunctionType::get(context.Builder.getInt32Ty(), {context.Builder.getPtrTy()}, false)), {collection}, "string_len");
+        } else {
+            result = Maps::isMap(lengthType) ? Maps::emitLen(context, collection) : context.getArrayLength(collection);
+        }
         return;
     }
 
@@ -683,7 +737,7 @@ void ASTGen::visit(CallNode& node) {
     if (retType->isVoidTy()) {
         result = context.Builder.CreateCall(calleeFunc, argsV);
     } else {
-        result = context.Builder.CreateCall(calleeFunc, argsV, "calltmp");
+        result = TypeConversions::applyCharCast(context, node, context.Builder.CreateCall(calleeFunc, argsV, "calltmp"));
     }
 }
 
@@ -753,7 +807,7 @@ void ASTGen::visit(IdentifierNode& node) {
 
     // Базовая заглушка: ищем переменную в таблице символов
     if (context.NamedValues.find(node.name) != context.NamedValues.end()) {
-        result = context.NamedValues[node.name];
+        result = TypeConversions::applyCharCast(context, node, context.NamedValues[node.name]);
         LogWarning("Найдена переменная " + node.name);
         return;
     }
@@ -854,7 +908,7 @@ void ASTGen::visit(ContinueNode& node) {
 void ASTGen::visit(AccessExpression& node) {
     llvm::Type* elementType = nullptr;
     llvm::Value* elementPtr = Arrays::emitElementPtr(context, node, elementType);
-    result = context.Builder.CreateLoad(elementType, elementPtr, "element");
+    result = TypeConversions::applyCharCast(context, node, context.Builder.CreateLoad(elementType, elementPtr, "element"));
 }
 
 void ASTGen::visit(ImportNode &node)

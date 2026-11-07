@@ -16,7 +16,16 @@ std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSym
         type = node->inferredType;
 
     if (auto numberNode = std::dynamic_pointer_cast<NumberNode>(node)) {
-        if(numberNode->isBoolLiteral)
+        // Важен тип после каста: 65->char печатается как A, а 'a'->i32 как 97
+        if(type->toString() == "char")
+        {
+            auto charType = std::make_shared<SimpleTypeNode>("char");
+            auto literal = std::make_shared<NumberNode>(numberNode->value, charType);
+            literal->isCharLiteral = true;
+            literal->inferredType = charType;
+            callNode = std::make_shared<CallNode>("toString_char", std::vector<std::shared_ptr<ASTNode>>{literal});
+        }
+        else if(numberNode->isBoolLiteral)
             callNode = std::make_shared<CallNode>(
                 "toString_bool",
                 std::vector<std::shared_ptr<ASTNode>>{
@@ -64,7 +73,9 @@ std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSym
     } else if (auto call = std::dynamic_pointer_cast<CallNode>(node)) {
         std::string toStringMethod;
 
-        if (type->toString() == "float")
+        if (type->toString() == "char")
+            toStringMethod = "toString_char";
+        else if (type->toString() == "float")
             toStringMethod = "toString_float";
         else if (type->toString() == "f64")
             toStringMethod = "toString_f64";
@@ -85,7 +96,9 @@ std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSym
         std::string toStringMethod;
         const std::string typeName = type->toString();
 
-        if (typeName == "float")
+        if (typeName == "char")
+            toStringMethod = "toString_char";
+        else if (typeName == "float")
             toStringMethod = "toString_float";
         else if (typeName == "f64")
             toStringMethod = "toString_f64";
@@ -150,7 +163,7 @@ void TypeSymbolVisitor::handlePlusOperator(std::shared_ptr<BinaryOpNode>& node, 
             LogError("Implicit type casting is not allowed for '+' in @strict mode: " + left + " and " + right, node->right->shared_from_this());
 
         // У объекта нет текста: без проверки ссылка ушла бы в scat как строка
-        if ((left != "string" && getTypeRank(left) == 0) || (right != "string" && getTypeRank(right) == 0))
+        if ((left != "string" && left != "char" && getTypeRank(left) == 0) || (right != "string" && right != "char" && getTypeRank(right) == 0))
             LogError("Cannot join string with " + (left == "string" ? right : left), node->right->shared_from_this());
         
         // Операнды внутри выражения приводим друг к другу до превращения в строку
@@ -396,6 +409,16 @@ void TypeSymbolVisitor::handleCompareOperator(std::shared_ptr<BinaryOpNode>& nod
 
     if (cmpOp.empty()) {
         LogError("Unknown comparison operator: " + node->op, node->right->shared_from_this());
+        return;
+    }
+
+    // char сравнивается как байт без знака, поэтому через i32
+    if (left == "char" && right == "char") {
+        auto i32Type = registry.findType("i32");
+        node->left->implicitCastTo = i32Type;
+        node->right->implicitCastTo = i32Type;
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "icmp_" + cmpOp, node->right); node->implicitCastTo = cast; }
+        node->inferredType = registry.findType("i1");
         return;
     }
 

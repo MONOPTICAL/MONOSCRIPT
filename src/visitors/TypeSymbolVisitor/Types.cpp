@@ -28,8 +28,8 @@ void TypeSymbolVisitor::visit(GenericTypeNode &node)
     // Ключ map сравнивается на равенство: у float мешает точность, а у объектов равенства нет
     if (node.baseName == "map" && !node.typeParameters.empty()) {
         const std::string keyType = node.typeParameters[0]->toString();
-        if (keyType != "string" && (getTypeRank(keyType) == 0 || isFloatType(keyType)))
-            LogError("Map key must be an integer or string, got " + keyType);
+        if (keyType != "string" && keyType != "char" && (getTypeRank(keyType) == 0 || isFloatType(keyType)))
+            LogError("Map key must be an integer, char or string, got " + keyType);
     }
 
     node.inferredType = baseType;
@@ -59,16 +59,32 @@ void TypeSymbolVisitor::visit(IdentifierNode& node)
         node.inferredType = varAssign->implicitCastTo;
     }
     node.inferredType = result;
+    checkCharCast(node);
+}
+
+// char не число: неявно не приводится, а явно только в целое и из целого
+void TypeSymbolVisitor::checkCharCast(ASTNode& node)
+{
+    if (!node.inferredType || !node.implicitCastTo) return;
+    const std::string from = node.inferredType->toString(), to = node.implicitCastTo->toString();
+    if (from == to) return;
+
+    const bool integerFrom = getTypeRank(from) > 0 && !isFloatType(from);
+    const bool integerTo = getTypeRank(to) > 0 && !isFloatType(to);
+    if ((to == "char" && !integerFrom) || (from == "char" && !integerTo))
+        LogError("Cannot cast " + from + " to " + to, node.shared_from_this());
 }
 
 void TypeSymbolVisitor::visit(NumberNode& node)
 {
     node.inferredType = registry.findType(node.type->toString()); // Тут пока что i32 потом разделим на i8, i32, i64
+    checkCharCast(node);
 }
 
 void TypeSymbolVisitor::visit(FloatNumberNode& node)
 {
     node.inferredType = registry.findType("f64"); // Без указания типа самый точный, x ^= 0.1 это f64
+    checkCharCast(node);
 }
 
 void TypeSymbolVisitor::visit(StringNode& node)

@@ -1,4 +1,4 @@
-// expect-error: cstr expects a number or string, got P
+// expect-error: cstr expects a number, char or string, got P
 [struct]P
 |   i32 a = 1
 

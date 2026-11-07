@@ -361,6 +361,38 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
             return ASTnode; // Возвращаем узел числа с плавающей точкой
         }
     }
+    else if (currentToken.type == TokenType::Char) // Литерал 'a': один байт
+    {
+        advance();
+        std::string text = currentToken.value.substr(1, currentToken.value.size() - 2);
+        int code = -1;
+        if (text.size() == 1 && text[0] != '\\') {
+            code = static_cast<unsigned char>(text[0]);
+        } else if (text.size() == 2 && text[0] == '\\') {
+            switch (text[1]) {
+                case 'n': code = '\n'; break;
+                case 't': code = '\t'; break;
+                case 'r': code = '\r'; break;
+                case 'f': code = '\f'; break;
+                case 'b': code = '\b'; break;
+                case '0': code = 0; break;
+                case '\'': code = '\''; break;
+                case '"': code = '"'; break;
+                case '\\': code = '\\'; break;
+                default: throwError("Unknown escape in char literal: " + text);
+            }
+        } else if (text.empty()) {
+            throwError("Empty char literal");
+        } else {
+            throwError("A char is one byte, this does not fit: '" + text + "'. Use a string");
+        }
+
+        auto ASTnode = std::make_shared<NumberNode>(code, std::make_shared<SimpleTypeNode>("char"));
+        ASTnode->isCharLiteral = true;
+        ASTnode->line = lineIndex; ASTnode->column = tokenIndex;
+        if(check(TokenType::Arrow)) return parseCast(ASTnode);
+        return ASTnode;
+    }
     else if (currentToken.type == TokenType::String) // Если токен - строка
     {
         advance(); // Переходим к следующему токену

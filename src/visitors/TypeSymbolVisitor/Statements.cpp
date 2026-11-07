@@ -643,11 +643,15 @@ void TypeSymbolVisitor::visit(ForNode& node) {
         // Проверяем тип переменной
         node.iterable->accept(*this);
         auto collection = std::dynamic_pointer_cast<GenericTypeNode>(node.iterable->inferredType);
-        if (!collection || (collection->baseName != "array" && collection->baseName != "map")) {
-            LogError("for expects an array, map or range(n), got " + (node.iterable->inferredType ? node.iterable->inferredType->toString() : std::string("unknown")), node.iterable);
-        }
+        if (node.iterable->inferredType && node.iterable->inferredType->toString() == "string") {
+            node.varType = registry.findType("char"); // for c in s: по байтам строки
+        } else {
+            if (!collection || (collection->baseName != "array" && collection->baseName != "map")) {
+                LogError("for expects an array, map, string or range(n), got " + (node.iterable->inferredType ? node.iterable->inferredType->toString() : std::string("unknown")), node.iterable);
+            }
 
-        node.varType = collection->typeParameters[0]; // Переменная цикла это элемент массива
+            node.varType = collection->typeParameters[0]; // Переменная цикла это элемент массива
+        }
     }
 
     // Создаем новый контекст для блока for
@@ -793,8 +797,8 @@ void TypeSymbolVisitor::visit(CallNode& node) {
         if (!argTypes[0]) {
             LogError("len cannot take a collection literal, assign it to a variable first", node.arguments[0]);
         }
-        if (!argTypes[0]->toString().starts_with("array") && !argTypes[0]->toString().starts_with("map")) {
-            LogError("len expects an array or map, got " + argTypes[0]->toString(), node.arguments[0]);
+        if (!argTypes[0]->toString().starts_with("array") && !argTypes[0]->toString().starts_with("map") && argTypes[0]->toString() != "string") {
+            LogError("len expects an array, map or string, got " + argTypes[0]->toString(), node.arguments[0]);
         }
         node.inferredType = registry.findType("i32");
         return;
@@ -812,8 +816,8 @@ void TypeSymbolVisitor::visit(CallNode& node) {
             node.inferredType = registry.findType("string");
             return;
         }
-        if (getTypeRank(argumentType) == 0) {
-            LogError("cstr expects a number or string, got " + argumentType, node.arguments[0]);
+        if (getTypeRank(argumentType) == 0 && argumentType != "char") {
+            LogError("cstr expects a number, char or string, got " + argumentType, node.arguments[0]);
         }
         if (std::dynamic_pointer_cast<BinaryOpNode>(node.arguments[0]) || std::dynamic_pointer_cast<UnaryOpNode>(node.arguments[0])) {
             castNumbersInBinaryTree(node.arguments[0], "auto");

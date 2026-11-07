@@ -1,4 +1,4 @@
-// expect-error: Map key must be an integer or string, got P
+// expect-error: Map key must be an integer, char or string, got P
 [struct]P
 |   i32 a = 1
 

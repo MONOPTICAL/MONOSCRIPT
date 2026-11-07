@@ -36,6 +36,21 @@ extern(C) void ms_panic_index(long index, int length, int line) nothrow @nogc
     ms_panic(message.ptr, line);
 }
 
+extern(C) int ms_str_len(const char* text) nothrow @nogc
+{
+    import core.stdc.string : strlen;
+    return cast(int) strlen(text);
+}
+
+// Адрес байта строки. Длина нигде не хранится, поэтому проверка границ идёт до этого индекса
+extern(C) const(char)* ms_str_at(const char* text, long index, int line) nothrow @nogc
+{
+    if (index < 0) ms_panic_index(index, ms_str_len(text), line);
+    for (long i = 0; i <= index; i++)
+        if (text[i] == 0) ms_panic_index(index, cast(int) i, line);
+    return text + index;
+}
+
 private extern(C) void* ms_out_of_memory(size_t) nothrow @nogc
 {
     ms_panic("out of memory", 0);

@@ -341,6 +341,7 @@ class NumberNode : public ASTNode {
         int64_t value;
         std::shared_ptr<TypeNode> type; // тип числа (i32, i64, i8, i1)
         bool isBoolLiteral = false; // написано true или false, а не 0 или 1
+        bool isCharLiteral = false; // написано 'a': это char, а не число, под другой тип не подстраивается
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);
