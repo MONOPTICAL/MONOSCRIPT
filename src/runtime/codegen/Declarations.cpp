@@ -2,9 +2,32 @@
 #include "../headers/ASTVisitors.h"
 namespace Declarations 
 {
+    // Значение объявления без значения: ноль, пустая строка. Объект получит значение до чтения, это проверила семантика
+    static llvm::Value* emitDefaultValue(CodeGenContext& context, VariableAssignNode& node, llvm::Type* varType)
+    {
+        auto declared = node.inferredType ? node.inferredType : node.type;
+        if (declared && declared->toString() == "string")
+            return context.Builder.CreateGlobalString("", "empty_string");
+        return llvm::Constant::getNullValue(varType);
+    }
+
+    static bool hasNoValue(const VariableAssignNode& node)
+    {
+        auto none = std::dynamic_pointer_cast<NoneNode>(node.expression);
+        return none && !none->isEmptyLiteral;
+    }
+
     llvm::Value* handleSimpleAssignment(CodeGenContext& context, VariableAssignNode& node, llvm::Type* varType)
     {
         ASTGen codeGen(context);
+
+        if (hasNoValue(node)) {
+            llvm::AllocaInst* variable = context.createEntryAlloca(varType, node.name);
+            context.NamedValues[node.name] = variable;
+            context.Builder.CreateStore(emitDefaultValue(context, node, varType), variable);
+            return variable;
+        }
+
         // Генерируем код для выражения
         node.expression->accept(codeGen);
         llvm::Value* value = codeGen.getResult();
@@ -59,7 +82,9 @@ namespace Declarations
         ASTGen codeGen(context);
 
         llvm::Value* initValue = nullptr;
-        if (Arrays::isLiteral(node.expression)) {
+        if (hasNoValue(node)) {
+            initValue = emitDefaultValue(context, node, varType);
+        } else if (Arrays::isLiteral(node.expression)) {
             initValue = Arrays::emitLiteral(context, node.expression, node.inferredType ? node.inferredType : node.type);
         } else {
             node.expression->accept(codeGen);

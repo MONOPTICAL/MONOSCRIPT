@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "../headers/TypeSymbolVisitor.h"
 #include "../../includes/ASTDebugger.hpp"
 void TypeSymbolVisitor::LogError(const std::string &message, std::shared_ptr<ASTNode> node)

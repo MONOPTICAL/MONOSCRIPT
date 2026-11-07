@@ -35,6 +35,13 @@ void TypeSymbolVisitor::visit(GenericTypeNode &node)
     node.inferredType = baseType;
 }
 
+void TypeSymbolVisitor::checkFinalAssigned(const std::shared_ptr<ASTNode>& variable, const std::string& name, const std::shared_ptr<ASTNode>& usage)
+{
+    auto final = std::dynamic_pointer_cast<VariableAssignNode>(variable);
+    if (final && final->isDeferred && assignedFinals.count(variable.get()) == 0)
+        LogError("Final variable '" + name + "' is used before it is assigned", usage);
+}
+
 void TypeSymbolVisitor::visit(IdentifierNode& node)
 {
     // Проверяем, существует ли переменная в реестре
@@ -44,6 +51,7 @@ void TypeSymbolVisitor::visit(IdentifierNode& node)
     }
 
     std::shared_ptr<ASTNode> varAssign = contexts.back().variables[node.name];
+    checkFinalAssigned(varAssign, node.name, node.shared_from_this());
     auto result = checkForIdentifier(varAssign);
 
     if(varAssign->implicitCastTo)

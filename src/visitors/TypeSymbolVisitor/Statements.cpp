@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "../headers/TypeSymbolVisitor.h"
 #include "../../includes/ASTDebugger.hpp"
 #include <string_view>
@@ -326,8 +327,16 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
         const bool isCollection = varType.starts_with("array") || varType.starts_with("map");
         if (noValue->isEmptyLiteral && !isCollection)
             LogError("Empty literal cannot initialize variable '" + node.name + "' of type " + varType, node.shared_from_this());
-        if (!noValue->isEmptyLiteral && (isCollection || registry.findStruct(varType)))
+
+        // final получит значение позже, а читать его до этого нельзя, поэтому пустой ссылки никто не увидит
+        if (!noValue->isEmptyLiteral && node.isDeferred) {
+            if (contexts.back().currentFunctionName.empty())
+                LogError("Global final variable '" + node.name + "' must have a value", node.shared_from_this());
+        } else if (!noValue->isEmptyLiteral && node.isConst) {
+            LogError("Constant '" + node.name + "' must have a value", node.shared_from_this());
+        } else if (!noValue->isEmptyLiteral && (isCollection || registry.findStruct(varType))) {
             LogError("Variable '" + node.name + "' of type " + varType + " must have a value", node.shared_from_this());
+        }
     }
 
     if (isAuto) {
@@ -405,6 +414,11 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
     // Добавляем переменную в реестр
     auto varNode = std::make_shared<VariableAssignNode>(node.name, node.isConst, node.type, node.expression);
     varNode->inferredType = node.type; // Устанавливаем тип переменной
+    varNode->isDeferred = node.isDeferred;
+    if (node.isDeferred) {
+        finalLoopDepth[varNode.get()] = loopDepth;
+        deferredFinals.push_back(varNode);
+    }
 
     contexts.back().variables[node.name] = varNode;
 }
@@ -454,8 +468,14 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
     std::string varTypeStr = varType->toString();
     node.inferredType = varType; // Кодгену нужен тип, чтобы собрать литерал a = [1, 2]
 
-    if (varAssign->isConst) {
+    if (varAssign->isConst && !varAssign->isDeferred) {
         LogError("Cannot reassign constant variable: " + node.name, node.shared_from_this());
+    }
+    if (varAssign->isDeferred) {
+        if (maybeAssignedFinals.count(varAssign.get()))
+            LogError("Final variable '" + node.name + "' is already assigned", node.shared_from_this());
+        if (loopDepth > finalLoopDepth[varAssign.get()])
+            LogError("Final variable '" + node.name + "' cannot be assigned in a loop", node.shared_from_this());
     }
 
     std::string expressionType;
@@ -471,6 +491,10 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
         // a = [] или a = b: validateCollectionElements уже всё проверил
         if (!Block) {
             varAssign->expression = node.expression;
+            if (varAssign->isDeferred) {
+                assignedFinals.insert(varAssign.get());
+                maybeAssignedFinals.insert(varAssign.get());
+            }
             return;
         }
 
@@ -490,6 +514,11 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
 
     // Добавляем переменную в реестр
     varAssign->expression = node.expression;
+
+    if (varAssign->isDeferred) {
+        assignedFinals.insert(varAssign.get());
+        maybeAssignedFinals.insert(varAssign.get());
+    }
 }
 
 void TypeSymbolVisitor::visit(IfNode& node) {
@@ -512,6 +541,10 @@ void TypeSymbolVisitor::visit(IfNode& node) {
                 castNumbersInBinaryTree(node.condition, "auto");
     }
 
+    // Ветки идут независимо: присваивание final в одной не видно в другой
+    const auto assignedBefore = assignedFinals;
+    const auto maybeBefore = maybeAssignedFinals;
+
     // Создаем новый контекст для блока if
     contexts.push_back(contexts.back());
 
@@ -524,6 +557,12 @@ void TypeSymbolVisitor::visit(IfNode& node) {
     // Убираем контекст блока if
     contexts.pop_back();
 
+    const auto assignedInThen = assignedFinals;
+    const auto maybeInThen = maybeAssignedFinals;
+    assignedFinals = assignedBefore;
+    maybeAssignedFinals = maybeBefore;
+    bool elseReturnedAll = false;
+
     // Проверяем блок else
     if (node.elseBlock) {
         // Создаем новый контекст для блока else
@@ -534,6 +573,7 @@ void TypeSymbolVisitor::visit(IfNode& node) {
         // Проверяем блок else
         node.elseBlock->accept(*this);
         const bool elseReturned = contexts.back().returnedValue;
+        elseReturnedAll = elseReturned;
 
         // Убираем контекст блока else
         contexts.pop_back();
@@ -543,6 +583,18 @@ void TypeSymbolVisitor::visit(IfNode& node) {
             contexts.back().returnedValue = true;
     }
 
+    // После if код продолжается только из веток без return.
+    // Здесь сейчас состояние после else или, если его нет, состояние до if
+    if (elseReturnedAll && !thenReturned) {
+        assignedFinals = assignedInThen;
+        maybeAssignedFinals = maybeInThen;
+    } else if (!thenReturned) {
+        std::set<const ASTNode*> both;
+        for (const auto* variable : assignedInThen)
+            if (assignedFinals.count(variable)) both.insert(variable);
+        assignedFinals = both;
+        maybeAssignedFinals.insert(maybeInThen.begin(), maybeInThen.end());
+    }
 }
 
 void TypeSymbolVisitor::visit(ForNode& node) {
@@ -596,7 +648,9 @@ void TypeSymbolVisitor::visit(ForNode& node) {
     contexts.back().variables[node.varName] = loopVariable;
 
     // Проверяем блок for
+    loopDepth++;
     node.body->accept(*this);
+    loopDepth--;
 
     // Убираем контекст блока for
     contexts.pop_back();
@@ -628,7 +682,9 @@ void TypeSymbolVisitor::visit(WhileNode& node) {
     contexts.back().currentFunctionName = "while";
 
     // Проверяем блок while
+    loopDepth++;
     node.body->accept(*this);
+    loopDepth--;
 
     // Убираем контекст блока while
     contexts.pop_back();

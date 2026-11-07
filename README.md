@@ -176,6 +176,7 @@ Integer addition, subtraction and multiplication wrap around on overflow, so `21
 |Explicit type|`i32 count = 0`|
 |Inferred type|`name ^= "value"`|
 |Constant|`const i32 limit = 10`, `final limit ^= 10`|
+|Assigned once, later|`final i32 limit`, then `limit = 10` on every path before it is read|
 |Cast|`value->i8`|
 
 ## 📋 Syntax

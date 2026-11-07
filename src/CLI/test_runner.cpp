@@ -24,6 +24,7 @@
 #include "headers/test_runner.h"
 #include "headers/ast_tools.h"
 #include "headers/cli.h"
+#include "headers/ui.h"
 #include "headers/symantic.h"
 #include "../lexer/headers/Lexer.h"
 #include "../parser/headers/Parser.h"
@@ -563,6 +564,7 @@ int runFrontendTests(const std::vector<std::string>& checkCommand, const std::ve
     for (const auto& test : tests)
     {
         const fs::path relative = fs::relative(test.path, testsDir);
+        ui::showProgress(passed + knownBugs + failed + fixed + skipped, static_cast<int>(tests.size()), failed + fixed, relative.string());
         const std::string group = relative.has_parent_path() ? relative.begin()->string() : "";
 
         ReportEntry entry;
@@ -606,6 +608,8 @@ int runFrontendTests(const std::vector<std::string>& checkCommand, const std::ve
 
         groups[group].push_back(entry);
     }
+
+    ui::clearProgress();
 
     std::cout << "\n" << termcolor::bold << "MONOSCRIPT: тесты фронтенда" << termcolor::reset << "\n";
 

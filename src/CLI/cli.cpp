@@ -1,21 +1,33 @@
 #include "headers/cli.h"
+#include "headers/ui.h"
+#include <filesystem>
 #include <iostream>
 #include <fstream>
 
 void printHelp(const char* programName) {
-    std::cout << "🤔 Usage: " << programName << " [OPTIONS] [FILE]\n\n"
-              << "⚙️ Options:\n"
-              << "  --help           ❓ Show this help message and exit\n"
-              << "  --tokens         🏷️  Show tokens\n"
-              << "  --ast            🌳 Show AST\n"
-              << "  --symantic       🔍 Show symantic analysis\n"
-              << "  --run, run       ▶️  Execute the program via LLVM\n"
-              << "  --compile        🏗️  Compile to executable\n"
-              << "  --offOptimization 🛠️  Disable LLVM optimization\n"
-              << "  --run_tests [FILTER] 🧪 Run frontend tests, FILTER selects tests by path\n"
-              << "  --verbose        📋 Show every test with -run_tests\n"
-              << "\n⌨️ If FILE is not specified, input is read from standard input.\n"
-              << std::endl;
+    const std::string name = std::filesystem::path(programName).filename().string();
+    const std::string bold = ui::style(stdout, ui::BOLD), cyan = ui::style(stdout, ui::CYAN), dim = ui::style(stdout, ui::DIM), reset = ui::style(stdout, ui::RESET);
+
+    auto option = [&](const std::string& flag, const std::string& text) {
+        std::cout << "  " << cyan << flag << reset << std::string(flag.size() < 24 ? 24 - flag.size() : 1, ' ') << text << "\n";
+    };
+
+    ui::printBanner(stdout);
+    std::cout << "\n" << dim << "  statically typed scripting language on LLVM" << reset << "\n\n"
+              << bold << "USAGE" << reset << "\n"
+              << "  " << name << " [OPTIONS] [FILE]\n\n"
+              << bold << "RUN" << reset << "\n";
+    option("run FILE", "Run a program through the JIT");
+    option("--compile OUT FILE", "Build a native executable");
+    option("--offOptimization", "Run without LLVM optimization");
+    std::cout << "\n" << bold << "INSPECT" << reset << "\n";
+    option("--tokens", "Show tokens");
+    option("--ast", "Show AST");
+    option("--symantic", "Show semantic analysis");
+    std::cout << "\n" << bold << "TEST" << reset << "\n";
+    option("--run_tests [FILTER]", "Run the test suite, FILTER selects tests by path");
+    option("--verbose", "Show every test");
+    std::cout << "\n" << dim << "  Without FILE the source is read from standard input." << reset << "\n" << std::endl;
 }
 
 CLIOptions parseArgs(int argc, char* argv[]) {
@@ -77,7 +89,10 @@ std::string readSourceCode(const std::string& inputFile) {
             sourceCode += line + "\n";
         }
     } else {
-        std::cout << "Enter source code (Ctrl+D to finish):\n";
+        if (ui::isTerminal(stdin)) {
+            ui::printBanner(stderr);
+            std::cerr << "\n" << ui::style(stderr, ui::DIM) << "  Enter source code, Ctrl+D to finish" << ui::style(stderr, ui::RESET) << "\n\n";
+        }
         std::string line;
         while (std::getline(std::cin, line)) {
             sourceCode += line + "\n";

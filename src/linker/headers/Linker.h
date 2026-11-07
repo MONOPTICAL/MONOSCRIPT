@@ -2,7 +2,7 @@
 #define LINKER_H
 
 #include "../../lexer/headers/Lexer.h"
-#include "../../includes/icecream.hpp"
+#include "../../includes/ic.hpp"
 #include "../../visitors/headers/TypeSymbolVisitor.h"
 
 #include <string>

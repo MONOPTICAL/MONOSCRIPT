@@ -173,7 +173,9 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
         llvm::Function* concatFunc = declareFunctionFromTOML("scat", context.TheModule.get(), 
                                                          context.TheContext, TOML_path);
         if (!concatFunc) {
+#if DEBUG
             std::cerr << "Warning: Функция scat не найдена в стандартной библиотеке" << std::endl;
+#endif
             return nullptr;
         }
         std::vector<llvm::Value*> args = {left, right};
@@ -273,7 +275,9 @@ llvm::Value* Expressions::handleUnaryOperation(CodeGenContext& context, UnaryOpN
         } else if (operand->getType()->isIntegerTy()) {
             return context.Builder.CreateNeg(operand, "negtmp");
         } else {
+#if DEBUG
             std::cerr << "Warning: Неподдерживаемый тип для унарного минуса" << std::endl;
+#endif
             return nullptr;
         }
     } 
@@ -289,7 +293,9 @@ llvm::Value* Expressions::handleUnaryOperation(CodeGenContext& context, UnaryOpN
             );
             return context.Builder.CreateNot(boolValue, "nottmp");
         } else {
+#if DEBUG
             std::cerr << "Warning: Неподдерживаемый тип для логического отрицания" << std::endl;
+#endif
             return nullptr;
         }
     }

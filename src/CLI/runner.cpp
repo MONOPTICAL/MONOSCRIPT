@@ -3,6 +3,7 @@
 #include "../runtime/headers/ASTVisitors.h"
 #include "../includes/ASTDebugger.hpp"
 #include "../loader/headers/loader.h"
+#include "headers/ui.h"
 #include <llvm/IR/Module.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/IRReader/IRReader.h>
@@ -20,7 +21,7 @@
 #include <llvm/IR/PassManager.h>
 #include <llvm/Passes/PassBuilder.h>
 
-int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimization) {
+int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimization, ui::Spinner* spinner) {
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
     llvm::InitializeNativeTargetAsmParser();
@@ -115,6 +116,9 @@ int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimi
     auto MainSymbol = ExitOnErr(JIT->lookup(mainFunction));
     auto MainFn = MainSymbol.toPtr<int(*)()>();
 
+    // Анимация заканчивается до старта: дальше экран принадлежит программе
+    if (spinner) spinner->done();
+
     // Вызываем функцию
     #if DEBUG
         std::cout << "Executing " << mainFunction << "()...\n";
@@ -132,6 +136,7 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
     auto t_start = std::chrono::high_resolution_clock::now();
 #endif
     // Code generation
+    ui::Spinner spinner("Компиляция", false);
     CodeGenContext context(currentFilePath);
     ASTGen codeGen(context);
     combinedAST->accept(codeGen);
@@ -155,13 +160,14 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
                 return RUN_FAILED;
             }
 
-            int result = executeModule(context.TheModule.get(), "main", offOptimization);
+            int result = executeModule(context.TheModule.get(), "main", offOptimization, &spinner);
 #if DEBUG
             auto t_jit_end = std::chrono::high_resolution_clock::now();
 #endif
             if (result == RUN_FAILED) return RUN_FAILED;
 
-            std::cout << "[" << entryFunctionName << " exited with code " << result << "]" << std::endl;
+            std::cout << ui::style(stdout, result == 0 ? ui::DIM : ui::YELLOW) << "[" << entryFunctionName << " exited with code " << result << "]"
+                      << ui::style(stdout, ui::RESET) << std::endl;
 
 #if DEBUG
             // Статистика по времени

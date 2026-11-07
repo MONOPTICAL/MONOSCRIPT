@@ -33,8 +33,8 @@ public:
     }
 
     // Error reporting methods
-    void report(int line, int column, const std::string& module, const std::string& message, const std::string& errorType = "Unknown Error");
-    void reportWithHint(int line, int column, const std::string& module, const std::string& message, const std::string& hint, const std::string& errorType = "Unknown Error");
+    void report(int line, int column, const std::string& module, const std::string& message, const std::string& errorType = "Error");
+    void reportWithHint(int line, int column, const std::string& module, const std::string& message, const std::string& hint, const std::string& errorType = "Error");
     void warn(int line, int column, const std::string& message);
 
     // Настоящий номер строки в файле по номеру строки из узла AST
