@@ -268,10 +268,7 @@ void ASTGen::visit(VariableAssignNode& node) {
         return;
     }
     
-    // Пустой литерал {} и литерал с парами сюда приходят одинаково, поэтому проверяем по типу
     auto declaredType = node.inferredType ? node.inferredType : node.type;
-    if (auto generic = std::dynamic_pointer_cast<GenericTypeNode>(declaredType); generic && generic->baseName == "map")
-        throw std::runtime_error("Codegen Error: map пока не реализован: " + node.name);
 
     // Получаем тип переменной
     llvm::Type* varType;
@@ -330,7 +327,7 @@ void ASTGen::visit(ReassignMemberNode& node) {
     }
 
     llvm::Type* elementType = nullptr;
-    llvm::Value* elementPtr = Arrays::emitElementPtr(context, *access, elementType);
+    llvm::Value* elementPtr = Arrays::emitElementPtr(context, *access, elementType, true);
     context.Builder.CreateStore(TypeConversions::convertValueToType(context, value, elementType), elementPtr);
     result = nullptr;
 }
@@ -461,7 +458,10 @@ static void emitArrayFor(CodeGenContext& context, ASTGen& codeGen, ForNode& node
 void ASTGen::visit(ForNode& node) {
     auto range = std::dynamic_pointer_cast<CallNode>(node.iterable);
     if (!range || range->callee != "range") {
-        emitArrayFor(context, *this, node);
+        if (Maps::isMap(node.iterable->inferredType))
+            Maps::emitFor(context, *this, node);
+        else
+            emitArrayFor(context, *this, node);
         result = nullptr;
         return;
     }
@@ -583,7 +583,22 @@ void ASTGen::visit(CallNode& node) {
     // Встроенная len(a). Функция с таким же именем важнее, семантика решила так же
     if (!calleeFunc && node.callee == "len") {
         node.arguments[0]->accept(*this);
-        result = context.getArrayLength(TypeConversions::loadValueIfPointer(context, getResult()));
+        llvm::Value* collection = TypeConversions::loadValueIfPointer(context, getResult());
+        result = Maps::isMap(node.arguments[0]->inferredType) ? Maps::emitLen(context, collection) : context.getArrayLength(collection);
+        return;
+    }
+
+    // Встроенные has(m, k) и del(m, k)
+    if (!calleeFunc && (node.callee == "has" || node.callee == "del")) {
+        node.arguments[0]->accept(*this);
+        llvm::Value* map = TypeConversions::loadValueIfPointer(context, getResult());
+        llvm::Value* key = Maps::emitKey(context, node.arguments[1], node.arguments[0]->inferredType);
+        if (node.callee == "has") {
+            result = Maps::emitHas(context, map, key);
+        } else {
+            Maps::emitDel(context, map, key, node.line);
+            result = nullptr;
+        }
         return;
     }
 

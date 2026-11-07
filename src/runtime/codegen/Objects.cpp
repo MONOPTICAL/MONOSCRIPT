@@ -74,11 +74,10 @@ namespace Objects
     {
         const llvm::Align align(8);
 
-        auto generic = std::dynamic_pointer_cast<GenericTypeNode>(type);
-        if (generic && generic->baseName == "map")
-            throw std::runtime_error("Codegen Error: copy для map пока не реализован");
+        if (Maps::isMap(type))
+            return Maps::emitCopy(context, source);
 
-        if (generic) {
+        if (auto generic = std::dynamic_pointer_cast<GenericTypeNode>(type)) {
             llvm::Type* elementType = context.getLLVMType(generic->typeParameters[0], context.TheContext);
             llvm::Value* length = context.getArrayLength(source);
             llvm::Value* result = context.createArray(elementType, length);

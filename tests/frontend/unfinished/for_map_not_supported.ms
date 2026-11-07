@@ -1,4 +1,4 @@
-// expect-error: for expects an array or range
+// expect: ok
 [i32]main()
 |   map<string,i32> m = {"a": 1}
 |   for i in m
