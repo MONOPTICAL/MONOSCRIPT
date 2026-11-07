@@ -5,6 +5,8 @@ import mono.std.core.rt : ms_panic;
 
 import mono.std.core.abi : GC_malloc_atomic;
 
+// Склейка и поиск
+
 extern(C) char* scat(const char* a, const char* b) nothrow @nogc
 {
     import core.stdc.string : strlen, strcpy, strcat;
@@ -34,12 +36,6 @@ extern(C) char* substr(const char* str, int start, int length) nothrow @nogc
     return result;
 }
 
-extern(C) int toInt(const char* str) nothrow @nogc
-{
-    import core.stdc.stdlib : strtol;
-    return cast(int) strtol(str, null, 10);
-}
-
 extern(C) int strfind(const char* str, const char* substr) nothrow @nogc
 {
     import core.stdc.string : strstr;
@@ -48,7 +44,14 @@ extern(C) int strfind(const char* str, const char* substr) nothrow @nogc
     return cast(int)(pos - str);
 }
 
-// Пустые части сохраняются: "a,,b" это три строки, как в Python
+extern(C) bool startsWith(const char* str, const char* prefix) nothrow @nogc
+{
+    import core.stdc.string : strncmp, strlen;
+    const size_t prefixLength = strlen(prefix);
+    return strncmp(str, prefix, prefixLength) == 0;
+}
+
+
 extern(C) MsArray* split(const char* str, const char* delim) nothrow @nogc
 {
     import core.stdc.string : memcpy, strlen, strstr;
@@ -77,6 +80,62 @@ extern(C) MsArray* split(const char* str, const char* delim) nothrow @nogc
     }
     return result;
 }
+
+extern(C) int count(const char* str, const char* delim) nothrow @nogc
+{
+    import core.stdc.string : strlen;
+
+    const size_t needle = strlen(delim);
+   
+    if (needle == 0)
+        return cast(int) strlen(str) + 1;
+
+    int found = 0;
+    for (size_t i = 0; str[i] != 0; )
+    {
+        if (strfind(str + i, delim) == 0)
+        {
+            found++;
+            i += needle; // без перекрытия, как str.count в Python
+        }
+        else
+            i++;
+    }
+    return found;
+}
+
+// Строка и массив символов
+
+extern(C) MsArray* toArray(const char* str) nothrow @nogc
+{
+    import core.stdc.string : memcpy, strlen;
+    const int length = cast(int) strlen(str);
+    auto array = newArray(1, length, false);
+    memcpy(array.data, str, length);
+    return array;
+}
+
+extern(C) char* joinChars(MsArray* array) nothrow @nogc
+{
+    import core.stdc.string : memcpy;
+
+    // data не C-строка: GC_malloc_atomic не ставит '\0', длина только в заголовке
+    char* result = cast(char*) GC_malloc_atomic(array.length + 1);
+    if (array.length > 0)
+        memcpy(result, array.data, array.length);
+    result[array.length] = 0;
+    return result;
+}
+
+// Разбор
+
+extern(C) int toInt(const char* str) nothrow @nogc
+{
+    import core.stdc.stdlib : strtol;
+    return cast(int) strtol(str, null, 10);
+}
+
+// В строку
 
 extern(C) char* toString_int(const int a) nothrow @nogc
 {

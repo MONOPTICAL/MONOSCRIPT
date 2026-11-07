@@ -17,6 +17,18 @@ ret = "i32"
 args = ["string", "string"]
 
 [[function]]
+name = "startsWith"
+pure = true
+ret = "i1"
+args = ["string", "string"]
+
+[[function]]
+name = "count"
+pure = true
+ret = "i32"
+args = ["string", "string"]
+
+[[function]]
 name = "split"
 pure = true
 ret = "array<string>"
@@ -65,9 +77,26 @@ ret = "string"
 args = ["i64"]
 
 [[function]]
+name = "toArray"
+pure = true
+ret = "array<char>"
+args = ["string"]
+
+[[function]]
+name = "joinChars"
+pure = true
+ret = "string"
+args = ["array<char>"]
+
+[[function]]
 name = "echo"
 ret = "void"
 args = ["string"]
+
+[[function]]
+name = "input"
+ret = "string"
+args = []
 
 [[function]]
 name = "gc_collect"
