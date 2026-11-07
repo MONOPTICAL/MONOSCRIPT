@@ -29,11 +29,16 @@ add_library(ms_frontend STATIC
     src/linker/Linker.cpp
     src/loader/loader.cpp
     src/CLI/cli.cpp
+    src/CLI/ui.cpp
     src/CLI/ast_tools.cpp
     src/CLI/symantic.cpp
     src/CLI/test_runner.cpp
     src/errors/ErrorEngine.cpp
 )
+
+# Спиннер работает в отдельном потоке
+find_package(Threads REQUIRED)
+target_link_libraries(ms_frontend PUBLIC Threads::Threads)
 
 # DEBUG_MODE
 if(CMAKE_BUILD_TYPE MATCHES Debug)

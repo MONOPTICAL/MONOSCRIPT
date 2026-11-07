@@ -168,5 +168,7 @@ void CodeGenContext::LogError(const std::string &message)
 
 void CodeGenContext::LogWarning(const std::string &message)
 {
+#if DEBUG
     std::cerr << "Warning: " << message << std::endl;
+#endif
 }

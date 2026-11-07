@@ -196,6 +196,7 @@ class VariableAssignNode : public ASTNode {
         std::string name;
         std::shared_ptr<TypeNode> type;
         bool isConst;
+        bool isDeferred = false; // final без значения: присвоить можно ровно один раз, позже
         std::shared_ptr<ASTNode> expression;
 
         void accept(ASTNodeVisitor& visitor) override {

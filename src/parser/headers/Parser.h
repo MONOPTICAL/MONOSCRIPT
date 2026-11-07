@@ -1,5 +1,5 @@
 #include "../../lexer/headers/Token.h"
-#include "../../includes/icecream.hpp"
+#include "../../includes/ic.hpp"
 #include "AST.h"
 #include <memory>
 #include <stdexcept>

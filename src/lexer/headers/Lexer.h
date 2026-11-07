@@ -9,7 +9,7 @@
 #include <optional>
 #include "Token.h"
 #include "ParsingFunctions.h"
-#include "../../includes/icecream.hpp"
+#include "../../includes/ic.hpp"
 
 class Lexer
 {

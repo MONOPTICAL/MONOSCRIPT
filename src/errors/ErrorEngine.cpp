@@ -1,4 +1,5 @@
 #include "headers/ErrorEngine.h"
+#include "../CLI/headers/ui.h"
 #include <iostream> // Используем cerr для ошибок
 #include <iomanip>
 #include <cctype> // Для isspace
@@ -15,14 +16,14 @@ int ErrorEngine::getWarningCount() const {
 void ErrorEngine::report(int line, int column, const std::string& module, const std::string& message, const std::string& errorType) {
     printError(line, column, errorType, message);
 
-    if (errorType != "Unknown Error") { // Или более строгая проверка типа
+    if (errorType != "Error") { // Или более строгая проверка типа
         errorCount++;
     }
 }
 
 void ErrorEngine::reportWithHint(int line, int column, const std::string& module, const std::string& message, const std::string& hint, const std::string& errorType) {
     printError(line, column, errorType, message, hint);
-     if (errorType != "Unknown Error") {
+     if (errorType != "Error") {
         errorCount++;
     }
 }
@@ -42,16 +43,16 @@ int ErrorEngine::displayLine(int line) const {
 }
 
 void ErrorEngine::printError(int line, int column, const std::string& errorType, const std::string& message, const std::string& hint) {
-    // TODO: Добавить цвета
-    std::cerr << errorType << " [line " << displayLine(line) << ", column " << column + 1 << "]: " << message << std::endl;
+    std::cerr << ui::style(stderr, ui::RED) << ui::style(stderr, ui::BOLD) << errorType << ui::style(stderr, ui::RESET)
+              << ui::style(stderr, ui::DIM) << " [line " << displayLine(line) << ", column " << column + 1 << "]" << ui::style(stderr, ui::RESET)
+              << ": " << message << std::endl;
 
     if (sourceLines && sourceLines->size() > 0) {
         printSourceLine(line, column);
     }
 
     if (!hint.empty()) {
-        // TODO: Добавить цвета для подсказки
-        std::cerr << "    Hint: " << hint << std::endl;
+        std::cerr << ui::style(stderr, ui::CYAN) << "    Hint: " << hint << ui::style(stderr, ui::RESET) << std::endl;
     }
     throw std::runtime_error("");
 }
@@ -82,7 +83,7 @@ void ErrorEngine::printSourceLine(int line, int column) {
         // Вывод номера строки и самой строки
         std::cerr << std::setw(5) << displayLine(line) << " | " << codeLine << std::endl;
         // Вывод указателя (передаем очищенную строку, исходную колонку и кол-во удаленных символов)
-        std::cerr << std::setw(5) << "" << " | " << generatePointer(codeLine, column, removedCharsCount) << std::endl;
+        std::cerr << std::setw(5) << "" << " | " << ui::style(stderr, ui::RED) << generatePointer(codeLine, column, removedCharsCount) << ui::style(stderr, ui::RESET) << std::endl;
     } else {
         std::cerr << "    (Can't reach source code at line " << line + 1 << ")" << std::endl;
     }

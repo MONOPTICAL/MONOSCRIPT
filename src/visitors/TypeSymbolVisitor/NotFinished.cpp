@@ -15,6 +15,7 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
                 if (auto varAssign = std::dynamic_pointer_cast<VariableAssignNode>(varIt->second)) {
                     currentType = varAssign->type;
                     idNode->inferredType = currentType; // С этого типа кодген начинает обход цепочки
+                    checkFinalAssigned(varIt->second, idNode->name, node.shared_from_this());
                 }
             } else {
                 currentStructDef = registry.findStruct(idNode->name);

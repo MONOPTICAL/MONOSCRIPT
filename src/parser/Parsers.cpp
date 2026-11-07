@@ -388,7 +388,12 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
         if(!check(TokenType::Operator) || current().value != "=") // Проверяем наличие оператора присваивания
         {   
             std::shared_ptr<NoneNode> none = std::make_shared<NoneNode>();
-            return std::make_shared<VariableAssignNode>(variableName, isConst, type, none);
+            none->line = lineIndex; none->column = tokenIndex; // Устанавливаем строку и колонку для узла
+
+            auto varAssign = std::make_shared<VariableAssignNode>(variableName, isConst, type, none);
+            varAssign->line = lineIndex; varAssign->column = tokenIndex; // Устанавливаем строку и колонку для узла
+            varAssign->isDeferred = finalFlag;
+            return varAssign;
         }
     }
     else if(current().type == TokenType::Identifier && peek().value == "^=") // Проверяем наличие идентификатора
@@ -439,6 +444,7 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
 
             auto varAssign = std::make_shared<VariableAssignNode>(variableName, isConst, type, none);
             varAssign->line = lineIndex; varAssign->column = tokenIndex; // Устанавливаем строку и колонку для узла
+            varAssign->isDeferred = finalFlag;
             return varAssign; // Возвращаем узел присваивания переменной
         }
     }

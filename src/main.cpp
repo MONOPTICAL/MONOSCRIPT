@@ -4,6 +4,7 @@
 #include "CLI/headers/symantic.h"
 #include "CLI/headers/compile.h"
 #include "CLI/headers/test_runner.h"
+#include "CLI/headers/ui.h"
 #include "errors/headers/ErrorEngine.h"
 #include "loader/headers/loader.h"
 #include <gc/gc.h>
@@ -55,15 +56,18 @@ int main(int argc, char* argv[]) {
             if (!compileToExecutable(combinedAST, outputFile)) {
                 return 1;
             }
-            std::cout << "Компиляция завершена. Исполняемый файл: " << outputFile << std::endl;
+            std::cout << ui::style(stdout, ui::GREEN) << "Компиляция завершена." << ui::style(stdout, ui::RESET)
+                      << " Исполняемый файл: " << ui::style(stdout, ui::BOLD) << outputFile << ui::style(stdout, ui::RESET) << std::endl;
             return 0;
         }
         
         // Если --run не указан, просто завершаем работу после анализа
-        std::cout << "Анализ кода завершен. Для выполнения используйте флаг --run." << std::endl;
+        std::cout << ui::style(stdout, ui::GREEN) << "Анализ кода завершен." << ui::style(stdout, ui::RESET)
+                  << " Для выполнения используйте флаг --run." << std::endl;
         
     } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
+        // Ошибки компиляции уже напечатаны, у них пустой текст
+        if (e.what()[0] != '\0') std::cerr << ui::style(stderr, ui::RED) << e.what() << ui::style(stderr, ui::RESET) << std::endl;
         return 1;
     }
     

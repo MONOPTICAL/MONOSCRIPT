@@ -1,10 +1,12 @@
 #ifndef SYMANTICVISITOR_H
 #define SYMANTICVISITOR_H
 
+#include <set>
+#include <map>
 #include "../../parser/headers/AST.h"
 #include "../../errors/headers/ErrorEngine.h"
 #include "../../loader/headers/loader.h"
-#include "../../includes/icecream.hpp"
+#include "../../includes/ic.hpp"
 #include "Register.h"
 #include "BuiltIn.h"
 #include <fstream>
@@ -24,6 +26,14 @@ private:
     std::unique_ptr<ErrorEngine>                                    errorEngine;
 
     std::vector<Context>                                            contexts;
+    // final без значения: присвоена точно, присвоена хотя бы на одном пути, и в каком цикле объявлена
+    std::set<const ASTNode*>                                        assignedFinals;
+    std::set<const ASTNode*>                                        maybeAssignedFinals;
+    std::map<const ASTNode*, int>                                   finalLoopDepth;
+    // Узлы живут до конца проверки: иначе адрес освобождённого занял бы новый узел и выглядел бы уже присвоенным
+    std::vector<std::shared_ptr<ASTNode>>                           deferredFinals;
+    int                                                             loopDepth = 0;
+    void                                                            checkFinalAssigned(const std::shared_ptr<ASTNode>& variable, const std::string& name, const std::shared_ptr<ASTNode>& usage);
 
     std::vector<std::string>                                        types;
 

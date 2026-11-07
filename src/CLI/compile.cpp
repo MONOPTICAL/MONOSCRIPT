@@ -2,6 +2,7 @@
 #include "../runtime/headers/CodeGenContext.h"
 #include "../runtime/headers/ASTVisitors.h"
 #include "../loader/headers/loader.h"
+#include "headers/ui.h"
 #include <llvm/Support/FileSystem.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/Support/TargetSelect.h>
@@ -40,12 +41,17 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath) {
     // pic нужен, потому что gcc по умолчанию собирает PIE, а без него не линкуются строки
     std::string llcCmd = llcTool + " -filetype=obj -relocation-model=pic -o " + objPath + " " + irPath;
     
+#if DEBUG
     std::cout << "Запуск команды: " << llcCmd << std::endl;
+#endif
+    ui::Spinner machineCode("Машинный код");
     int llcRet = std::system(llcCmd.c_str());
     if (llcRet != 0) {
+        machineCode.fail();
         std::cerr << "Ошибка при выполнении llc: команда вернула код " << llcRet << std::endl;
         return false;
     }
+    machineCode.done();
 
     std::string stdlibPath = loader::findLibraryPath();
     if (stdlibPath.empty()) {
@@ -53,7 +59,9 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath) {
         return false;
     }
 
+#if DEBUG
     std::cout << "Стандартная библиотека: " << stdlibPath << std::endl;
+#endif
 
     std::string stdlibDir = "";
     size_t lastSlash = stdlibPath.find_last_of('/');
@@ -67,12 +75,17 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath) {
     // mono
     gccCmd += " " + stdlibPath + " -lgc -lm -ldl -Wl,-rpath," + stdlibDir;
     
+#if DEBUG
     std::cout << "Запуск команды: " << gccCmd << std::endl;
+#endif
+    ui::Spinner linking("Линковка");
     int gccRet = std::system(gccCmd.c_str());
     if (gccRet != 0) {
+        linking.fail();
         std::cerr << "Ошибка при линковке с помощью gcc: команда вернула код " << gccRet << std::endl;
         return false;
     }
+    linking.done();
     
     // Удаляем промежуточные файлы
     std::remove(irPath.c_str());
@@ -84,7 +97,11 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath) {
 bool compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::string& outputFile) {
     CodeGenContext context(outputFile);
     ASTGen codeGen(context);
-    combinedAST->accept(codeGen);
+    {
+        ui::Spinner step("Генерация IR");
+        combinedAST->accept(codeGen);
+        step.done();
+    }
 
     if (context.TheModule != nullptr) {
 #if DEBUG
@@ -93,6 +110,7 @@ bool compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::st
         std::cerr << "--- END LLVM IR ---\n" << std::endl;
 #endif
         {
+            ui::Spinner step("Оптимизация");
             llvm::PassBuilder passBuilder;
             llvm::LoopAnalysisManager LAM;
             llvm::FunctionAnalysisManager FAM;
@@ -110,6 +128,7 @@ bool compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::st
         
             // Прогоняем *оптимизейшен*
             MPM.run(*context.TheModule, MAM);
+            step.done();
         }
 #if DEBUG
         std::cerr << "\n--- LLVM IR(O2) ---" << std::endl;

@@ -1,7 +1,8 @@
 module mono.rt;
 
 import core.stdc.stdio : fflush, fprintf, snprintf, stderr, stdout;
-import core.stdc.stdlib : exit;
+import core.stdc.stdlib : exit, getenv;
+import core.sys.posix.unistd : isatty;
 
 extern(C) nothrow @nogc
 {
@@ -20,10 +21,11 @@ extern(C) void ms_panic(const char* message, int line) nothrow @nogc
 {
     // Сначала то, что программа успела напечатать, потом ошибка
     fflush(stdout);
+    const bool color = isatty(2) && getenv("NO_COLOR") is null;
+    fprintf(stderr, "%sRuntime Error%s: %s", color ? "\033[1;31m".ptr : "".ptr, color ? "\033[0m".ptr : "".ptr, message);
     if (line > 0)
-        fprintf(stderr, "Runtime Error: %s at line %d\n", message, line);
-    else
-        fprintf(stderr, "Runtime Error: %s\n", message);
+        fprintf(stderr, " at line %d", line);
+    fprintf(stderr, "\n");
     exit(PANIC_EXIT_CODE);
 }
 
