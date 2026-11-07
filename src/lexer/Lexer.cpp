@@ -352,7 +352,7 @@ TokenType Lexer::IsKeyword(const std::string &value) const
     }; 
 
     std::vector<std::string> builtinTypes = {
-        "i1", "i8", "i16","i32", "i64", "string", "void", "array", "map", "float", "struct", "func"
+        "i1", "i8", "i16","i32", "i64", "string", "void", "array", "map", "float", "f64", "struct", "func"
     };
 
     std::vector<std::string> labels = {

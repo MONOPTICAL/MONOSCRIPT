@@ -20,6 +20,10 @@ struct Context {
     bool returnedValue = false;
 };
 
+inline bool isFloatType(const std::string& type) {
+    return type == "float" || type == "f64";
+}
+
 class TypeSymbolVisitor : public ASTNodeVisitor {
 
 private:

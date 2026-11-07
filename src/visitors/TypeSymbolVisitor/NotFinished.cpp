@@ -99,15 +99,15 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
                 const std::string indexTypeStr = indexType->toString();
                 if (genericType->baseName == "array") {
                     const int rank = getTypeRank(indexTypeStr);
-                    if (rank == 0 || indexTypeStr == "float")
+                    if (rank == 0 || isFloatType(indexTypeStr))
                         LogError("Array index must be an integer, got " + indexTypeStr, indexNode->expression);
                     // Литерал 1 имеет тип i1, а -1 в i1 это снова 1
                     if (resolveExprType(indexNode->expression).empty())
                         castAllNumbersToType(indexNode->expression, "i64");
                 } else {
                     const std::string keyTypeStr = genericType->typeParameters[0]->toString();
-                    const bool bothIntegers = getTypeRank(indexTypeStr) > 0 && indexTypeStr != "float" &&
-                                              getTypeRank(keyTypeStr) > 0 && keyTypeStr != "float";
+                    const bool bothIntegers = getTypeRank(indexTypeStr) > 0 && !isFloatType(indexTypeStr) &&
+                                              getTypeRank(keyTypeStr) > 0 && !isFloatType(keyTypeStr);
                     if (indexTypeStr != keyTypeStr && !bothIntegers)
                         LogError("Map key must be " + keyTypeStr + ", got " + indexTypeStr, indexNode->expression);
                     // Сужение обрезало бы ключ, и нашлось бы не то значение

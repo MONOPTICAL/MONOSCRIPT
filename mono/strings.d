@@ -84,3 +84,32 @@ extern(C) char* toString_float(const float a) nothrow @nogc
 
     return result;
 }
+
+// Самая короткая запись, которая читается обратно в то же число: 0.1, а не 0.100000 и не 0.10000000000000001.
+// Целое значение пишем с .0, чтобы было видно, что это не i64
+extern(C) char* toString_f64(const double a) nothrow @nogc
+{
+    import core.stdc.stdio : snprintf;
+    import core.stdc.stdlib : strtod;
+    import core.stdc.string : strlen, strcpy, strpbrk;
+
+    char[40] buffer;
+    foreach (precision; 15 .. 18)
+    {
+        snprintf(buffer.ptr, buffer.length, "%.*g", precision, a);
+        if (strtod(buffer.ptr, null) == a) break;
+    }
+
+    // inf и nan точку не получают
+    size_t length = strlen(buffer.ptr);
+    if (strpbrk(buffer.ptr, ".eEn") is null)
+    {
+        buffer[length++] = '.';
+        buffer[length++] = '0';
+        buffer[length] = 0;
+    }
+
+    char* result = cast(char*)GC_malloc_atomic(length + 1);
+    strcpy(result, buffer.ptr);
+    return result;
+}

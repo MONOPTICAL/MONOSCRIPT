@@ -21,6 +21,7 @@ llvm::Type* CodeGenContext::getLLVMType(std::shared_ptr<TypeNode> typeNode, llvm
         if (simpleType->name == "i32") return llvm::Type::getInt32Ty(ctx);
         if (simpleType->name == "i64") return llvm::Type::getInt64Ty(ctx);
         if (simpleType->name == "float") return llvm::Type::getFloatTy(ctx);
+        if (simpleType->name == "f64") return llvm::Type::getDoubleTy(ctx);
         if (simpleType->name == "string") return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0); // Строки как char*
         if (simpleType->name == "void") return llvm::Type::getVoidTy(ctx);
         if (simpleType->name == "null") return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0); // null как указатель на i8

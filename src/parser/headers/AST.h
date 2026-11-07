@@ -350,8 +350,8 @@ class NumberNode : public ASTNode {
 class FloatNumberNode : public ASTNode {
     public:
         FloatNumberNode() = default;
-        FloatNumberNode(float value) : value(value) {}
-        float value;
+        FloatNumberNode(double value) : value(value) {}
+        double value;
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);

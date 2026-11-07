@@ -1,5 +1,10 @@
 #include "../headers/TypeSymbolVisitor.h"
 
+// В какой вещественный тип считается операция: float с f64 это f64, целое с float это float
+static std::string floatTypeOf(const std::string& left, const std::string& right) {
+    return left == "f64" || right == "f64" ? "f64" : "float";
+}
+
 static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSymbolVisitor& visitor)
 {
     std::shared_ptr<CallNode> callNode;
@@ -31,11 +36,11 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
             );
         }
     } else if (auto floatNumberNode = std::dynamic_pointer_cast<FloatNumberNode>(node)) {
+        auto literal = std::make_shared<FloatNumberNode>(floatNumberNode->value);
+        literal->implicitCastTo = floatNumberNode->implicitCastTo;
         callNode = std::make_shared<CallNode>(
-            "toString_float",
-            std::vector<std::shared_ptr<ASTNode>>{
-                std::make_shared<FloatNumberNode>(floatNumberNode->value)
-            }
+            type->toString() == "f64" ? "toString_f64" : "toString_float",
+            std::vector<std::shared_ptr<ASTNode>>{literal}
         );
     } else if (std::dynamic_pointer_cast<BinaryOpNode>(node) || std::dynamic_pointer_cast<UnaryOpNode>(node)) {
         auto binary = std::dynamic_pointer_cast<BinaryOpNode>(node);
@@ -48,6 +53,7 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
         const std::string typeName = type->toString();
         if (isBoolean) toStringMethod = "toString_bool";
         else if (typeName == "float") toStringMethod = "toString_float";
+        else if (typeName == "f64") toStringMethod = "toString_f64";
         else if (typeName == "i64") toStringMethod = "toString_long";
         else if (typeName != "i32") node->implicitCastTo = std::make_shared<SimpleTypeNode>("i32");
 
@@ -60,6 +66,8 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
 
         if (type->toString() == "float")
             toStringMethod = "toString_float";
+        else if (type->toString() == "f64")
+            toStringMethod = "toString_f64";
         else if (type->toString() == "i1")
             toStringMethod = "toString_bool";
         else if (type->toString() == "i64")
@@ -79,6 +87,8 @@ static std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, 
 
         if (typeName == "float")
             toStringMethod = "toString_float";
+        else if (typeName == "f64")
+            toStringMethod = "toString_f64";
         else if (typeName == "i1")
             toStringMethod = "toString_bool";
         else if (typeName == "i64")
@@ -160,22 +170,22 @@ void TypeSymbolVisitor::handlePlusOperator(std::shared_ptr<BinaryOpNode>& node, 
     }
 
     // float
-    if (left == "float" || right == "float") {
-        if (checkLabels("@strict") && !(left == "float" && right == "float")) {
-            bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == "float";
-            bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == "float";
+    if (isFloatType(left) || isFloatType(right)) {
+        if (checkLabels("@strict") && left != right) {
+            bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == floatTypeOf(left, right);
+            bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == floatTypeOf(left, right);
             if (leftImplicitFloat || rightImplicitFloat)
                 LogError("Implicit te casting is not allowed for '+' in @strict mode: " + left + " and " + right, node->right->shared_from_this());
         }
 
-        if (left != "float") {
-            node->left->implicitCastTo = registry.findType("float");
+        if (left != floatTypeOf(left, right)) {
+            node->left->implicitCastTo = registry.findType(floatTypeOf(left, right));
         }
-        if (right != "float") {
-            node->right->implicitCastTo = registry.findType("float");
+        if (right != floatTypeOf(left, right)) {
+            node->right->implicitCastTo = registry.findType(floatTypeOf(left, right));
         }
         { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "fadd", node->right); node->implicitCastTo = cast; }
-        node->inferredType = registry.findType("float");
+        node->inferredType = registry.findType(floatTypeOf(left, right));
         return;
     }
 
@@ -206,22 +216,22 @@ void TypeSymbolVisitor::handleMinusOperator(std::shared_ptr<BinaryOpNode>& node,
     }
 
     // float
-    if (left == "float" || right == "float") {
-        if (checkLabels("@strict") && !(left == "float" && right == "float")) {
-            bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == "float";
-            bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == "float";
+    if (isFloatType(left) || isFloatType(right)) {
+        if (checkLabels("@strict") && left != right) {
+            bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == floatTypeOf(left, right);
+            bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == floatTypeOf(left, right);
             if (leftImplicitFloat || rightImplicitFloat)
                 LogError("Implicit type casting is not allowed for '-' in @strict mode: " + left + " and " + right, node->right->shared_from_this());
         }
 
-        if (left != "float") {
-            node->left->implicitCastTo = registry.findType("float");
+        if (left != floatTypeOf(left, right)) {
+            node->left->implicitCastTo = registry.findType(floatTypeOf(left, right));
         }
-        if (right != "float") {
-            node->right->implicitCastTo = registry.findType("float");
+        if (right != floatTypeOf(left, right)) {
+            node->right->implicitCastTo = registry.findType(floatTypeOf(left, right));
         }
         { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "fsub", node->right); node->implicitCastTo = cast; }
-        node->inferredType = registry.findType("float");
+        node->inferredType = registry.findType(floatTypeOf(left, right));
         return;
     }
 
@@ -251,22 +261,22 @@ void TypeSymbolVisitor::handleMulOperator(std::shared_ptr<BinaryOpNode>& node, s
     }
 
     // float
-    if (left == "float" || right == "float") {
-        if (checkLabels("@strict") && !(left == "float" && right == "float")) {
-            bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == "float";
-            bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == "float";
+    if (isFloatType(left) || isFloatType(right)) {
+        if (checkLabels("@strict") && left != right) {
+            bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == floatTypeOf(left, right);
+            bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == floatTypeOf(left, right);
             if (leftImplicitFloat || rightImplicitFloat)
                 LogError("Implicit type casting is not allowed for '*' in @strict mode: " + left + " and " + right, node->right->shared_from_this());
         }
 
-        if (left != "float") {
-            node->left->implicitCastTo = registry.findType("float");
+        if (left != floatTypeOf(left, right)) {
+            node->left->implicitCastTo = registry.findType(floatTypeOf(left, right));
         }
-        if (right != "float") {
-            node->right->implicitCastTo = registry.findType("float");
+        if (right != floatTypeOf(left, right)) {
+            node->right->implicitCastTo = registry.findType(floatTypeOf(left, right));
         }
         { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "fmul", node->right); node->implicitCastTo = cast; }
-        node->inferredType = registry.findType("float");
+        node->inferredType = registry.findType(floatTypeOf(left, right));
         return;
     }
 
@@ -294,22 +304,22 @@ void TypeSymbolVisitor::handleDivOperator(std::shared_ptr<BinaryOpNode>& node, s
         return;
     }
 
-    if (left == "float" || right == "float") {
-        if (checkLabels("@strict") && !(left == "float" && right == "float")) {
-            bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == "float";
-            bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == "float";
+    if (isFloatType(left) || isFloatType(right)) {
+        if (checkLabels("@strict") && left != right) {
+            bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == floatTypeOf(left, right);
+            bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == floatTypeOf(left, right);
             if (leftImplicitFloat || rightImplicitFloat)
                 LogError("Implicit type casting is not allowed for '/' in @strict mode: " + left + " and " + right, node->right->shared_from_this());
         }
 
-        if (left != "float") {
-            node->left->implicitCastTo = registry.findType("float");
+        if (left != floatTypeOf(left, right)) {
+            node->left->implicitCastTo = registry.findType(floatTypeOf(left, right));
         }
-        if (right != "float") {
-            node->right->implicitCastTo = registry.findType("float");
+        if (right != floatTypeOf(left, right)) {
+            node->right->implicitCastTo = registry.findType(floatTypeOf(left, right));
         }
         { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "fdiv", node->right); node->implicitCastTo = cast; }
-        node->inferredType = registry.findType("float");
+        node->inferredType = registry.findType(floatTypeOf(left, right));
         return;
     }
 
@@ -336,22 +346,22 @@ void TypeSymbolVisitor::handleModOperator(std::shared_ptr<BinaryOpNode>& node, s
         return;
     }
 
-    if (left == "float" || right == "float") {
-        if (checkLabels("@strict") && !(left == "float" && right == "float")) {
-            bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == "float";
-            bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == "float";
+    if (isFloatType(left) || isFloatType(right)) {
+        if (checkLabels("@strict") && left != right) {
+            bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == floatTypeOf(left, right);
+            bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == floatTypeOf(left, right);
             if (leftImplicitFloat || rightImplicitFloat)
                 LogError("Implicit type casting is not allowed for '%' in @strict mode: " + left + " and " + right, node->right->shared_from_this());
         }
 
-        if (left != "float") {
-            node->left->implicitCastTo = registry.findType("float");
+        if (left != floatTypeOf(left, right)) {
+            node->left->implicitCastTo = registry.findType(floatTypeOf(left, right));
         }
-        if (right != "float") {
-            node->right->implicitCastTo = registry.findType("float");
+        if (right != floatTypeOf(left, right)) {
+            node->right->implicitCastTo = registry.findType(floatTypeOf(left, right));
         }
         { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "frem", node->right); node->implicitCastTo = cast; }
-        node->inferredType = registry.findType("float");
+        node->inferredType = registry.findType(floatTypeOf(left, right));
         return;
     }
 
@@ -409,16 +419,16 @@ void TypeSymbolVisitor::handleCompareOperator(std::shared_ptr<BinaryOpNode>& nod
     }
 
     // float
-    if (left == "float" || right == "float") {
-        if (checkLabels("@strict") && !(left == "float" && right == "float")) {
-            bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == "float";
-            bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == "float";
+    if (isFloatType(left) || isFloatType(right)) {
+        if (checkLabels("@strict") && left != right) {
+            bool leftImplicitFloat = node->left && node->left->implicitCastTo && node->left->implicitCastTo->toString() == floatTypeOf(left, right);
+            bool rightImplicitFloat = node->right && node->right->implicitCastTo && node->right->implicitCastTo->toString() == floatTypeOf(left, right);
             if (leftImplicitFloat || rightImplicitFloat)
                 LogError("Implicit type casting is not allowed for '" + node->op + "' in @strict mode: " + left + " and " + right, node->right->shared_from_this());
         }
 
-        if (left != "float") node->left->implicitCastTo = registry.findType("float");
-        if (right != "float") node->right->implicitCastTo = registry.findType("float");
+        if (left != floatTypeOf(left, right)) node->left->implicitCastTo = registry.findType(floatTypeOf(left, right));
+        if (right != floatTypeOf(left, right)) node->right->implicitCastTo = registry.findType(floatTypeOf(left, right));
         { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "fcmp_" + cmpOp, node->right); node->implicitCastTo = cast; }
         node->inferredType = registry.findType("i1");
         return;

@@ -300,12 +300,12 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
     {
         advance(); // Переходим к следующему токену
         std::optional<int64_t> intValue; // Переменная для хранения значения числа
-        std::optional<float> floatValue; // Переменная для хранения значения числа с плавающей точкой
+        std::optional<double> floatValue; // Переменная для хранения значения числа с плавающей точкой
         try
         {
             if(std::find(currentToken.value.begin(), currentToken.value.end(), '.') != currentToken.value.end()) // Если число с плавающей точкой
             {
-                floatValue = std::stof(currentToken.value); // Преобразуем строку в число с плавающей точкой
+                floatValue = std::stod(currentToken.value); // Преобразуем строку в число с плавающей точкой
             }
             else
             {
