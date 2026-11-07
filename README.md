@@ -25,7 +25,7 @@
 |   return 0
 ```
 
-> 🚧 **Early development.** Numbers, strings, functions, loops and modules work today. Arrays, maps and structs are type-checked, but do not fully run yet. See [Current State](#-current-state).
+> 🚧 **Early development.** Numbers, strings, functions, loops, modules, arrays, maps and structs work today, through the JIT and in native executables. See [Current State](#-current-state).
 
 ## 💡 Why MONOSCRIPT?
 
@@ -142,7 +142,30 @@ use
 - `map<K, V>` — key-value mappings
 - `struct` — user-defined structures
 
-Like in Python, numbers are copied, while objects are passed by reference. Use `copy(x)` when you need a separate copy.
+Like in Python, numbers are copied, while objects are passed by reference. Use `copy(x)` when you need a separate shallow copy. Objects live on a garbage-collected heap, and a reference is never null.
+
+```go
+[i32]main()
+|   array<i32> scores = [10, 20, 30]
+|   scores[0] = 5
+|   for score in scores
+|   |   echo("score: " + score)
+|
+|   map<string, i32> ports = {"ssh": 22}
+|   ports["http"] = 80
+|   if has(ports, "ssh")
+|   |   del(ports, "ssh")
+|   for name in ports                // keys come in insertion order
+|   |   echo(name + " = " + ports[name])
+|
+|   return len(scores) + len(ports)
+```
+
+Map keys are integers or strings. An index out of bounds, a missing map key or an integer division by zero stops the program with a message, the line number and exit code 101:
+
+```
+Runtime Error: index 3 out of bounds (len 3) at line 5
+```
 
 ### ⚙️ Typing
 
@@ -182,7 +205,7 @@ The return type goes in square brackets, and the parameter type goes before its 
 ### ⚖️ Control Structures
 
 - `if`, `else if`, `else`
-- `for i in range(n)`
+- `for i in range(n)`, `for x in array`, `for key in map`
 - `while ...`
 - `break`, `continue`
 
@@ -223,10 +246,12 @@ Labels go after the function declaration:
 |Functions, recursion, calling before declaration|✅ Working|
 |Modules, `@strict`, `@pure`, `@entry`|✅ Working|
 |JIT and native executables|✅ Working|
-|Arrays: element access, `for x in array`|🚧 Type-checked, code generation in progress|
-|Structs and `copy`|🚧 Type-checked, code generation in progress|
-|Garbage collection (Boehm)|🚧 Linked, not used yet|
-|Maps|🚧 Type-checked, not generated yet|
+|Arrays: literals, nesting, `a[i]`, `len`, `for x in array`, bounds checks|✅ Working|
+|Maps: `m[k]`, `has`, `del`, `len`, `for k in map`|✅ Working|
+|Structs: `P()`, fields, nesting, arrays of structs|✅ Working|
+|`copy` for arrays, maps and structs|✅ Working|
+|Garbage collection (Boehm)|✅ Working|
+|Runtime errors with line numbers|✅ Working|
 |Struct methods|📅 Planned|
 |Lambdas and pipes (`\|>`)|📅 Planned|
 |Null safety|📅 Planned|
