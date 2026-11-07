@@ -25,6 +25,13 @@ void TypeSymbolVisitor::visit(GenericTypeNode &node)
         param->accept(*this);
     }
     
+    // Ключ map сравнивается на равенство: у float мешает точность, а у объектов равенства нет
+    if (node.baseName == "map" && !node.typeParameters.empty()) {
+        const std::string keyType = node.typeParameters[0]->toString();
+        if (keyType != "string" && (getTypeRank(keyType) == 0 || keyType == "float"))
+            LogError("Map key must be an integer or string, got " + keyType);
+    }
+
     node.inferredType = baseType;
 }
 

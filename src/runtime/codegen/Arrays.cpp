@@ -28,9 +28,10 @@ namespace Arrays
 
     llvm::Value* emitLiteral(CodeGenContext& context, const std::shared_ptr<ASTNode>& literal, const std::shared_ptr<TypeNode>& arrayType)
     {
+        if (Maps::isMap(arrayType))
+            return Maps::emitLiteral(context, literal, arrayType);
+
         auto generic = std::dynamic_pointer_cast<GenericTypeNode>(arrayType);
-        if (generic && generic->baseName == "map")
-            throw std::runtime_error("Codegen Error: map пока не реализован");
         if (!generic || generic->baseName != "array")
             throw std::runtime_error("Codegen Error: литерал массива для типа " + (arrayType ? arrayType->toString() : std::string("?")));
 
@@ -63,7 +64,7 @@ namespace Arrays
         return variable;
     }
 
-    llvm::Value* emitElementPtr(CodeGenContext& context, AccessExpression& root, llvm::Type*& elementType)
+    llvm::Value* emitElementPtr(CodeGenContext& context, AccessExpression& root, llvm::Type*& elementType, bool forWrite)
     {
         ASTGen codeGen(context);
         root.expression->accept(codeGen);
@@ -85,7 +86,11 @@ namespace Arrays
 
             elementType = context.getLLVMType(next->inferredType, context.TheContext);
 
-            if (link->notation == "[]") {
+            if (link->notation == "[]" && Maps::isMap(currentType)) {
+                // Только последнее звено записи создаёт ключ: в m[k][0] = x ключ k должен уже быть
+                const bool createKey = forWrite && !next->nextAccess;
+                elementPtr = Maps::emitSlot(context, base, Maps::emitKey(context, next->expression, currentType), createKey, next->line);
+            } else if (link->notation == "[]") {
                 next->expression->accept(codeGen);
                 llvm::Value* index = TypeConversions::loadValueIfPointer(context, codeGen.getResult());
                 index = TypeConversions::applyImplicitCast(context, index, next->expression->implicitCastTo);

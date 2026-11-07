@@ -388,8 +388,12 @@ void TypeSymbolVisitor::findMaxRank(const std::shared_ptr<ASTNode>& node, int& m
         findMaxRank(unary->operand, maxRank);
     }
     if (auto call = std::dynamic_pointer_cast<CallNode>(node)) {
-        // Важен тип, который вызов возвращает, а не типы его аргументов
-        if (contexts.back().functions.find(call->callee) == contexts.back().functions.end()) {
+        // Важен тип, который вызов возвращает, а не типы его аргументов.
+        // У встроенных len, has и P() записи в таблице функций нет, зато тип уже выведен
+        if (call->inferredType) {
+            maxRank = std::max(maxRank, getTypeRank(call->inferredType->toString()));
+        }
+        else if (contexts.back().functions.find(call->callee) == contexts.back().functions.end()) {
             if (registry.findFunction(call->callee) == nullptr)
                 LogError("Function not found: " + call->callee, node);
             else
@@ -522,20 +526,17 @@ void TypeSymbolVisitor::validateCollectionElements(
                 auto expectedKeyType = genericType->typeParameters[0];
                 auto expectedValueType = genericType->typeParameters[1];
 
-                // Проверка ключа
-                if (auto expectedGenericKey = std::dynamic_pointer_cast<GenericTypeNode>(expectedKeyType)) {
+                // Ключ и значение подчиняются тем же правилам, что и обычное присваивание
+                if (std::dynamic_pointer_cast<GenericTypeNode>(expectedKeyType)) {
                     validateCollectionElements(expectedKeyType, keyValue->key, isAuto);
-                } else if (keyType->toString() != expectedKeyType->toString()) {
-                    if (!(numericRank(keyType->toString(), maxRank) > 0 && numericRank(expectedKeyType->toString(), maxRank) > 0))
-                        LogError("Key type mismatch: expected " + expectedKeyType->toString() + ", got " + keyType->toString(), keyValue->key);
+                } else {
+                    checkConversion(keyValue->key, expectedKeyType->toString());
                 }
 
-                // Проверка значения
-                if (auto expectedGenericValue = std::dynamic_pointer_cast<GenericTypeNode>(expectedValueType)) {
+                if (std::dynamic_pointer_cast<GenericTypeNode>(expectedValueType)) {
                     validateCollectionElements(expectedValueType, keyValue->value, isAuto);
-                } else if (valueType->toString() != expectedValueType->toString()) {
-                    if (!(numericRank(valueType->toString(), maxRank) > 0 && numericRank(expectedValueType->toString(), maxRank) > 0))   
-                        LogError("Value type mismatch: expected " + expectedValueType->toString() + ", got " + valueType->toString(), keyValue->value);
+                } else {
+                    checkConversion(keyValue->value, expectedValueType->toString());
                 }
 
                 // Проверка ключей на дубликацию

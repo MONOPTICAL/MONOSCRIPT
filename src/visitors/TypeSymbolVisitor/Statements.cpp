@@ -161,6 +161,11 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
    
     std::unordered_map<std::string, std::shared_ptr<TypeNode>> args = {};
 
+    // Простой тип возврата может быть void, которого нет в реестре типов
+    if (std::dynamic_pointer_cast<GenericTypeNode>(node.returnType)) {
+        node.returnType->accept(*this);
+    }
+
     // Проходим по параметрам функции
     for (const auto& param : node.parameters) {
         param.first->accept(*this); // Проверяем тип параметра
@@ -351,6 +356,7 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
             }
             else {
                 node.type = inferredType;
+                node.type->accept(*this); // Выведенный тип подчиняется тем же правилам, что и написанный
             }
             varType = node.type->toString(); // Обновляем varType после вывода
         }
@@ -468,20 +474,8 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
             return;
         }
 
-        if (auto keyValue = std::dynamic_pointer_cast<KeyValueNode>(Block->statements[0])) {
-            std::vector<std::string> types = { keyValue->key->inferredType->toString(), keyValue->value->inferredType->toString() };
-            if (types[0] != Generic->typeParameters[0]->toString()) {
-                LogError("Key type mismatch: expected " + Generic->typeParameters[0]->toString() + ", got " + types[0], node.expression);
-            }
-            if (types[1] != Generic->typeParameters[1]->toString()) {
-                LogError("Value type mismatch: expected " + Generic->typeParameters[1]->toString() + ", got " + types[1], node.expression);
-            }
-            expressionType = "map<" + types[0] + ", " + types[1] + ">";
-        } 
-        else {
-            // Элементы уже проверил validateCollectionElements
-            expressionType = varTypeStr;
-        }
+        // Элементы уже проверил validateCollectionElements
+        expressionType = varTypeStr;
     }
     else
     {
@@ -585,8 +579,8 @@ void TypeSymbolVisitor::visit(ForNode& node) {
         // Проверяем тип переменной
         node.iterable->accept(*this);
         auto collection = std::dynamic_pointer_cast<GenericTypeNode>(node.iterable->inferredType);
-        if (!collection || collection->baseName != "array") {
-            LogError("for expects an array or range(n), got " + (node.iterable->inferredType ? node.iterable->inferredType->toString() : std::string("unknown")), node.iterable);
+        if (!collection || (collection->baseName != "array" && collection->baseName != "map")) {
+            LogError("for expects an array, map or range(n), got " + (node.iterable->inferredType ? node.iterable->inferredType->toString() : std::string("unknown")), node.iterable);
         }
 
         node.varType = collection->typeParameters[0]; // Переменная цикла это элемент массива
@@ -731,10 +725,40 @@ void TypeSymbolVisitor::visit(CallNode& node) {
         if (!argTypes[0]) {
             LogError("len cannot take a collection literal, assign it to a variable first", node.arguments[0]);
         }
-        if (!argTypes[0]->toString().starts_with("array")) {
-            LogError("len expects an array, got " + argTypes[0]->toString(), node.arguments[0]);
+        if (!argTypes[0]->toString().starts_with("array") && !argTypes[0]->toString().starts_with("map")) {
+            LogError("len expects an array or map, got " + argTypes[0]->toString(), node.arguments[0]);
         }
         node.inferredType = registry.findType("i32");
+        return;
+    }
+
+    // has(m, k) и del(m, k). Функция с таким же именем важнее
+    if ((node.callee == "has" || node.callee == "del")
+        && contexts.back().functions.find(node.callee) == contexts.back().functions.end()
+        && declaredFunctions.find(node.callee) == declaredFunctions.end()) {
+        if (node.arguments.size() != 2) {
+            LogError(node.callee + " expects 2 arguments, got " + std::to_string(node.arguments.size()), node.shared_from_this());
+        }
+        auto map = std::dynamic_pointer_cast<GenericTypeNode>(argTypes[0]);
+        if (!map || map->baseName != "map") {
+            LogError(node.callee + " expects a map, got " + (argTypes[0] ? argTypes[0]->toString() : std::string("a literal")), node.arguments[0]);
+        }
+        checkConversion(node.arguments[1], map->typeParameters[0]->toString(), node.callee + ", key: ");
+
+        if (node.callee == "del") {
+            // Те же правила, что у записи m[k] = v
+            if (auto baseId = std::dynamic_pointer_cast<IdentifierNode>(node.arguments[0])) {
+                auto it = contexts.back().variables.find(baseId->name);
+                auto var = it != contexts.back().variables.end() ? std::dynamic_pointer_cast<VariableAssignNode>(it->second) : nullptr;
+                if (var && var->isConst)
+                    LogError("Cannot modify member of constant variable: " + baseId->name, node.shared_from_this());
+                if (var && !var->expression && checkLabels("@pure"))
+                    LogError("Pure function cannot modify object passed to it: " + baseId->name, node.shared_from_this());
+            }
+            node.inferredType = std::make_shared<SimpleTypeNode>("void");
+        } else {
+            node.inferredType = registry.findType("i1");
+        }
         return;
     }
 

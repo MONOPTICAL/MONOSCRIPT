@@ -109,6 +109,8 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
                                               getTypeRank(keyTypeStr) > 0 && keyTypeStr != "float";
                     if (indexTypeStr != keyTypeStr && !bothIntegers)
                         LogError("Map key must be " + keyTypeStr + ", got " + indexTypeStr, indexNode->expression);
+                    // Сужение обрезало бы ключ, и нашлось бы не то значение
+                    checkConversion(indexNode->expression, keyTypeStr);
                 }
             }
 
