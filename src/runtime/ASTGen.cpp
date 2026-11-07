@@ -386,6 +386,7 @@ void ASTGen::visit(IfNode& node) {
         return;
     }
 
+    condValue = TypeConversions::loadValueIfPointer(context, condValue, "condition");
     if (!condValue->getType()->isIntegerTy(1)) {
         condValue = context.Builder.CreateICmpNE(
             condValue, 
@@ -622,6 +623,7 @@ void ASTGen::visit(WhileNode& node) {
         return;
     }
 
+    condValue = TypeConversions::loadValueIfPointer(context, condValue, "condition");
     if (!condValue->getType()->isIntegerTy(1)) {
         condValue = context.Builder.CreateICmpNE(
             condValue,
@@ -943,6 +945,7 @@ void ASTGen::visit(UnaryOpNode& node) {
     }
     
     result = Expressions::handleUnaryOperation(context, node, operand);
+    if (node.op == "try") result = TypeConversions::applyCharCast(context, node, result);
 }
 
 void ASTGen::visit(IdentifierNode& node) {

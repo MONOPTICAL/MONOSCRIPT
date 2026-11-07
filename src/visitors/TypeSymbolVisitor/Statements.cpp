@@ -466,7 +466,8 @@ void TypeSymbolVisitor::visit(BlockNode &node)
         statement->accept(*this);
 
         // Забытая проверка ошибки: write_text(...) без чтения результата молча теряет ошибку
-        if (std::dynamic_pointer_cast<CallNode>(statement) || std::dynamic_pointer_cast<AccessExpression>(statement)) {
+        if (std::dynamic_pointer_cast<CallNode>(statement) || std::dynamic_pointer_cast<AccessExpression>(statement) ||
+            std::dynamic_pointer_cast<UnaryOpNode>(statement)) {
             const std::string type = statement->inferredType ? statement->inferredType->toString() : "";
             if (type.starts_with("result"))
                 LogError("The result is not used: check it, or write _ ^= ... to ignore it on purpose", statement);
@@ -483,7 +484,7 @@ static std::string getType(std::shared_ptr<ASTNode> expression, std::string type
         else
             return type;
     else if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(expression))
-        return (unary->op == "neg") ? type : "i1";
+        return (unary->op == "neg" || unary->op == "try") ? type : "i1";
     else
         return type;
 };
@@ -580,6 +581,8 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
         node.expression->accept(*this);
         auto exprType = node.expression->implicitCastTo ? node.expression->implicitCastTo
                                                         : node.expression->inferredType;
+        if (exprType && exprType->toString() == "void")
+            LogError("Cannot bind void value to a variable", node.expression);
         if (isAuto && exprType && exprType->toString() == "result literal") {
             LogError("Cannot infer the type of " + std::dynamic_pointer_cast<CallNode>(node.expression)->callee + "(), declare it: result<T> " + node.name + " = ...", node.shared_from_this());
         }

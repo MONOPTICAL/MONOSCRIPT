@@ -298,7 +298,19 @@ std::shared_ptr<ASTNode> Parser::parseUnary()
         node->line = lineIndex; node->column = tokenIndex; // Устанавливаем строку и колонку для узла
         return node; // Возвращаем узел унарной операции
     }
-    return parsePrimary(); // Если нет унарной операции, разбираем первичное выражение
+    return parsePostfix(parsePrimary());
+}
+
+std::shared_ptr<ASTNode> Parser::parsePostfix(std::shared_ptr<ASTNode> expression)
+{
+    while (check(TokenType::Operator) && current().value == "?") {
+        const int line = lineIndex, column = tokenIndex;
+        advance();
+        expression = std::make_shared<UnaryOpNode>("try", expression);
+        expression->line = line; expression->column = column;
+        if (check(TokenType::Arrow)) expression = parseCast(expression);
+    }
+    return expression;
 }
 
 std::shared_ptr<ASTNode> Parser::parsePrimary()

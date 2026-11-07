@@ -54,13 +54,14 @@ std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSym
     } else if (std::dynamic_pointer_cast<BinaryOpNode>(node) || std::dynamic_pointer_cast<UnaryOpNode>(node)) {
         auto binary = std::dynamic_pointer_cast<BinaryOpNode>(node);
         auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node);
-        const bool isBoolean = (unary && unary->op != "neg") ||
+        const bool isBoolean = (unary && unary->op != "neg" && unary->op != "try") ||
             (binary && (binary->op.starts_with("icmp_") || binary->op.starts_with("fcmp_") ||
                         binary->op.starts_with("strcmp_") || binary->op == "and" || binary->op == "or"));
 
         std::string toStringMethod = "toString_int";
         const std::string typeName = type->toString();
-        if (isBoolean) toStringMethod = "toString_bool";
+        if (typeName == "char") toStringMethod = "toString_char";
+        else if (isBoolean || typeName == "i1") toStringMethod = "toString_bool";
         else if (typeName == "float") toStringMethod = "toString_float";
         else if (typeName == "f64") toStringMethod = "toString_f64";
         else if (typeName == "i64") toStringMethod = "toString_long";
@@ -255,7 +256,7 @@ void TypeSymbolVisitor::handleMinusOperator(std::shared_ptr<BinaryOpNode>& node,
         return;
     }
 
-    LogError("Unsupported operand types for '+': " + left + " and " + right, node->right->shared_from_this());
+    LogError("Unsupported operand types for '-': " + left + " and " + right, node->right->shared_from_this());
 }
 
 void TypeSymbolVisitor::handleMulOperator(std::shared_ptr<BinaryOpNode>& node, std::shared_ptr<TypeNode> leftType, std::shared_ptr<TypeNode> rightType)
@@ -300,7 +301,7 @@ void TypeSymbolVisitor::handleMulOperator(std::shared_ptr<BinaryOpNode>& node, s
         return;
     }
 
-    LogError("Unsupported operand types for '+': " + left + " and " + right, node->right->shared_from_this());
+    LogError("Unsupported operand types for '*': " + left + " and " + right, node->right->shared_from_this());
 }
 
 void TypeSymbolVisitor::handleDivOperator(std::shared_ptr<BinaryOpNode>& node, std::shared_ptr<TypeNode> leftType, std::shared_ptr<TypeNode> rightType)

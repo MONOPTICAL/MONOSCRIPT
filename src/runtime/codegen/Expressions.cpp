@@ -273,6 +273,31 @@ llvm::Value* Expressions::handleUnaryOperation(CodeGenContext& context, UnaryOpN
         operand = TypeConversions::applyImplicitCast(context, operand, node.operand->implicitCastTo, "operand");
     }
     
+    // r?: propagate an error using the caller's result layout; unwrap on success.
+    if (node.op == "try") {
+        auto sourceLayout = context.getResultStruct(node.operand->inferredType);
+        auto destinationLayout = context.getResultStruct(context.CurrentReturnType);
+        auto function = context.Builder.GetInsertBlock()->getParent();
+        auto okBlock = llvm::BasicBlock::Create(context.TheContext, "try.ok", function);
+        auto errorBlock = llvm::BasicBlock::Create(context.TheContext, "try.error", function);
+        auto ok = context.Builder.CreateLoad(context.Builder.getInt8Ty(),
+            context.Builder.CreateStructGEP(sourceLayout, operand, 0));
+        context.Builder.CreateCondBr(context.Builder.CreateICmpNE(ok, context.Builder.getInt8(0)), okBlock, errorBlock);
+        context.Builder.SetInsertPoint(errorBlock);
+        auto code = context.Builder.CreateLoad(context.Builder.getInt32Ty(), context.Builder.CreateStructGEP(sourceLayout, operand, 1));
+        auto error = context.Builder.CreateLoad(context.Builder.getPtrTy(), context.Builder.CreateStructGEP(sourceLayout, operand, 2));
+        auto size = context.TheModule->getDataLayout().getTypeAllocSize(destinationLayout);
+        auto propagated = context.allocateObject(context.Builder.getInt64(size), true, "propagated_error");
+        context.Builder.CreateStore(context.Builder.getInt8(0), context.Builder.CreateStructGEP(destinationLayout, propagated, 0));
+        context.Builder.CreateStore(code, context.Builder.CreateStructGEP(destinationLayout, propagated, 1));
+        context.Builder.CreateStore(error, context.Builder.CreateStructGEP(destinationLayout, propagated, 2));
+        context.Builder.CreateRet(propagated);
+        context.Builder.SetInsertPoint(okBlock);
+        if (node.inferredType->toString() == "void") return nullptr;
+        return context.Builder.CreateLoad(context.getLLVMType(node.inferredType, context.TheContext),
+            context.Builder.CreateStructGEP(sourceLayout, operand, 3), "unwrapped");
+    }
+
     // ?r: байт ok объекта result
     if (node.op == "nullcheck") {
         llvm::StructType* layout = context.getResultStruct(node.operand->inferredType);

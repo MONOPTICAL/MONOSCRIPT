@@ -262,6 +262,8 @@ void TypeSymbolVisitor::checkPureAlias(const std::shared_ptr<ASTNode>& expr) {
                         result = !variable->expression || borrowed(variable->expression);
             } else if (auto access = std::dynamic_pointer_cast<AccessExpression>(value)) {
                 result = borrowed(access->expression);
+            } else if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(value)) {
+                result = borrowed(unary->operand);
             } else if (auto call = std::dynamic_pointer_cast<CallNode>(value)) {
                 const bool builtinCopy = call->callee == "copy" &&
                     !contexts.back().functions.count("copy") && !declaredFunctions.count("copy");
