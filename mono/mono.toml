@@ -1,14 +1,44 @@
 [[function]]
-name = "sum"
-pure = true
-ret = "i32"
-args = ["i32","i32"]
-
-[[function]]
 name = "scat"
 pure = true
 ret = "string"
 args = ["string", "string"]
+
+[[function]]
+name = "str_len"
+pure = true
+ret = "i32"
+args = ["string"]
+
+[[function]]
+name = "getIndex"
+pure = true
+ret = "string"
+args = ["string", "i32"]
+
+[[function]]
+name = "substr"
+pure = true
+ret = "string"
+args = ["string", "i32", "i32"]
+
+[[function]]
+name = "strfind"
+pure = true
+ret = "i32"
+args = ["string", "string"]
+
+[[function]]
+name = "split"
+pure = true
+ret = "array<string>"
+args = ["string", "string"]
+
+[[function]]
+name = "toInt"
+pure = true
+ret = "i32"
+args = ["string"]
 
 [[function]]
 name = "toString_int"
@@ -44,11 +74,6 @@ args = ["i64"]
 name = "echo"
 ret = "void"
 args = ["string"]
-
-[[function]]
-name = "test"
-ret = "void"
-args = []
 
 [[function]]
 name = "gc_collect"

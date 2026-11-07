@@ -60,13 +60,13 @@ if(LLVM_FOUND)
 
   # СТАНДАРНАЯ БИБЛИОТЕКА
   # ----------------------
-  file(GLOB D_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/mono/*.d") # Получаем все .d файлы в папке std
+  file(GLOB_RECURSE D_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/mono/*.d") # Все .d файлы в mono и подпапках
   set(D_LIB ${CMAKE_BINARY_DIR}/libm_std.so) # Путь к .so библиотеке
 
   # Создаём .so библиотеку из .d файлов
   add_custom_command(
       OUTPUT ${D_LIB}
-      COMMAND dmd -betterC -shared -fPIC -L-lgc -of=${D_LIB} ${D_SOURCES}
+      COMMAND dmd "-I${CMAKE_SOURCE_DIR}" -betterC -shared -fPIC -L-lgc -of=${D_LIB} ${D_SOURCES}
       DEPENDS ${D_SOURCES}
       COMMENT "Building D shared library: ${D_LIB}"
   )
