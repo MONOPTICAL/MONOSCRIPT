@@ -75,7 +75,7 @@ bool Linker::processImports(ModuleContext& module) {
                 if (modules.find(moduleName) == modules.end()) {
                     // Пытаемся загрузить модуль, если он ещё не загружен
                     if (!loadModule(moduleName)) {
-                        std::cerr << "Ошибка: Не удалось найти модуль " << moduleName << std::endl;
+                        std::cerr << "Error: could not find module " << moduleName << std::endl;
                         return false;
                     }
                 }
@@ -87,7 +87,7 @@ bool Linker::processImports(ModuleContext& module) {
                     
                     // Проверяем, существует ли символ в модуле
                     if (!symbolExists(moduleName, symbolName)) {
-                        std::cerr << "Ошибка: Символ " << symbolName << " не найден в модуле " << moduleName << std::endl;
+                        std::cerr << "Error: symbol " << symbolName << " not found in module " << moduleName << std::endl;
                         return false;
                     }
                     
@@ -170,7 +170,7 @@ bool Linker::loadModule(const std::string& moduleName) {
     // Чтение файла модуля
     std::ifstream file(filePath);
     if (!file) {
-        std::cerr << "Ошибка: не удалось открыть файл модуля " << filePath << std::endl;
+        std::cerr << "Error: could not open module file " << filePath << std::endl;
         return false;
     }
     

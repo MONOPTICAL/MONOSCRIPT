@@ -317,7 +317,7 @@ void ASTGen::visit(VariableAssignNode& node) {
 void ASTGen::visit(ReassignMemberNode& node) {
     auto access = std::dynamic_pointer_cast<AccessExpression>(node.accessExpression);
     if (!access)
-        throw std::runtime_error("Codegen Error: присваивание не в элемент массива");
+        throw std::runtime_error("Codegen Error: assignment target is not an element or field");
 
     // Как в Python: сначала значение, потом место, куда оно запишется
     llvm::Value* value = nullptr;
@@ -627,7 +627,7 @@ void ASTGen::visit(CallNode& node) {
     }
 
     if (!calleeFunc) {
-        throw std::runtime_error("Codegen Error: неизвестная функция: " + node.callee);
+        throw std::runtime_error("Codegen Error: unknown function: " + node.callee);
     }
 
     if (calleeFunc->arg_size() != node.arguments.size()) {
