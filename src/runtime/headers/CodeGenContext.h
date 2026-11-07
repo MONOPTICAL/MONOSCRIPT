@@ -36,6 +36,7 @@ public:
     llvm::Function*                     StartFunction = nullptr; // Точка входа программы: инициализирует рантайм и глобальные переменные
     std::shared_ptr<TypeNode>           CurrentReturnType; // Что возвращает функция, которая генерируется сейчас
     std::map<std::string, StructLayout> Structs;
+    int                                 CurrentLine = -1; // Строка инструкции, которая генерируется сейчас, для сообщений об ошибках
 
     std::vector<llvm::BasicBlock*> loopEndBlocks;    // Стек для блоков выхода из цикла (для break)
     std::vector<llvm::BasicBlock*> loopCondBlocks;   // Стек для блоков условия цикла (для continue)

@@ -4,8 +4,9 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
     node.left->accept(*this);
     node.right->accept(*this);
 
-    std::shared_ptr<TypeNode> leftType = node.left->inferredType;
-    std::shared_ptr<TypeNode> rightType = node.right->inferredType;
+    // Важен тип значения после приведения: (a->i32) + 1 при float a это целая операция
+    std::shared_ptr<TypeNode> leftType = node.left->implicitCastTo ? node.left->implicitCastTo : node.left->inferredType;
+    std::shared_ptr<TypeNode> rightType = node.right->implicitCastTo ? node.right->implicitCastTo : node.right->inferredType;
     
     std::shared_ptr<BinaryOpNode> root = std::make_shared<BinaryOpNode>(node.left, node.op, node.right);
     root->implicitCastTo = node.implicitCastTo; // Явный каст (a + b)->i32 не должен потеряться

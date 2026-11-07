@@ -161,11 +161,13 @@ Like in Python, numbers are copied, while objects are passed by reference. Use `
 |   return len(scores) + len(ports)
 ```
 
-Map keys are integers or strings. An index out of bounds, a missing map key or an integer division by zero stops the program with a message, the line number and exit code 101:
+Map keys are integers or strings. An index out of bounds, a missing map key, an integer division by zero, or a cast from `float` that does not fit stops the program with a message, the line number and exit code 101:
 
 ```
 Runtime Error: index 3 out of bounds (len 3) at line 5
 ```
+
+Integer addition, subtraction and multiplication wrap around on overflow, so `2147483647 + 1` in `i32` is `-2147483648`. The one integer operation that stops the program is dividing the smallest value of a type by `-1`.
 
 ### ⚙️ Typing
 

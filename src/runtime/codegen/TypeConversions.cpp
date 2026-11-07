@@ -5,7 +5,43 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Intrinsics.h>
+#include <cmath>
 #include <string>
+
+// float в целое. Значение, которое не помещается, и NaN для LLVM это неопределённое поведение: получался мусор
+static llvm::Value* emitFloatToInt(CodeGenContext& context, llvm::Value* value, llvm::Type* targetType, const std::string& name) {
+    llvm::Type* floatType = value->getType();
+    const unsigned width = targetType->getIntegerBitWidth();
+
+    // Дробная часть отбрасывается, поэтому в i8 помещается и -128.9. Сравнения с NaN всегда ложны
+    llvm::Value* truncated = context.Builder.CreateUnaryIntrinsic(llvm::Intrinsic::trunc, value);
+    llvm::Value* fits;
+    if (width == 1) {
+        fits = context.Builder.CreateFCmpOEQ(value, value, "is_number");
+    } else {
+        const double limit = std::ldexp(1.0, width - 1);
+        fits = context.Builder.CreateAnd(
+            context.Builder.CreateFCmpOGE(truncated, llvm::ConstantFP::get(floatType, -limit)),
+            context.Builder.CreateFCmpOLT(truncated, llvm::ConstantFP::get(floatType, limit)),
+            "fits"
+        );
+    }
+
+    llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
+    llvm::BasicBlock* errorBlock = llvm::BasicBlock::Create(context.TheContext, "cast.overflow", function);
+    llvm::BasicBlock* okBlock = llvm::BasicBlock::Create(context.TheContext, "cast.ok", function);
+    context.Builder.CreateCondBr(fits, okBlock, errorBlock);
+
+    context.Builder.SetInsertPoint(errorBlock);
+    context.emitPanic("float value out of range for i" + std::to_string(width), context.CurrentLine);
+
+    context.Builder.SetInsertPoint(okBlock);
+    // В i1 истина это всё, что не ноль: fptosi дал бы -1, который в i1 не помещается
+    if (width == 1)
+        return context.Builder.CreateFCmpUNE(truncated, llvm::ConstantFP::get(floatType, 0.0), name + "_fp2bool");
+    return context.Builder.CreateFPToSI(value, targetType, name + "_fp2int");
+}
 
 llvm::Value* TypeConversions::loadValueIfPointer(CodeGenContext& context, llvm::Value* value, const std::string& name) {
     if (!value->getType()->isPointerTy()) {
@@ -78,7 +114,7 @@ llvm::Value* TypeConversions::convertValueToType(CodeGenContext& context, llvm::
     } 
     // Плавающая точка в целое
     else if (value->getType()->isFloatingPointTy() && targetType->isIntegerTy()) {
-        return context.Builder.CreateFPToSI(value, targetType, castName + "_fp2int");
+        return emitFloatToInt(context, value, targetType, castName);
     } 
     // Целое в целое
     else if (value->getType()->isIntegerTy() && targetType->isIntegerTy()) {

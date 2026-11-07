@@ -150,6 +150,15 @@ set_target_properties(ms_check run_tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${C
 
 add_test(NAME frontend COMMAND run_tests $<TARGET_FILE:ms_check> ${CMAKE_SOURCE_DIR}/tests/frontend)
 
+# Все сочетания типа, источника значения и контекста: около минуты на режим, поэтому отдельно от обычных тестов
+if(LLVM_FOUND)
+  add_custom_target(test-matrix
+      COMMAND python3 -I ${CMAKE_SOURCE_DIR}/tests/matrix.py $<TARGET_FILE:ms>
+      DEPENDS ms
+      USES_TERMINAL
+  )
+endif()
+
 # Собирает только нужное для тестов и сразу гоняет их
 add_custom_target(test-frontend
     COMMAND run_tests $<TARGET_FILE:ms_check> ${CMAKE_SOURCE_DIR}/tests/frontend
@@ -161,3 +170,4 @@ add_custom_target(test-frontend
 # Билд с дебагом : cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build
 # Билд без дебага : cmake -B build -DCMAKE_BUILD_TYPE=Release
 # Тесты фронтенда : ./ms -run_tests или без LLVM: cmake --build build --target test-frontend
+# Перебор сочетаний : cmake --build build --target test-matrix

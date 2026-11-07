@@ -722,6 +722,8 @@ std::shared_ptr<ASTNode> Parser::parseMemberExpression()
         IdentifierASTNode->line = lineIndex; IdentifierASTNode->column = tokenIndex; // Устанавливаем строку и колонку для узла
         return IdentifierASTNode; // Возвращаем узел идентификатора
     }
+
+    if (check(TokenType::Arrow)) return parseCast(root); // a[0]->i32
     
     return root;
 }

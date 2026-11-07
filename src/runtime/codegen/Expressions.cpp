@@ -27,6 +27,24 @@ static void emitDivisionByZeroCheck(CodeGenContext& context, llvm::Value* diviso
     context.Builder.SetInsertPoint(okBlock);
 }
 
+// Самое маленькое число, делённое на -1, не помещается в свой тип, а для LLVM это неопределённое поведение
+static void emitDivisionOverflowCheck(CodeGenContext& context, llvm::Value* dividend, llvm::Value* divisor, int line) {
+    auto* type = llvm::cast<llvm::IntegerType>(dividend->getType());
+
+    llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
+    llvm::BasicBlock* errorBlock = llvm::BasicBlock::Create(context.TheContext, "div.overflow", function);
+    llvm::BasicBlock* okBlock = llvm::BasicBlock::Create(context.TheContext, "div.safe", function);
+
+    llvm::Value* isMin = context.Builder.CreateICmpEQ(dividend, llvm::ConstantInt::get(type, llvm::APInt::getSignedMinValue(type->getBitWidth())));
+    llvm::Value* isMinusOne = context.Builder.CreateICmpEQ(divisor, llvm::ConstantInt::getSigned(type, -1));
+    context.Builder.CreateCondBr(context.Builder.CreateAnd(isMin, isMinusOne), errorBlock, okBlock);
+
+    context.Builder.SetInsertPoint(errorBlock);
+    context.emitPanic("integer overflow", line);
+
+    context.Builder.SetInsertPoint(okBlock);
+}
+
 llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryOpNode& node, llvm::Value* left, llvm::Value* right) {
     left = TypeConversions::loadValueIfPointer(context, left, "left");
     right = TypeConversions::loadValueIfPointer(context, right, "right");
@@ -115,6 +133,10 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
             return context.Builder.CreateFDiv(left, right, "divtmp_float");
         } else {
             emitDivisionByZeroCheck(context, right, node.line);
+            // i1 это 0 или 1: со знаком истина была бы -1, и 1 / 1 считалось бы переполнением
+            if (left->getType()->isIntegerTy(1))
+                return context.Builder.CreateUDiv(left, right, "divtmp_bool");
+            emitDivisionOverflowCheck(context, left, right, node.line);
             return context.Builder.CreateSDiv(left, right, "divtmp_int");
         }
     }
@@ -129,13 +151,21 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
             return context.Builder.CreateFRem(left, right, "remtmp_float");
         } else {
             emitDivisionByZeroCheck(context, right, node.line);
-            return context.Builder.CreateSRem(left, right, "remtmp_int");
+            if (left->getType()->isIntegerTy(1))
+                return context.Builder.CreateURem(left, right, "remtmp_bool");
+            // Остаток от деления на -1 всегда 0, а srem на нём для самого маленького числа это неопределённое поведение.
+            // На 1 остаток тоже 0, поэтому просто подменяем делитель
+            llvm::Value* isMinusOne = context.Builder.CreateICmpEQ(right, llvm::ConstantInt::getSigned(right->getType(), -1));
+            llvm::Value* safeDivisor = context.Builder.CreateSelect(isMinusOne, llvm::ConstantInt::get(right->getType(), 1), right, "safe_divisor");
+            return context.Builder.CreateSRem(left, safeDivisor, "remtmp_int");
         }
     } 
     else if (node.op == "scat") {
         std::string TOML_path = loader::findTomlPath();
         if (TOML_path.empty()) {
+#if DEBUG
             std::cerr << "Warning: Не удалось найти путь к TOML-файлу" << std::endl;
+#endif
             return nullptr;
         }
 
