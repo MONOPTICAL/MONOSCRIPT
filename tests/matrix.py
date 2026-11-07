@@ -59,6 +59,8 @@ def contexts(t, src):
         'generic_id': ('[T]gid<T>(T: x)\n|   return x\n\n', f'|   echo("=" + gid({src}))', f'={text}'),
         'generic_first': ('[T]gfirst<T>(array<T>: a)\n|   return a[0]\n\n', f'|   array<{t}> b = [{src}]\n|   echo("=" + gfirst(b))', f'={text}'),
         'generic_local': ('[array<T>]gpair<T>(T: x)\n|   T y = x\n|   array<T> b = [x, y]\n|   return b\n\n', f'|   array<{t}> r = gpair({src})\n|   echo("=" + r[1])', f'={text}'),
+        'push': ('', f'|   array<{t}> b = []\n|   push(b, {src})\n|   echo("=" + pop(b))', f'={text}'),
+        'func_value': (f'[{t}]fid({t}: x)\n|   return x\n\n[{t}]fapply(func: f({t}: x) -> {t}, {t}: v)\n|   return f(v)\n\n', f'|   echo("=" + fapply(fid, {src}))', f'={text}'),
         'in_array': ('', f'|   array<{t}> b = [{src}]\n|   echo("=" + b[0])', f'={text}'),
         'in_map': ('', f'|   map<string,{t}> b = {{"z": {src}}}\n|   echo("=" + b["z"])', f'={text}'),
         'to_element': ('', f'|   array<{t}> b = [{value}]\n|   b[0] = {src}\n|   echo("=" + b[0])', f'={text}'),

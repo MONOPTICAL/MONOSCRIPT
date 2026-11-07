@@ -299,6 +299,7 @@ class CallNode : public ASTNode {
             : callee(callee), arguments(arguments) {}
         std::string callee;
         std::vector<std::shared_ptr<ASTNode>> arguments;
+        std::shared_ptr<TypeNode> functionValueType; // Вызов параметра типа func: keep(x)
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);
@@ -337,6 +338,7 @@ class IdentifierNode : public ASTNode {
         IdentifierNode() = default;
         IdentifierNode(const std::string& name) : name(name) {}
         std::string name;
+        std::shared_ptr<FunctionNode> referencedFunction; // Имя функции, переданной как значение: filter(a, isPositive)
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);

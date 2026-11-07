@@ -448,6 +448,14 @@ static void emitArrayFor(CodeGenContext& context, ASTGen& codeGen, ForNode& node
     context.Builder.CreateBr(condBlock);
 
     context.Builder.SetInsertPoint(condBlock);
+    // push и pop внутри цикла меняют длину: обход по старой длине прочитал бы чужую память
+    llvm::BasicBlock* changedBlock = llvm::BasicBlock::Create(context.TheContext, "for.changed", function);
+    llvm::BasicBlock* sameBlock = llvm::BasicBlock::Create(context.TheContext, "for.same", function);
+    context.Builder.CreateCondBr(context.Builder.CreateICmpNE(context.getArrayLength(array), length), changedBlock, sameBlock);
+    context.Builder.SetInsertPoint(changedBlock);
+    context.emitPanic("array changed during iteration", node.line);
+
+    context.Builder.SetInsertPoint(sameBlock);
     llvm::Value* current = context.Builder.CreateLoad(i32Type, index, "for.current");
     context.Builder.CreateCondBr(context.Builder.CreateICmpSLT(current, length, "for.check"), bodyBlock, endBlock);
 
@@ -650,6 +658,22 @@ void ASTGen::visit(CallNode& node) {
     // Сначала в модуле ищем хуйню
     llvm::Function* calleeFunc = context.TheModule->getFunction(node.callee);
 
+    // keep(x), где keep это параметр типа func: вызов по адресу
+    if (node.functionValueType) {
+        auto type = std::dynamic_pointer_cast<GenericTypeNode>(node.functionValueType);
+        std::vector<llvm::Type*> parameterTypes;
+        std::vector<llvm::Value*> arguments;
+        for (size_t i = 0; i + 1 < type->typeParameters.size(); i++) {
+            parameterTypes.push_back(context.getLLVMType(type->typeParameters[i], context.TheContext));
+            arguments.push_back(Arrays::emitValue(context, node.arguments[i], type->typeParameters[i]));
+        }
+        llvm::Type* returnType = context.getLLVMType(type->typeParameters.back(), context.TheContext);
+        llvm::Value* target = context.Builder.CreateLoad(context.Builder.getPtrTy(), context.NamedValues.at(node.callee), "function");
+        llvm::Value* call = context.Builder.CreateCall(llvm::FunctionType::get(returnType, parameterTypes, false), target, arguments);
+        result = returnType->isVoidTy() ? nullptr : TypeConversions::applyCharCast(context, node, call);
+        return;
+    }
+
     // Встроенная len(a). Функция с таким же именем важнее, семантика решила так же
     if (!calleeFunc && node.callee == "len") {
         node.arguments[0]->accept(*this);
@@ -668,6 +692,49 @@ void ASTGen::visit(CallNode& node) {
     if (!calleeFunc && node.callee == "cstr") {
         node.arguments[0]->accept(*this);
         result = TypeConversions::loadValueIfPointer(context, getResult());
+        return;
+    }
+
+    // Встроенные push(a, x) и pop(a)
+    if (!calleeFunc && (node.callee == "push" || node.callee == "pop")) {
+        auto arrayType = std::dynamic_pointer_cast<GenericTypeNode>(node.arguments[0]->inferredType);
+        llvm::Type* elementType = context.getLLVMType(arrayType->typeParameters[0], context.TheContext);
+        node.arguments[0]->accept(*this);
+        llvm::Value* array = TypeConversions::loadValueIfPointer(context, getResult());
+
+        llvm::StructType* header = context.getArrayStruct();
+        llvm::Value* lengthField = context.Builder.CreateStructGEP(header, array, 1);
+
+        if (node.callee == "push") {
+            llvm::Value* value = Arrays::emitValue(context, node.arguments[1], arrayType->typeParameters[0]);
+            const uint64_t elementSize = context.TheModule->getDataLayout().getTypeAllocSize(elementType);
+            context.Builder.CreateCall(context.getOrDeclareFunction("ms_array_reserve",
+                llvm::FunctionType::get(context.Builder.getVoidTy(), {context.Builder.getPtrTy(), context.Builder.getInt64Ty(), context.Builder.getInt32Ty()}, false)),
+                {array, context.Builder.getInt64(elementSize), context.Builder.getInt32(elementType->isPointerTy())});
+
+            // Данные могли переехать: адрес берём после reserve
+            llvm::Value* length = context.Builder.CreateLoad(context.Builder.getInt32Ty(), lengthField, "length");
+            context.Builder.CreateStore(value, context.Builder.CreateGEP(elementType, context.getArrayData(array), length));
+            context.Builder.CreateStore(context.Builder.CreateAdd(length, context.Builder.getInt32(1)), lengthField);
+            result = nullptr;
+            return;
+        }
+
+        llvm::Value* length = context.Builder.CreateLoad(context.Builder.getInt32Ty(), lengthField, "length");
+        llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
+        llvm::BasicBlock* emptyBlock = llvm::BasicBlock::Create(context.TheContext, "pop.empty", function);
+        llvm::BasicBlock* okBlock = llvm::BasicBlock::Create(context.TheContext, "pop.ok", function);
+        context.Builder.CreateCondBr(context.Builder.CreateICmpEQ(length, context.Builder.getInt32(0)), emptyBlock, okBlock);
+        context.Builder.SetInsertPoint(emptyBlock);
+        context.emitPanic("pop from an empty array", node.line);
+
+        context.Builder.SetInsertPoint(okBlock);
+        llvm::Value* last = context.Builder.CreateSub(length, context.Builder.getInt32(1), "last");
+        llvm::Value* slot = context.Builder.CreateGEP(elementType, context.getArrayData(array), last);
+        result = TypeConversions::applyCharCast(context, node, context.Builder.CreateLoad(elementType, slot, "popped"));
+        // Ссылку из освободившейся ячейки убираем, чтобы сборщик не держал объект
+        if (elementType->isPointerTy()) context.Builder.CreateStore(llvm::Constant::getNullValue(elementType), slot);
+        context.Builder.CreateStore(last, lengthField);
         return;
     }
 
@@ -855,6 +922,15 @@ void ASTGen::visit(IdentifierNode& node) {
     if (context.NamedValues.find(node.name) != context.NamedValues.end()) {
         result = TypeConversions::applyCharCast(context, node, context.NamedValues[node.name]);
         LogWarning("Найдена переменная " + node.name);
+        return;
+    }
+
+    // Функция как значение: её адрес
+    if (node.referencedFunction) {
+        llvm::Function* function = context.TheModule->getFunction(node.name);
+        if (!function) function = declareFunctionFromTOML(node.name, context.TheModule.get(), context.TheContext, loader::findTomlPath());
+        if (!function) throw std::runtime_error("Codegen Error: unknown function: " + node.name);
+        result = function;
         return;
     }
 

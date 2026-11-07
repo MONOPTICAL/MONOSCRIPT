@@ -72,7 +72,7 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
 
                     consume(TokenType::LeftParen, "Expected '(' after function type"); // Проверяем наличие левой скобки после типа параметра функции
                     std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> params;
-                    do
+                    if (!check(TokenType::RightParen)) do // func: f() -> i32 без параметров
                     {
                         std::shared_ptr<TypeNode> paramType = getFullType(); // Получаем полный тип параметра функции
                         consume(TokenType::Colon, "Expected ':' after parameter type"); // Проверяем наличие двоеточия после типа параметра функции

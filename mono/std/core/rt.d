@@ -2,6 +2,7 @@ module mono.std.core.rt;
 
 import core.stdc.stdio : fflush, fprintf, snprintf, stderr, stdout;
 import core.stdc.stdlib : exit, getenv;
+import mono.std.core.abi : MsArray;
 import core.sys.posix.unistd : isatty;
 
 extern(C) nothrow @nogc
@@ -49,6 +50,19 @@ extern(C) const(char)* ms_str_at(const char* text, long index, int line) nothrow
     for (long i = 0; i <= index; i++)
         if (text[i] == 0) ms_panic_index(index, cast(int) i, line);
     return text + index;
+}
+
+// Место ещё под один элемент: при нехватке ёмкость удваивается, данные переезжают
+extern(C) void ms_array_reserve(MsArray* array, size_t elementSize, int hasReferences) nothrow @nogc
+{
+    import core.stdc.string : memcpy;
+    if (array.length < array.capacity) return;
+
+    const int capacity = array.capacity < 4 ? 4 : array.capacity * 2;
+    void* data = allocate(capacity * elementSize, hasReferences != 0);
+    memcpy(data, array.data, array.length * elementSize);
+    array.data = data;
+    array.capacity = capacity;
 }
 
 private extern(C) void* ms_out_of_memory(size_t) nothrow @nogc

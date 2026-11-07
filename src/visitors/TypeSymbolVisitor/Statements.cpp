@@ -5,6 +5,7 @@
 #include <iostream>
 
 std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSymbolVisitor& visitor);
+std::shared_ptr<TypeNode> functionTypeOf(const FunctionNode& function);
 bool isLiteralExpression(const std::shared_ptr<ASTNode>& node);
 
 // Упоминается ли имя в типе: T в array<map<string,T>>
@@ -197,7 +198,7 @@ std::string TypeSymbolVisitor::instantiateGeneric(const std::shared_ptr<Function
 #include <string_view>
 #include <filesystem>
 
-static std::string moduleNameOf(const std::string& path) {
+std::string moduleNameOf(const std::string& path) {
     return std::filesystem::path(path).stem().string();
 }
 
@@ -599,6 +600,9 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
     // Добавляем переменную в реестр
     auto varNode = std::make_shared<VariableAssignNode>(node.name, node.isConst, node.type, node.expression);
     varNode->inferredType = node.type; // Устанавливаем тип переменной
+    if (node.type && node.type->toString().find("func") != std::string::npos) {
+        LogError("Functions can only be passed as arguments, not stored in variables: " + node.name, node.shared_from_this());
+    }
     varNode->isDeferred = node.isDeferred;
     if (node.isDeferred) {
         finalLoopDepth[varNode.get()] = loopDepth;
@@ -941,6 +945,25 @@ void TypeSymbolVisitor::visit(CallNode& node) {
             argTypes.push_back(node.arguments[i]->inferredType);
     }
 
+    // keep(x), где keep это параметр типа func. Переменная важнее функции с таким же именем
+    if (auto variable = contexts.back().variables.find(node.callee); variable != contexts.back().variables.end()) {
+        auto declared = std::dynamic_pointer_cast<VariableAssignNode>(variable->second);
+        auto type = declared ? std::dynamic_pointer_cast<GenericTypeNode>(declared->type) : nullptr;
+        if (!type || type->baseName != "func") {
+            LogError("'" + node.callee + "' is a variable, not a function", node.shared_from_this());
+        }
+
+        std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters;
+        for (size_t i = 0; i + 1 < type->typeParameters.size(); i++) parameters.push_back({type->typeParameters[i], ""});
+        if (node.arguments.size() != parameters.size()) {
+            LogError("Function " + node.callee + " expects " + std::to_string(parameters.size()) + " arguments, got " + std::to_string(node.arguments.size()), node.shared_from_this());
+        }
+        checkCallArguments(node.arguments, parameters, 0, "Function " + node.callee);
+        node.functionValueType = type;
+        node.inferredType = type->typeParameters.back();
+        return;
+    }
+
     // Имя в коде превращаем во внутреннее имя функции: свои и импортированные функции, алиасы
     auto scope = moduleScopes.find(moduleNameOf(currentModuleName));
     if (scope != moduleScopes.end()) {
@@ -1006,6 +1029,39 @@ void TypeSymbolVisitor::visit(CallNode& node) {
         node.callee = converted->callee;
         node.arguments = converted->arguments;
         visit(node);
+        return;
+    }
+
+    // push(a, x) и pop(a): массив растёт и уменьшается. Функция с таким же именем важнее
+    if ((node.callee == "push" || node.callee == "pop")
+        && contexts.back().functions.find(node.callee) == contexts.back().functions.end()
+        && declaredFunctions.find(node.callee) == declaredFunctions.end()) {
+        const size_t expected = node.callee == "push" ? 2 : 1;
+        if (node.arguments.size() != expected) {
+            LogError(node.callee + " expects " + std::to_string(expected) + " argument" + (expected == 1 ? "" : "s") + ", got " + std::to_string(node.arguments.size()), node.shared_from_this());
+        }
+        auto array = std::dynamic_pointer_cast<GenericTypeNode>(argTypes[0]);
+        if (!array || array->baseName != "array") {
+            LogError(node.callee + " expects an array, got " + (argTypes[0] ? argTypes[0]->toString() : std::string("a literal")), node.arguments[0]);
+        }
+
+        // Те же правила, что у записи a[i] = x
+        if (auto baseId = std::dynamic_pointer_cast<IdentifierNode>(node.arguments[0])) {
+            auto it = contexts.back().variables.find(baseId->name);
+            auto var = it != contexts.back().variables.end() ? std::dynamic_pointer_cast<VariableAssignNode>(it->second) : nullptr;
+            if (var && var->isConst)
+                LogError("Cannot modify member of constant variable: " + baseId->name, node.shared_from_this());
+            if (var && !var->expression && checkLabels("@pure"))
+                LogError("Pure function cannot modify object passed to it: " + baseId->name, node.shared_from_this());
+        }
+
+        if (node.callee == "push") {
+            std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters = {{argTypes[0], "array"}, {array->typeParameters[0], "value"}};
+            checkCallArguments(node.arguments, parameters, 0, "push");
+            node.inferredType = std::make_shared<SimpleTypeNode>("void");
+        } else {
+            node.inferredType = array->typeParameters[0];
+        }
         return;
     }
 
@@ -1091,6 +1147,15 @@ void TypeSymbolVisitor::visit(CallNode& node) {
     }
 
     checkCallArguments(node.arguments, func->parameters, 0, "Function " + node.callee);
+
+    // Чистая функция вызывает то, что ей передали: значит, передать можно только чистую
+    if (hasLabel(func, "@pure")) {
+        for (const auto& argument : node.arguments) {
+            auto reference = std::dynamic_pointer_cast<IdentifierNode>(argument);
+            if (reference && reference->referencedFunction && !hasLabel(reference->referencedFunction, "@pure"))
+                LogError("Pure function " + node.callee + " can only take @pure functions, " + reference->name + " is not", argument);
+        }
+    }
 
     node.inferredType = func->returnType; // Устанавливаем тип функции
 }
