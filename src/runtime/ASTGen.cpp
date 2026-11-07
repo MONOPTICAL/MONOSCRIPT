@@ -776,6 +776,39 @@ void ASTGen::visit(BinaryOpNode& node) {
         result = nullptr;
         return;
     }
+
+    // and и or не вычисляют правую часть, если ответ уже ясен: j > 0 and a[j - 1] > 0 не должно падать при j == 0
+    if (node.op == "and" || node.op == "or") {
+        auto toBool = [&](llvm::Value* value, const std::shared_ptr<ASTNode>& operand) {
+            value = TypeConversions::loadValueIfPointer(context, value);
+            value = TypeConversions::applyImplicitCast(context, value, operand->implicitCastTo);
+            if (!value->getType()->isIntegerTy(1))
+                value = context.Builder.CreateICmpNE(value, llvm::Constant::getNullValue(value->getType()), "to_bool");
+            return value;
+        };
+
+        llvm::Value* leftBool = toBool(left, node.left);
+        llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
+        llvm::BasicBlock* leftBlock = context.Builder.GetInsertBlock();
+        llvm::BasicBlock* rightBlock = llvm::BasicBlock::Create(context.TheContext, node.op + ".right", function);
+        llvm::BasicBlock* doneBlock = llvm::BasicBlock::Create(context.TheContext, node.op + ".done", function);
+
+        if (node.op == "and") context.Builder.CreateCondBr(leftBool, rightBlock, doneBlock);
+        else context.Builder.CreateCondBr(leftBool, doneBlock, rightBlock);
+
+        context.Builder.SetInsertPoint(rightBlock);
+        node.right->accept(*this);
+        llvm::Value* rightBool = toBool(getResult(), node.right);
+        llvm::BasicBlock* rightEnd = context.Builder.GetInsertBlock(); // Правая часть могла создать свои блоки
+        context.Builder.CreateBr(doneBlock);
+
+        context.Builder.SetInsertPoint(doneBlock);
+        llvm::PHINode* value = context.Builder.CreatePHI(context.Builder.getInt1Ty(), 2, node.op);
+        value->addIncoming(context.Builder.getInt1(node.op == "or"), leftBlock);
+        value->addIncoming(rightBool, rightEnd);
+        result = value;
+        return;
+    }
   
     if (!node.right) {
         LogWarning("Ошибка: правый операнд равен nullptr");
