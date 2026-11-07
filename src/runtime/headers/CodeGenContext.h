@@ -107,6 +107,8 @@ public:
     // Массив это объект в куче: заголовок { ptr data, i32 length, i32 capacity } и отдельный блок данных.
     // Переменная хранит ссылку на заголовок, тип элементов известен только из типов в AST
     llvm::StructType*                   getArrayStruct();
+    // result<T> в памяти: { i8 ok, i32 code, ptr error, T value }, у result<void> без value
+    llvm::StructType*                   getResultStruct(const std::shared_ptr<TypeNode>& resultType);
     // Память без ссылок сборщик не просматривает и не обнуляет: вызывающий заполняет её сам
     llvm::Value*                        allocateObject(llvm::Value* bytes, bool hasReferences, const std::string& name);
     llvm::Value*                        createArray(llvm::Type* elementType, llvm::Value* size);

@@ -74,6 +74,7 @@ static const std::vector<std::vector<std::string>> TIPS = {
     {"An index out of bounds stops the program with its line number and exit code 101."},
     {"has(m, k) checks a map key. Reading a missing key stops the program."},
     {"for k in m walks map keys in insertion order."},
+    {"A function that can fail returns result<T>. Check it with ?r, then read r.value or r.error."},
     {"Pass a function by name: filter(items, isValid). Inside, call it like any function."},
     {"push(a, x) and pop(a) grow and shrink an array. Changing it inside for x in a stops the program."},
     {"[T]first<T>(array<T>: a) is a generic function. The type comes from the arguments."},

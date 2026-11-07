@@ -280,6 +280,9 @@ void ASTGen::visit(BlockNode& node) {
 void ASTGen::visit(VariableAssignNode& node) {
     LogWarning("visit для VariableAssignNode: " + node.name);
     
+    // _ ^= f(): значение вычисляется, а имя можно занимать повторно
+    if (node.name == "_") context.NamedValues.erase("_");
+
     // Проверяем, существует ли переменная в таблице символов
     if (context.NamedValues.find(node.name) != context.NamedValues.end()) {
         LogWarning("!!!Переменная " + node.name + " уже существует!!!");
@@ -692,6 +695,33 @@ void ASTGen::visit(CallNode& node) {
     if (!calleeFunc && node.callee == "cstr") {
         node.arguments[0]->accept(*this);
         result = TypeConversions::loadValueIfPointer(context, getResult());
+        return;
+    }
+
+    // ok(x) и err(...): объект result нужного типа, тип ему дала семантика
+    if (!calleeFunc && (node.callee == "ok" || node.callee == "err")) {
+        llvm::StructType* layout = context.getResultStruct(node.inferredType);
+        const uint64_t size = context.TheModule->getDataLayout().getTypeAllocSize(layout);
+        llvm::Value* object = context.allocateObject(context.Builder.getInt64(size), true, node.callee);
+
+        context.Builder.CreateStore(context.Builder.getInt8(node.callee == "ok"), context.Builder.CreateStructGEP(layout, object, 0));
+        if (node.callee == "ok") {
+            context.Builder.CreateStore(context.Builder.getInt32(0), context.Builder.CreateStructGEP(layout, object, 1));
+            context.Builder.CreateStore(context.Builder.CreateGlobalString("", "no_error"), context.Builder.CreateStructGEP(layout, object, 2));
+            if (!node.arguments.empty()) {
+                auto valueType = std::dynamic_pointer_cast<GenericTypeNode>(node.inferredType)->typeParameters[0];
+                context.Builder.CreateStore(Arrays::emitValue(context, node.arguments[0], valueType), context.Builder.CreateStructGEP(layout, object, 3));
+            }
+        } else {
+            llvm::Value* code = node.arguments.size() == 2
+                ? Arrays::emitValue(context, node.arguments[0], std::make_shared<SimpleTypeNode>("i32"))
+                : context.Builder.getInt32(0);
+            context.Builder.CreateStore(code, context.Builder.CreateStructGEP(layout, object, 1));
+            context.Builder.CreateStore(Arrays::emitValue(context, node.arguments.back(), std::make_shared<SimpleTypeNode>("string")),
+                                        context.Builder.CreateStructGEP(layout, object, 2));
+            // value остаётся нулём: сборщик обнулил память, а читать его при ошибке нельзя
+        }
+        result = object;
         return;
     }
 

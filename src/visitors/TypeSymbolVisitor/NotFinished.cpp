@@ -5,6 +5,7 @@
 
 void TypeSymbolVisitor::visit(AccessExpression& node) {
     lastAccessIndexedString = false;
+    lastAccessResultField = false;
     std::shared_ptr<TypeNode> currentType = nullptr;
     std::shared_ptr<StructNode> currentStructDef = nullptr;
     auto currentLink = node.shared_from_this();
@@ -40,7 +41,35 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
         auto accessNode = std::dynamic_pointer_cast<AccessExpression>(currentLink);
         if (!accessNode) break;
 
+        // Поля result: ok, code, error, value. Писать в них нельзя
+        if (!accessNode->memberName.empty() && currentType && std::dynamic_pointer_cast<GenericTypeNode>(currentType)
+            && std::dynamic_pointer_cast<GenericTypeNode>(currentType)->baseName == "result") {
+            auto result = std::dynamic_pointer_cast<GenericTypeNode>(currentType);
+            auto memberLink = std::dynamic_pointer_cast<AccessExpression>(accessNode->nextAccess);
+            const std::string member = accessNode->memberName;
+            std::shared_ptr<TypeNode> memberType;
+            if (member == "ok") memberType = registry.findType("i1");
+            else if (member == "code") memberType = registry.findType("i32");
+            else if (member == "error") memberType = registry.findType("string");
+            else if (member == "value") {
+                if (result->typeParameters[0]->toString() == "void")
+                    LogError("result<void> has no value", accessNode);
+                memberType = result->typeParameters[0];
+            }
+            else LogError("result has no member '" + member + "', only ok, code, error and value", accessNode);
+
+            if (memberLink && std::dynamic_pointer_cast<CallNode>(memberLink->expression))
+                LogError("'" + member + "' of a result is a field, not a method", accessNode);
+            if (memberLink) memberLink->inferredType = memberType;
+            currentType = memberType;
+            currentStructDef = registry.findStruct(currentType->toString());
+            lastAccessResultField = true;
+            currentLink = accessNode->nextAccess;
+            continue;
+        }
+
         if (!accessNode->memberName.empty()) {
+            lastAccessResultField = false;
             if (!currentStructDef) {
                 std::string typeName = currentType ? currentType->toString() : "unknown";
                 LogError("Dot access on non-struct type '" + typeName + "'", accessNode);
@@ -245,6 +274,8 @@ void TypeSymbolVisitor::visit(ReassignMemberNode& node) {
         LogError("Could not resolve type of assignment target", node.accessExpression);
     if (lastAccessIndexedString)
         LogError("Strings are immutable, build a new string instead", node.accessExpression);
+    if (lastAccessResultField)
+        LogError("Fields of a result are read-only, return a new ok() or err() instead", node.accessExpression);
     std::string targetTypeStr = targetType->toString();
 
     if (std::dynamic_pointer_cast<BlockNode>(node.expression)) {

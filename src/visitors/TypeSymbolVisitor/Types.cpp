@@ -22,8 +22,9 @@ void TypeSymbolVisitor::visit(GenericTypeNode &node)
     
     // Проверяем, что все параметры типа также известны. У func последний это результат, он может быть void
     for (size_t i = 0; i < node.typeParameters.size(); i++) {
-        const bool functionResult = node.baseName == "func" && i + 1 == node.typeParameters.size();
-        if (functionResult && node.typeParameters[i]->toString() == "void") continue;
+        // void можно только там, где значения может не быть: результат func и result<void>
+        const bool voidAllowed = (node.baseName == "func" && i + 1 == node.typeParameters.size()) || node.baseName == "result";
+        if (voidAllowed && node.typeParameters[i]->toString() == "void") continue;
         node.typeParameters[i]->accept(*this);
     }
     

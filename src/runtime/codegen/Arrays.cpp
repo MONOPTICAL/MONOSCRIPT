@@ -91,7 +91,34 @@ namespace Arrays
 
             elementType = context.getLLVMType(next->inferredType, context.TheContext);
 
-            if (link->notation == "[]" && Maps::isMap(currentType)) {
+            auto resultType = std::dynamic_pointer_cast<GenericTypeNode>(currentType);
+            if (link->notation == "." && resultType && resultType->baseName == "result") {
+                llvm::StructType* layout = context.getResultStruct(currentType);
+                const std::string member = next->baseName;
+                if (member == "value") {
+                    // Значения нет: останавливаемся с исходной причиной ошибки
+                    llvm::Value* ok = context.Builder.CreateLoad(context.Builder.getInt8Ty(), context.Builder.CreateStructGEP(layout, base, 0), "ok");
+                    llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
+                    llvm::BasicBlock* failBlock = llvm::BasicBlock::Create(context.TheContext, "result.fail", function);
+                    llvm::BasicBlock* okBlock = llvm::BasicBlock::Create(context.TheContext, "result.ok", function);
+                    context.Builder.CreateCondBr(context.Builder.CreateICmpNE(ok, context.Builder.getInt8(0)), okBlock, failBlock);
+
+                    context.Builder.SetInsertPoint(failBlock);
+                    llvm::Value* error = context.Builder.CreateLoad(context.Builder.getPtrTy(), context.Builder.CreateStructGEP(layout, base, 2), "error");
+                    llvm::Function* panic = context.getOrDeclareFunction("ms_panic_result",
+                        llvm::FunctionType::get(context.Builder.getVoidTy(), {context.Builder.getPtrTy(), context.Builder.getInt32Ty()}, false));
+                    panic->setDoesNotReturn();
+                    context.Builder.CreateCall(panic, {error, context.Builder.getInt32(ErrorEngine::getInstance().displayLine(next->line))});
+                    context.Builder.CreateUnreachable();
+
+                    context.Builder.SetInsertPoint(okBlock);
+                    elementPtr = context.Builder.CreateStructGEP(layout, base, 3, "value");
+                } else {
+                    // ok хранится байтом: чтение i1 берёт из него 0 или 1
+                    const unsigned index = member == "ok" ? 0 : member == "code" ? 1 : 2;
+                    elementPtr = context.Builder.CreateStructGEP(layout, base, index, member);
+                }
+            } else if (link->notation == "[]" && Maps::isMap(currentType)) {
                 // Только последнее звено записи создаёт ключ: в m[k][0] = x ключ k должен уже быть
                 const bool createKey = forWrite && !next->nextAccess;
                 elementPtr = Maps::emitSlot(context, base, Maps::emitKey(context, next->expression, currentType), createKey, next->line);

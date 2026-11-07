@@ -273,6 +273,13 @@ llvm::Value* Expressions::handleUnaryOperation(CodeGenContext& context, UnaryOpN
         operand = TypeConversions::applyImplicitCast(context, operand, node.operand->implicitCastTo, "operand");
     }
     
+    // ?r: байт ok объекта result
+    if (node.op == "nullcheck") {
+        llvm::StructType* layout = context.getResultStruct(node.operand->inferredType);
+        llvm::Value* ok = context.Builder.CreateLoad(context.Builder.getInt8Ty(), context.Builder.CreateStructGEP(layout, operand, 0), "ok");
+        return context.Builder.CreateICmpNE(ok, context.Builder.getInt8(0), "is_ok");
+    }
+
     if (node.op == "neg") {  // Унарный минус
         if (operand->getType()->isFloatingPointTy()) {
             return context.Builder.CreateFNeg(operand, "negtmp");

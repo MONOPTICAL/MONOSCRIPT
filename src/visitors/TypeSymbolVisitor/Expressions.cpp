@@ -117,15 +117,27 @@ void TypeSymbolVisitor::visit(UnaryOpNode& node) {
         LogError("Unsupported operand type for unary operator: char, use ->i32", node.shared_from_this());
 
     // Узел уже обходили и переименовали оператор, второй обход ничего не меняет
-    if (node.op == "neg" || node.op == "not" || node.op == "nullcheck")
+    if (node.op == "nullcheck")
+    {
+        node.inferredType = registry.findType("i1");
+        return;
+    }
+    if (node.op == "neg" || node.op == "not")
     {
         node.inferredType = operandType;
         return;
     }
 
+    // ?r это r.ok. На остальных типах ?x появится вместе с nullable-типами
     if (node.op == "?")
     {
-        LogError("Operator '?' is not implemented yet", node.shared_from_this());
+        auto generic = std::dynamic_pointer_cast<GenericTypeNode>(operandType);
+        if (!generic || generic->baseName != "result") {
+            LogError("Operator '?' is not implemented yet for " + (operandType ? operandType->toString() : std::string("this value")) + ", only for result<T>", node.shared_from_this());
+            return;
+        }
+        node.op = "nullcheck";
+        node.inferredType = registry.findType("i1");
         return;
     }
     else if (node.op == "!")
