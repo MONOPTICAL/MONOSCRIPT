@@ -1,5 +1,6 @@
 #include "../headers/TypeSymbolVisitor.h"
 #include <algorithm>
+#include <set>
 
 // Какие структуры обязательно создаются при создании этой: поле такого типа или вызов P() в значении поля
 static void collectConstructedStructs(const std::shared_ptr<ASTNode>& expression, Registry& registry, std::vector<std::string>& result) {
@@ -56,6 +57,16 @@ void TypeSymbolVisitor::visit(StructNode& node) {
 
     // Обрабатываем тело структуры
     if (auto blockNode = std::dynamic_pointer_cast<BlockNode>(node.body)) {
+        // Цепочка ищет член структуры по имени, поэтому имена не должны повторяться
+        std::set<std::string> members;
+        for (const auto& statement : blockNode->statements) {
+            std::string member;
+            if (auto field = std::dynamic_pointer_cast<VariableAssignNode>(statement)) member = field->name;
+            else if (auto method = std::dynamic_pointer_cast<FunctionNode>(statement)) member = method->name;
+            if (!member.empty() && !members.insert(member).second)
+                LogError("Struct '" + node.name + "' already has a member named '" + member + "'", statement);
+        }
+
         for (const auto& statement : blockNode->statements) {
             // Конструкторов пока нет, поэтому значение полю взять неоткуда. [] и {} это значение
             auto field = std::dynamic_pointer_cast<VariableAssignNode>(statement);

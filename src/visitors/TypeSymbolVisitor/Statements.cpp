@@ -105,65 +105,16 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
     // Проверяем, существует ли функция в реестре(в текущем контексте или глобальном)
     // Если вызов выше определения уже положил сюда эту же функцию, это не повтор
     auto existingFunction = contexts.back().functions.find(node.name);
-    if(existingFunction != contexts.back().functions.end() && existingFunction->second != node.shared_from_this()) {
+    if(node.associated.empty() && existingFunction != contexts.back().functions.end() && existingFunction->second != node.shared_from_this()) {
         if(contexts[0].functions.find(node.name) != contexts[0].functions.end()) {
             LogError("Function already defined in global context: " + node.name);
         }
         LogError("Function already defined: " + node.name);
     }
 
-    if(!node.associated.empty())
-    {
-        auto st = registry.findStruct(node.associated);
-        if(st == nullptr)
-            LogError("Struct not found: " + node.associated);
-
-        if(contexts.size() != 1)
-            LogError("Function " + node.name + " cannot be defined in a non-global context");
-
-        // Есть ли в структуре метод с таким же именем(Надо потом сделать более подробную проверку)
-        const auto structHasMethodNamed = [](const std::shared_ptr<StructNode>& s,
-                                             const std::string& methodName) -> bool
-        {
-            if (!s || !s->body) return false;
-
-            for (const auto& stmt : std::dynamic_pointer_cast<BlockNode>(s->body)->statements)
-            {
-                auto fn = std::dynamic_pointer_cast<FunctionNode>(stmt);
-#if DEBUG
-                if(fn)
-                {
-                    IC(fn->name);
-                    IC(fn->labels);
-                    IC(methodName);
-                }
-#endif
-                if (fn && fn->name == methodName && fn->labels.end() != std::find(fn->labels.begin(), fn->labels.end(), "@decl"))
-                    return true;
-                
-            }
-#if DEBUG
-            IC(methodName);
-#endif
-            return false;
-        };
-
-        if(!structHasMethodNamed(st, node.name))
-            LogError("Method not declared or already implemented in struct '" + node.associated + "': " + node.associated + "::" + node.name);
-        
-        node.associated = st->name; // Нормализуем имя структуры
-    }
-
     std::vector<std::string> labels = contexts.back().labels;
     labels.insert(labels.end(), node.labels.begin(), node.labels.end()); // Добавляем метки функции в текущий контекст
 
-    /*
-    Пока что не проверяем, что функция является методом структуры
-    */
-    if(registry.findStruct(contexts.back().currentFunctionName)) {
-        node.associated = contexts.back().currentFunctionName;
-    }
-   
     std::unordered_map<std::string, std::shared_ptr<TypeNode>> args = {};
 
     // Простой тип возврата может быть void, которого нет в реестре типов
@@ -202,8 +153,9 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
 
     if(std::find(labels.begin(), labels.end(), "@pure") == labels.end())
     {
-        variables = contexts.back().variables;
-        functions = contexts.back().functions;
+        // Контекст структуры пустой: метод, как и обычная функция, видит глобальные переменные
+        variables = node.associated.empty() ? contexts.back().variables : contexts[0].variables;
+        functions = node.associated.empty() ? contexts.back().functions : contexts[0].functions;
     }
     else
     {
@@ -216,12 +168,14 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
         }
     }
     
-    if(std::find(labels.begin(), labels.end(), "@entry") != labels.end() || node.name == "main")
+    // Метод с именем main это обычный метод
+    const bool isEntry = node.associated.empty() && (std::find(labels.begin(), labels.end(), "@entry") != labels.end() || node.name == "main");
+    if(isEntry)
         if(node.returnType->toString() != "i32" && node.returnType->toString() != "void")
             LogError("Function " + node.name + " must return i32 or void");
 
     // Аргументов программы пока нет: параметры пришлось бы заполнять нулями, а пустая ссылка это падение
-    if((std::find(labels.begin(), labels.end(), "@entry") != labels.end() || node.name == "main") && !node.parameters.empty())
+    if(isEntry && !node.parameters.empty())
         LogError("Entry function " + node.name + " cannot have parameters yet", node.shared_from_this());
 
     // Если не вывилась ошибка, добавляем функцию в реестр
@@ -247,31 +201,24 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
 
     // Если функция находится в глобальном контексте, то добавляем ее в глобальный реестр(глобальный контекст - это первый элемент в векторе)
     // Если функция не является методом класса, то добавляем ее в глобальный реестр
-    if(contexts.size() == 1)
-        contexts[0].functions[node.name] = node.shared_from_this();
-    else
-        contexts.back().functions[node.name] = node.shared_from_this();
+    // Метод вызывается только через объект, как функция он не виден
+    if(node.associated.empty()) {
+        if(contexts.size() == 1)
+            contexts[0].functions[node.name] = node.shared_from_this();
+        else
+            contexts.back().functions[node.name] = node.shared_from_this();
 
-    currentFunction.functions[node.name] = node.shared_from_this(); // Добавляем функцию в текущий контекст
-    
-    const bool noDecl =
-        std::find(labels.begin(), labels.end(), "@decl") != labels.end();
-
-    if (noDecl)
-    {
-        node.inferredType = node.returnType;
-#if DEBUG
-        IC(contexts.back().currentFunctionName);
-        IC();
-#endif
-        return;
+        currentFunction.functions[node.name] = node.shared_from_this(); // Добавляем функцию в текущий контекст
     }
-
+    
     // Добавляем функцию в реестр
     contexts.push_back(currentFunction);
 
     // Проверяем тело функции
+    const bool outerInMethod = insideMethod;
+    insideMethod = !node.associated.empty();
     node.body->accept(*this);
+    insideMethod = outerInMethod;
 
     if(contexts.back().returnedValue == false && contexts.back().returnType->toString() != "void") {
         LogError("Function " + node.name + " must return a value of type " + contexts.back().returnType->toString());
@@ -280,6 +227,28 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
     contexts.pop_back(); // Убираем текущий контекст
     
     node.inferredType = node.returnType; // Устанавливаем тип функции
+}
+
+void TypeSymbolVisitor::checkCallArguments(std::vector<std::shared_ptr<ASTNode>>& arguments,
+                                           const std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>>& parameters,
+                                           size_t firstParameter, const std::string& name)
+{
+    for (size_t i = 0; i < arguments.size(); ++i) {
+        const auto& parameter = parameters[i + firstParameter].first;
+        const std::string paramType = parameter->toString();
+
+        // Литерал сам не знает свой тип, его задаёт параметр
+        if (std::dynamic_pointer_cast<BlockNode>(arguments[i])) {
+            validateCollectionElements(parameter, arguments[i], false);
+            arguments[i]->inferredType = parameter;
+            continue;
+        }
+        if (auto none = std::dynamic_pointer_cast<NoneNode>(arguments[i]);
+            none && none->isEmptyLiteral && (paramType.starts_with("array") || paramType.starts_with("map")))
+            arguments[i]->inferredType = parameter;
+
+        checkConversion(arguments[i], paramType, name + ", argument " + std::to_string(i + 1) + ": ");
+    }
 }
 
 void TypeSymbolVisitor::visit(BlockNode &node)
@@ -476,6 +445,9 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
     std::string varTypeStr = varType->toString();
     node.inferredType = varType; // Кодгену нужен тип, чтобы собрать литерал a = [1, 2]
 
+    if (insideMethod && node.name == "self") {
+        LogError("Cannot reassign self", node.shared_from_this());
+    }
     if (varAssign->isConst && !varAssign->isDeferred) {
         LogError("Cannot reassign constant variable: " + node.name, node.shared_from_this());
     }
@@ -904,22 +876,7 @@ void TypeSymbolVisitor::visit(CallNode& node) {
         LogError("Function " + node.callee + " expects " + std::to_string(func->parameters.size()) + " arguments, got " + std::to_string(argTypes.size()), node.shared_from_this());
     }
 
-    // Проверяем типы аргументов
-    for (size_t i = 0; i < argTypes.size(); ++i) {
-        std::string paramType = func->parameters[i].first->toString();
-
-        // Литерал сам не знает свой тип, его задаёт параметр
-        if (std::dynamic_pointer_cast<BlockNode>(node.arguments[i])) {
-            validateCollectionElements(func->parameters[i].first, node.arguments[i], false);
-            node.arguments[i]->inferredType = func->parameters[i].first;
-            continue;
-        }
-        if (auto none = std::dynamic_pointer_cast<NoneNode>(node.arguments[i]);
-            none && none->isEmptyLiteral && (paramType.starts_with("array") || paramType.starts_with("map")))
-            node.arguments[i]->inferredType = func->parameters[i].first;
-
-        checkConversion(node.arguments[i], paramType, "Function " + node.callee + ", argument " + std::to_string(i + 1) + ": ");
-    }
+    checkCallArguments(node.arguments, func->parameters, 0, "Function " + node.callee);
 
     node.inferredType = func->returnType; // Устанавливаем тип функции
 }

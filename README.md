@@ -233,14 +233,20 @@ Labels go after the function declaration:
 |   i32 age = 18
 |   string name = "anon"
 
-[void]birthday(User: user)
-|   user.age = user.age + 1
+|   [void]birthday()
+|   |   self.age = self.age + 1
+|
+|   [string]describe() @pure
+|   |   return self.name + " is " + self.age
 
 [i32]main()
 |   User user = User()
-|   birthday(user)
-|   return user.age
+|   user.birthday()
+|   echo(user.describe())
+|   return 0
 ```
+
+Inside a method, `self` is the object. A constant object can only call `@pure` methods, and a `@pure` method cannot change `self`.
 
 ## 📍 Current State
 
@@ -257,7 +263,7 @@ Labels go after the function declaration:
 |`copy` for arrays, maps and structs|✅ Working|
 |Garbage collection (Boehm)|✅ Working|
 |Runtime errors with line numbers|✅ Working|
-|Struct methods|📅 Planned|
+|Struct methods|✅ Working|
 |Lambdas and pipes (`\|>`)|📅 Planned|
 |Null safety|📅 Planned|
 |Embedding and sandboxing|📅 Planned|

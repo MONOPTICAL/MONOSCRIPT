@@ -23,6 +23,7 @@ struct StructLayout {
     llvm::Function*                                  constructor = nullptr;
     std::map<std::string, unsigned>                  fieldIndex;
     std::vector<std::shared_ptr<VariableAssignNode>> fields;
+    std::map<std::string, std::shared_ptr<FunctionNode>> methods;
     bool                                             hasReferences = false; // Иначе память без ссылок: сборщику просматривать незачем
 };
 

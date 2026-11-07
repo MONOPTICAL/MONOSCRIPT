@@ -2,6 +2,8 @@
 #include "../headers/ASTVisitors.h"
 #include "../../errors/headers/ErrorEngine.h"
 
+llvm::Function* declareUserFunction(CodeGenContext& context, FunctionNode& node);
+
 namespace Arrays
 {
     bool isLiteral(const std::shared_ptr<ASTNode>& expression)
@@ -24,6 +26,7 @@ namespace Arrays
             throw std::runtime_error("Codegen Error: could not generate a collection element");
 
         value = TypeConversions::loadValueIfPointer(context, value);
+        value = TypeConversions::applyImplicitCast(context, value, expression->implicitCastTo);
         return TypeConversions::convertValueToType(context, value, context.getLLVMType(type, context.TheContext));
     }
 
@@ -77,6 +80,7 @@ namespace Arrays
         AccessExpression* link = &root;
         std::shared_ptr<TypeNode> currentType = root.expression->inferredType;
         llvm::Value* elementPtr = nullptr;
+        bool isVoidCall = false;
         while (auto next = std::dynamic_pointer_cast<AccessExpression>(link->nextAccess)) {
             // Уже не последнее звено: то, что лежит по адресу, это следующий объект
             if (elementPtr)
@@ -110,6 +114,31 @@ namespace Arrays
                 auto layout = currentType ? context.Structs.find(currentType->toString()) : context.Structs.end();
                 if (layout == context.Structs.end())
                     throw std::runtime_error("Codegen Error: . used on something that is not a struct: " + root.baseName);
+
+                // Вызов метода: результат кладём во временную ячейку, чтобы цепочка шла дальше как обычно
+                if (auto call = std::dynamic_pointer_cast<CallNode>(next->expression)) {
+                    auto method = layout->second.methods.at(call->callee);
+                    llvm::Function* function = declareUserFunction(context, *method);
+
+                    std::vector<llvm::Value*> arguments{base};
+                    for (size_t i = 0; i < call->arguments.size(); i++) {
+                        arguments.push_back(emitValue(context, call->arguments[i], method->parameters[i + 1].first));
+                    }
+
+                    llvm::Value* returned = context.Builder.CreateCall(function, arguments);
+                    if (elementType->isVoidTy()) {
+                        elementPtr = nullptr;
+                        isVoidCall = true;
+                    } else {
+                        elementPtr = context.createEntryAlloca(elementType, "method_result");
+                        context.Builder.CreateStore(returned, elementPtr);
+                    }
+
+                    currentType = next->inferredType;
+                    link = next.get();
+                    continue;
+                }
+
                 elementPtr = context.Builder.CreateStructGEP(layout->second.type, base, layout->second.fieldIndex.at(next->baseName), next->baseName);
             }
 
@@ -117,7 +146,7 @@ namespace Arrays
             link = next.get();
         }
 
-        if (!elementPtr)
+        if (!elementPtr && !isVoidCall)
             throw std::runtime_error("Codegen Error: access through . is not implemented for: " + root.baseName);
         return elementPtr;
     }
