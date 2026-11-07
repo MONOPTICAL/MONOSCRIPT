@@ -72,6 +72,7 @@ void registerBuiltInTypes(Registry& registry)
     registry.addBuiltinType("f64", std::make_shared<SimpleTypeNode>("f64"));
     registry.addBuiltinType("char", std::make_shared<SimpleTypeNode>("char"));
     registry.addBuiltinType("func", std::make_shared<SimpleTypeNode>("func")); // func<параметры..., результат>
+    registry.addBuiltinType("result", std::make_shared<SimpleTypeNode>("result")); // result<T>: значение или ошибка
     registry.addBuiltinType("string", std::make_shared<SimpleTypeNode>("string"));
     registry.addBuiltinType("null", std::make_shared<SimpleTypeNode>("null"));
     registry.addBuiltinType("none", std::make_shared<SimpleTypeNode>("none"));

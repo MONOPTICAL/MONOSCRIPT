@@ -30,6 +30,8 @@ private:
     std::unique_ptr<ErrorEngine>                                    errorEngine;
 
     std::vector<Context>                                            contexts;
+    bool                                                            lastAccessResultField = false; // r.value и прочие поля result только для чтения
+    bool                                                            checkResultLiteral(const std::shared_ptr<ASTNode>& node, const std::string& targetType);
     // Копии шаблонов: добавляются в программу после обхода, из какого модуля шаблон
     std::vector<std::shared_ptr<ASTNode>>                           genericInstances;
     std::map<std::string, std::string>                              genericModules;

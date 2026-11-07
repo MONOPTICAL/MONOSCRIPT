@@ -266,6 +266,30 @@ A function can be passed by name to a parameter of type `func`. Together with ge
 
 A function can only be passed as an argument, not stored in a variable. `push(a, x)` and `pop(a)` grow and shrink an array.
 
+### ⚠️ Errors Without Crashes
+
+Something that can fail returns `result<T>`. The caller checks it, and the program keeps running:
+
+```go
+[result<i32>]parseDigit(string: s)
+|   if len(s) != 1
+|   |   return err(1, "expected one digit")
+|   char c = s[0]
+|   if c < '0' or c > '9'
+|   |   return err(2, "not a digit: " + s)
+|   return ok(c->i32 - '0'->i32)
+
+[i32]main()
+|   result<i32> r = parseDigit("x")
+|   if ?r                        // the same as r.ok
+|   |   echo("digit " + r.value)
+|   else
+|   |   echo("error " + r.code + ": " + r.error)
+|   return 0
+```
+
+Reading `r.value` from an error stops the program with the original message. A result that is never read is a compile error, write `_ ^= save()` to ignore one on purpose. Use `result<void>` and `return ok()` when there is no value. A native function in D returns the same layout with `resultOk`, `resultErr`, `resultVoidOk` and `resultVoidErr` from `mono/std/core/abi.d`.
+
 ### 🧰 Structs
 
 ```go
@@ -305,6 +329,8 @@ Inside a method, `self` is the object. A constant object can only call `@pure` m
 |Runtime errors with line numbers|✅ Working|
 |Struct methods|✅ Working|
 |Lambdas and pipes (`\|>`)|📅 Planned|
+|Errors as values: `result<T>`, `ok()`, `err()`, `?r`|✅ Working|
+|Generic functions and passing functions by name|✅ Working|
 |Null safety|📅 Planned|
 |Embedding and sandboxing|📅 Planned|
 

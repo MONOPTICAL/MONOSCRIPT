@@ -65,6 +65,13 @@ extern(C) void ms_array_reserve(MsArray* array, size_t elementSize, int hasRefer
     array.capacity = capacity;
 }
 
+extern(C) void ms_panic_result(const char* error, int line) nothrow @nogc
+{
+    char[512] message;
+    snprintf(message.ptr, message.length, "result has no value: %s", error);
+    ms_panic(message.ptr, line);
+}
+
 private extern(C) void* ms_out_of_memory(size_t) nothrow @nogc
 {
     ms_panic("out of memory", 0);

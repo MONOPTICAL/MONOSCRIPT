@@ -26,3 +26,55 @@ MsArray* newArray(size_t elementSize, int length, bool hasReferences) nothrow @n
     array.capacity = length;
     return array;
 }
+
+// result<T>: функция на D, которая возвращает result<T>, отдаёт указатель на эту структуру.
+// Раскладка совпадает с кодгеном (CodeGenContext::getResultStruct). Для result<void> поле value не нужно: используйте MsResultVoid
+struct MsResult(T)
+{
+    bool ok;
+    int code;
+    const(char)* error;
+    T value;
+}
+
+struct MsResultVoid
+{
+    bool ok;
+    int code;
+    const(char)* error;
+}
+
+MsResult!T* resultOk(T)(T value) nothrow @nogc
+{
+    auto result = cast(MsResult!T*) GC_malloc(MsResult!T.sizeof);
+    result.ok = true;
+    result.error = "";
+    result.value = value;
+    return result;
+}
+
+MsResult!T* resultErr(T)(int code, const(char)* message) nothrow @nogc
+{
+    auto result = cast(MsResult!T*) GC_malloc(MsResult!T.sizeof);
+    result.ok = false;
+    result.code = code;
+    result.error = message;
+    return result;
+}
+
+MsResultVoid* resultVoidOk() nothrow @nogc
+{
+    auto result = cast(MsResultVoid*) GC_malloc(MsResultVoid.sizeof);
+    result.ok = true;
+    result.error = "";
+    return result;
+}
+
+MsResultVoid* resultVoidErr(int code, const(char)* message) nothrow @nogc
+{
+    auto result = cast(MsResultVoid*) GC_malloc(MsResultVoid.sizeof);
+    result.ok = false;
+    result.code = code;
+    result.error = message;
+    return result;
+}

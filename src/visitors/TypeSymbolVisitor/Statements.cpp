@@ -464,6 +464,13 @@ void TypeSymbolVisitor::visit(BlockNode &node)
 {
     for (const auto& statement : node.statements) {
         statement->accept(*this);
+
+        // Забытая проверка ошибки: write_text(...) без чтения результата молча теряет ошибку
+        if (std::dynamic_pointer_cast<CallNode>(statement) || std::dynamic_pointer_cast<AccessExpression>(statement)) {
+            const std::string type = statement->inferredType ? statement->inferredType->toString() : "";
+            if (type.starts_with("result"))
+                LogError("The result is not used: check it, or write _ ^= ... to ignore it on purpose", statement);
+        }
     }
 }
 
@@ -483,8 +490,8 @@ static std::string getType(std::shared_ptr<ASTNode> expression, std::string type
 
 void TypeSymbolVisitor::visit(VariableAssignNode &node)
 {
-    // Проверяем, существует ли переменная в реестре
-    if (contexts.back().variables.find(node.name) != contexts.back().variables.end()) {
+    // Проверяем, существует ли переменная в реестре. _ можно объявлять сколько угодно: так игнорируют result
+    if (node.name != "_" && contexts.back().variables.find(node.name) != contexts.back().variables.end()) {
         LogError("Variable already defined: " + node.name);
     }
 
@@ -510,7 +517,7 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
     
     // Объект это ссылка: без значения в переменной оказалась бы пустая ссылка
     if (auto noValue = std::dynamic_pointer_cast<NoneNode>(node.expression); noValue && !isAuto) {
-        const bool isCollection = varType.starts_with("array") || varType.starts_with("map");
+        const bool isCollection = varType.starts_with("array") || varType.starts_with("map") || varType.starts_with("result");
         if (noValue->isEmptyLiteral && !isCollection)
             LogError("Empty literal cannot initialize variable '" + node.name + "' of type " + varType, node.shared_from_this());
 
@@ -573,6 +580,9 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
         node.expression->accept(*this);
         auto exprType = node.expression->implicitCastTo ? node.expression->implicitCastTo
                                                         : node.expression->inferredType;
+        if (isAuto && exprType && exprType->toString() == "result literal") {
+            LogError("Cannot infer the type of " + std::dynamic_pointer_cast<CallNode>(node.expression)->callee + "(), declare it: result<T> " + node.name + " = ...", node.shared_from_this());
+        }
 
         if (std::dynamic_pointer_cast<GenericTypeNode>(exprType)) {
             if (isAuto)
@@ -1029,6 +1039,14 @@ void TypeSymbolVisitor::visit(CallNode& node) {
         node.callee = converted->callee;
         node.arguments = converted->arguments;
         visit(node);
+        return;
+    }
+
+    // ok(x) и err(...): их тип станет известен там, куда их положат
+    if ((node.callee == "ok" || node.callee == "err")
+        && contexts.back().functions.find(node.callee) == contexts.back().functions.end()
+        && declaredFunctions.find(node.callee) == declaredFunctions.end()) {
+        node.inferredType = std::make_shared<SimpleTypeNode>("result literal");
         return;
     }
 

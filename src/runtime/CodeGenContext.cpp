@@ -70,6 +70,14 @@ llvm::StructType* CodeGenContext::getArrayStruct() {
     );
 }
 
+llvm::StructType* CodeGenContext::getResultStruct(const std::shared_ptr<TypeNode>& resultType) {
+    std::vector<llvm::Type*> fields = {Builder.getInt8Ty(), Builder.getInt32Ty(), Builder.getPtrTy()};
+    auto generic = std::dynamic_pointer_cast<GenericTypeNode>(resultType);
+    if (generic && !generic->typeParameters.empty() && generic->typeParameters[0]->toString() != "void")
+        fields.push_back(getLLVMType(generic->typeParameters[0], TheContext));
+    return llvm::StructType::get(TheContext, fields);
+}
+
 llvm::Value* CodeGenContext::allocateObject(llvm::Value* bytes, bool hasReferences, const std::string& name) {
     llvm::FunctionType* allocType = llvm::FunctionType::get(
         llvm::PointerType::get(TheContext, 0), {llvm::Type::getInt64Ty(TheContext)}, false);

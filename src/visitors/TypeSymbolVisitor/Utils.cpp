@@ -1,3 +1,4 @@
+#include "../headers/TomlType.h"
 #include <algorithm>
 #include "../headers/TypeSymbolVisitor.h"
 #include "../../includes/ASTDebugger.hpp"
@@ -304,7 +305,41 @@ std::string TypeSymbolVisitor::resolveExprType(const std::shared_ptr<ASTNode>& n
     return node->inferredType->toString();
 }
 
+// ok(x) и err(...) как литерал []: тип им задаёт место, куда их кладут. false, если это не они
+bool TypeSymbolVisitor::checkResultLiteral(const std::shared_ptr<ASTNode>& node, const std::string& targetType) {
+    auto call = std::dynamic_pointer_cast<CallNode>(node);
+    if (!call || !call->inferredType || call->inferredType->toString() != "result literal") return false;
+
+    auto target = std::dynamic_pointer_cast<GenericTypeNode>(parseTomlType(targetType));
+    if (!target || target->baseName != "result" || target->typeParameters.size() != 1) {
+        LogError(call->callee + "() can only be used where a result<T> is expected, here it is " + targetType, node);
+    }
+    const auto& valueType = target->typeParameters[0];
+    const std::string value = valueType->toString();
+
+    if (call->callee == "ok") {
+        if (value == "void") {
+            if (!call->arguments.empty()) LogError("ok() for result<void> takes no value", node);
+        } else {
+            if (call->arguments.size() != 1) LogError("ok() for " + targetType + " takes one value", node);
+            if (std::dynamic_pointer_cast<BlockNode>(call->arguments[0]))
+                validateCollectionElements(valueType, call->arguments[0], false);
+            else
+                checkConversion(call->arguments[0], value, "ok(): ");
+        }
+    } else {
+        // err("текст") или err(код, "текст")
+        if (call->arguments.empty() || call->arguments.size() > 2) LogError("err() takes a message, or a code and a message", node);
+        if (call->arguments.size() == 2) checkConversion(call->arguments[0], "i32", "err(): code: ");
+        checkConversion(call->arguments.back(), "string", "err(): message: ");
+    }
+
+    call->inferredType = target;
+    return true;
+}
+
 void TypeSymbolVisitor::checkConversion(const std::shared_ptr<ASTNode>& node, const std::string& targetType, const std::string& errorPrefix) {
+    if (checkResultLiteral(node, targetType)) return;
     // Пустой литерал [] или {} подходит к любой коллекции
     if (std::dynamic_pointer_cast<NoneNode>(node) && (targetType.starts_with("array") || targetType.starts_with("map")))
         return;
