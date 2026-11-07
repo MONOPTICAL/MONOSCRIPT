@@ -123,6 +123,7 @@ void ASTGen::visit(ProgramNode& node) {
 
         // Глобальные переменные инициализируются в стартовой функции в порядке объявления
         if (std::dynamic_pointer_cast<VariableAssignNode>(n)) {
+            context.CurrentLine = n->line;
             context.Builder.SetInsertPoint(startBlock);
             n->accept(*this);
             startBlock = context.Builder.GetInsertBlock(); // Выражение могло создать новые блоки
@@ -239,6 +240,7 @@ void ASTGen::visit(BlockNode& node) {
     for (auto& stmt : node.statements) {
         if (!stmt) continue;
 
+        if (stmt->line > 0) context.CurrentLine = stmt->line;
         stmt->accept(*this);
 
         // Если это вложенная функция, то чтобы не терялась точка вставки

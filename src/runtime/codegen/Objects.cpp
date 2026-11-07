@@ -55,6 +55,7 @@ namespace Objects
         llvm::Value* object = allocate(context, layout);
 
         for (size_t i = 0; i < layout.fields.size(); i++) {
+            context.CurrentLine = layout.fields[i]->line;
             llvm::Value* value = Arrays::emitValue(context, layout.fields[i]->expression, fieldType(*layout.fields[i]));
             context.Builder.CreateStore(value, context.Builder.CreateStructGEP(layout.type, object, i));
         }
