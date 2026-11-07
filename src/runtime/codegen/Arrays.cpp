@@ -20,7 +20,7 @@ namespace Arrays
         expression->accept(codeGen);
         llvm::Value* value = codeGen.getResult();
         if (!value)
-            throw std::runtime_error("Codegen Error: не удалось сгенерировать элемент массива");
+            throw std::runtime_error("Codegen Error: could not generate a collection element");
 
         value = TypeConversions::loadValueIfPointer(context, value);
         return TypeConversions::convertValueToType(context, value, context.getLLVMType(type, context.TheContext));
@@ -33,7 +33,7 @@ namespace Arrays
 
         auto generic = std::dynamic_pointer_cast<GenericTypeNode>(arrayType);
         if (!generic || generic->baseName != "array")
-            throw std::runtime_error("Codegen Error: литерал массива для типа " + (arrayType ? arrayType->toString() : std::string("?")));
+            throw std::runtime_error("Codegen Error: array literal for type " + (arrayType ? arrayType->toString() : std::string("?")));
 
         const std::shared_ptr<TypeNode>& elementTypeNode = generic->typeParameters[0];
         llvm::Type* elementType = context.getLLVMType(elementTypeNode, context.TheContext);
@@ -69,7 +69,7 @@ namespace Arrays
         ASTGen codeGen(context);
         root.expression->accept(codeGen);
         if (!codeGen.getResult())
-            throw std::runtime_error("Codegen Error: доступ через [] и . пока не реализован: " + root.baseName);
+            throw std::runtime_error("Codegen Error: access through [] and . is not implemented for: " + root.baseName);
         llvm::Value* base = TypeConversions::loadValueIfPointer(context, codeGen.getResult());
 
         // Каждое звено говорит своей нотацией, как получено следующее. Следующее звено хранит индекс или имя поля и тип результата
@@ -82,7 +82,7 @@ namespace Arrays
                 base = context.Builder.CreateLoad(context.Builder.getPtrTy(), elementPtr, "nested_object");
 
             if (!next->inferredType)
-                throw std::runtime_error("Codegen Error: не удалось определить тип в цепочке доступа: " + root.baseName);
+                throw std::runtime_error("Codegen Error: unknown type in access chain: " + root.baseName);
 
             elementType = context.getLLVMType(next->inferredType, context.TheContext);
 
@@ -98,7 +98,7 @@ namespace Arrays
             } else {
                 auto layout = currentType ? context.Structs.find(currentType->toString()) : context.Structs.end();
                 if (layout == context.Structs.end())
-                    throw std::runtime_error("Codegen Error: доступ через . не к структуре: " + root.baseName);
+                    throw std::runtime_error("Codegen Error: . used on something that is not a struct: " + root.baseName);
                 elementPtr = context.Builder.CreateStructGEP(layout->second.type, base, layout->second.fieldIndex.at(next->baseName), next->baseName);
             }
 
@@ -107,7 +107,7 @@ namespace Arrays
         }
 
         if (!elementPtr)
-            throw std::runtime_error("Codegen Error: доступ через . пока не реализован: " + root.baseName);
+            throw std::runtime_error("Codegen Error: access through . is not implemented for: " + root.baseName);
         return elementPtr;
     }
 }

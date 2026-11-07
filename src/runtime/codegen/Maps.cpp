@@ -67,7 +67,7 @@ namespace Maps
         for (const auto& statement : block->statements) {
             auto pair = std::dynamic_pointer_cast<KeyValueNode>(statement);
             if (!pair)
-                throw std::runtime_error("Codegen Error: в литерале map ожидается пара ключ и значение");
+                throw std::runtime_error("Codegen Error: a map literal expects key-value pairs");
 
             llvm::Value* key = emitKey(context, pair->key, type);
             llvm::Value* value = Arrays::emitValue(context, pair->value, generic->typeParameters[1]);

@@ -56,14 +56,14 @@ int main(int argc, char* argv[]) {
             if (!compileToExecutable(combinedAST, outputFile)) {
                 return 1;
             }
-            std::cout << ui::style(stdout, ui::GREEN) << "Компиляция завершена." << ui::style(stdout, ui::RESET)
-                      << " Исполняемый файл: " << ui::style(stdout, ui::BOLD) << outputFile << ui::style(stdout, ui::RESET) << std::endl;
+            std::cout << ui::style(stdout, ui::GREEN) << "Build finished." << ui::style(stdout, ui::RESET)
+                      << " Executable: " << ui::style(stdout, ui::BOLD) << outputFile << ui::style(stdout, ui::RESET) << std::endl;
             return 0;
         }
         
         // Если --run не указан, просто завершаем работу после анализа
-        std::cout << ui::style(stdout, ui::GREEN) << "Анализ кода завершен." << ui::style(stdout, ui::RESET)
-                  << " Для выполнения используйте флаг --run." << std::endl;
+        std::cout << ui::style(stdout, ui::GREEN) << "Analysis finished." << ui::style(stdout, ui::RESET)
+                  << " Use run to execute the program." << std::endl;
         
     } catch (const std::exception& e) {
         // Ошибки компиляции уже напечатаны, у них пустой текст

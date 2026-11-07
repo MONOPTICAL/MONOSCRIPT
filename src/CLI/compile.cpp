@@ -24,7 +24,7 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath) {
     llvm::raw_fd_ostream irFile(irPath, EC, llvm::sys::fs::OF_None);
     
     if (EC) {
-        std::cerr << "Не удалось открыть файл для IR кода: " << EC.message() << std::endl;
+        std::cerr << "Could not open the IR file: " << EC.message() << std::endl;
         return false;
     }
     
@@ -44,18 +44,18 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath) {
 #if DEBUG
     std::cout << "Запуск команды: " << llcCmd << std::endl;
 #endif
-    ui::Spinner machineCode("Машинный код");
+    ui::Spinner machineCode("Machine code");
     int llcRet = std::system(llcCmd.c_str());
     if (llcRet != 0) {
         machineCode.fail();
-        std::cerr << "Ошибка при выполнении llc: команда вернула код " << llcRet << std::endl;
+        std::cerr << "llc failed with code " << llcRet << std::endl;
         return false;
     }
     machineCode.done();
 
     std::string stdlibPath = loader::findLibraryPath();
     if (stdlibPath.empty()) {
-        std::cerr << "Не удалось найти стандартную библиотеку" << std::endl;
+        std::cerr << "Could not find the standard library" << std::endl;
         return false;
     }
 
@@ -78,11 +78,11 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath) {
 #if DEBUG
     std::cout << "Запуск команды: " << gccCmd << std::endl;
 #endif
-    ui::Spinner linking("Линковка");
+    ui::Spinner linking("Linking");
     int gccRet = std::system(gccCmd.c_str());
     if (gccRet != 0) {
         linking.fail();
-        std::cerr << "Ошибка при линковке с помощью gcc: команда вернула код " << gccRet << std::endl;
+        std::cerr << "gcc failed with code " << gccRet << std::endl;
         return false;
     }
     linking.done();
@@ -98,7 +98,7 @@ bool compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::st
     CodeGenContext context(outputFile);
     ASTGen codeGen(context);
     {
-        ui::Spinner step("Генерация IR");
+        ui::Spinner step("Generating IR");
         combinedAST->accept(codeGen);
         step.done();
     }
@@ -110,7 +110,7 @@ bool compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::st
         std::cerr << "--- END LLVM IR ---\n" << std::endl;
 #endif
         {
-            ui::Spinner step("Оптимизация");
+            ui::Spinner step("Optimizing");
             llvm::PassBuilder passBuilder;
             llvm::LoopAnalysisManager LAM;
             llvm::FunctionAnalysisManager FAM;
@@ -140,12 +140,12 @@ bool compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::st
             return false;
         }
         if (!emitExecutable(context.TheModule.get(), outputFile)) {
-            std::cerr << "Ошибка при компиляции в исполняемый файл." << std::endl;
+            std::cerr << "Could not build the executable." << std::endl;
             return false;
         }
         return true;
     } else {
-        std::cerr << "Ошибка: Не удалось получить модуль LLVM для компиляции." << std::endl;
+        std::cerr << "Error: could not get the LLVM module to compile." << std::endl;
         return false;
     }
 }

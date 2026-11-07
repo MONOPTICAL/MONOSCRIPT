@@ -23,7 +23,7 @@ void printHelp(const char* programName) {
     std::cout << "\n" << bold << "INSPECT" << reset << "\n";
     option("--tokens", "Show tokens");
     option("--ast", "Show AST");
-    option("--symantic", "Show semantic analysis");
+    option("--semantic", "Show semantic analysis");
     std::cout << "\n" << bold << "TEST" << reset << "\n";
     option("--run_tests [FILTER]", "Run the test suite, FILTER selects tests by path");
     option("--verbose", "Show every test");
@@ -42,7 +42,7 @@ CLIOptions parseArgs(int argc, char* argv[]) {
             options.showTokens = true;
         } else if (arg == "--ast") {
             options.showAST = true;
-        } else if (arg == "--symantic") {
+        } else if (arg == "--semantic" || arg == "--symantic") {
             options.showSymantic = true;
         } else if (arg == "--run" || arg == "run") {
             options.runJIT = true;

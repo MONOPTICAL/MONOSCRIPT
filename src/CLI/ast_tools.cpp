@@ -12,9 +12,9 @@ std::vector<std::vector<Token>> tokenizeSource(const std::string& sourceCode, bo
     lexer.tokenize();
     
     if (showTokens) {
-        std::cout << "\n--- Токены ---\n";
+        std::cout << "\n--- Tokens ---\n";
         lexer.printTokens();
-        std::cout << "--- Конец токенов ---\n\n";
+        std::cout << "--- End of tokens ---\n\n";
     }
     
     return lexer.getTokens();
@@ -34,11 +34,11 @@ std::shared_ptr<ProgramNode> parseAndLinkModules(
     
     // Добавляем основной модуль
     if (!linker.addModule(std::filesystem::path(inputFile).stem().string(), inputFile, program)) {
-        throw std::runtime_error("Ошибка при добавлении модуля");
+        throw std::runtime_error("Could not add the module");
     }
     
     if (!linker.linkModules()) {
-        throw std::runtime_error("Ошибка при линковке модулей");
+        throw std::runtime_error("Could not link the modules");
     }
     
     // Создаем объединенный AST из всех модулей
@@ -75,9 +75,9 @@ std::shared_ptr<ProgramNode> parseAndLinkModules(
 #endif    
 
     if (showAST && combinedAST) {
-        std::cout << "\n--- Объединенный AST ---\n";
+        std::cout << "\n--- Combined AST ---\n";
         ASTDebugger::debug(combinedAST);
-        std::cout << "--- Конец объединенного AST ---\n";
+        std::cout << "--- End of combined AST ---\n";
     }
 
     

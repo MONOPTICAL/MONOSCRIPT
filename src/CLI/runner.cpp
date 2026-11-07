@@ -136,7 +136,7 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
     auto t_start = std::chrono::high_resolution_clock::now();
 #endif
     // Code generation
-    ui::Spinner spinner("Компиляция", false);
+    ui::Spinner spinner("Compiling", false);
     CodeGenContext context(currentFilePath);
     ASTGen codeGen(context);
     combinedAST->accept(codeGen);
@@ -184,11 +184,11 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
             
             return result;
         } else {
-            std::cerr << "Ошибка: Не удалось получить модуль LLVM для выполнения." << std::endl;
+            std::cerr << "Error: could not get the LLVM module to run." << std::endl;
             return RUN_FAILED;
         }
     } catch (const std::exception& e) {
-        std::cerr << "Ошибка при выполнении: " << e.what() << std::endl;
+        std::cerr << "Error while running: " << e.what() << std::endl;
         return RUN_FAILED;
     }
 }

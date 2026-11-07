@@ -144,7 +144,7 @@ void Spinner::finish(const char* mark, const char* color, const std::string& det
 
     std::fputs("\r\033[K", stderr);
     if (keep) {
-        const std::string note = detail.empty() ? std::to_string(elapsed) + " мс" : detail;
+        const std::string note = detail.empty() ? std::to_string(elapsed) + " ms" : detail;
         std::fprintf(stderr, "%s%s%s %s %s%s%s\n", style(stderr, color).c_str(), mark, style(stderr, RESET).c_str(), label.c_str(),
                      style(stderr, DIM).c_str(), note.c_str(), style(stderr, RESET).c_str());
     }
@@ -152,7 +152,7 @@ void Spinner::finish(const char* mark, const char* color, const std::string& det
 }
 
 void Spinner::done(const std::string& detail) { finish("✓", GREEN, detail); }
-void Spinner::fail() { finish("✗", RED, "ошибка"); }
+void Spinner::fail() { finish("✗", RED, "failed"); }
 
 // Сюда попадаем и при исключении: строка спиннера не должна остаться перед сообщением об ошибке
 Spinner::~Spinner() {

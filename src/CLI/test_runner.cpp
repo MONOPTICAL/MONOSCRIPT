@@ -323,7 +323,7 @@ constexpr int RUNTIME_ERROR_CODE = 101;
 // Пустая строка - тест прошёл, иначе причина провала
 static std::string evaluate(const TestCase& test, const RunResult& run)
 {
-    if (run.exitCode == 124) return "завис (таймаут 10 с)";
+    if (run.exitCode == 124) return "hung (10 s timeout)";
 
     // Программа дошла до конца: код выхода теперь её собственный, это не ошибка компилятора.
     // Строки вывода ищем по порядку: между ними может быть отладочный вывод
@@ -335,54 +335,54 @@ static std::string evaluate(const TestCase& test, const RunResult& run)
         while (nextOutputCheck < test.outputChecks.size() && std::getline(programOutput, programLine))
             if (trim(programLine) == test.outputChecks[nextOutputCheck]) ++nextOutputCheck;
         if (nextOutputCheck < test.outputChecks.size())
-            return "в выводе нет строки: " + test.outputChecks[nextOutputCheck];
+            return "output is missing the line: " + test.outputChecks[nextOutputCheck];
         return "";
     }
 
     if (test.expect == "runtime-error")
     {
         if (run.exitCode != RUNTIME_ERROR_CODE)
-            return "ожидалась ошибка выполнения с кодом " + std::to_string(RUNTIME_ERROR_CODE) + ", код выхода " + std::to_string(run.exitCode);
+            return "expected a runtime error with code " + std::to_string(RUNTIME_ERROR_CODE) + ", exit code " + std::to_string(run.exitCode);
         if (run.output.find(test.errorText) == std::string::npos)
-            return "в выводе нет текста: " + test.errorText;
+            return "output is missing the text: " + test.errorText;
         return "";
     }
 
     if (run.exitCode == RUNTIME_ERROR_CODE && test.expect == "run")
-        return "неожиданная ошибка выполнения";
+        return "unexpected runtime error";
 
     if (run.exitCode != 0 && run.exitCode != 1)
-        return "компилятор упал, код выхода " + std::to_string(run.exitCode);
+        return "compiler crashed, exit code " + std::to_string(run.exitCode);
 
     if (test.expect == "no-crash") return "";
 
     if (test.expect == "start-error")
     {
-        if (run.exitCode == 0) return "ожидалось, что программа не запустится";
+        if (run.exitCode == 0) return "expected the program not to start";
         if (run.output.find(test.errorText) == std::string::npos)
-            return "в выводе нет текста: " + test.errorText;
+            return "output is missing the text: " + test.errorText;
         return "";
     }
 
     if (test.expect == "error")
     {
-        if (run.exitCode == 0) return "ожидалась ошибка компиляции, но код принят";
+        if (run.exitCode == 0) return "expected a compile error, but the code was accepted";
         if (test.errorLine != 0 && !hasErrorOnLine(run.output, test.errorLine))
-            return "ошибка не на строке " + std::to_string(test.errorLine);
+            return "error is not on line " + std::to_string(test.errorLine);
         if (!test.errorText.empty() && run.output.find(test.errorText) == std::string::npos)
-            return "в выводе нет текста: " + test.errorText;
+            return "output is missing the text: " + test.errorText;
         return "";
     }
 
-    if (run.exitCode != 0) return "ожидался успех, но код отвергнут";
+    if (run.exitCode != 0) return "expected success, but the code was rejected";
 
     for (const auto& check : test.parseChecks)
         if (run.output.find(check) == std::string::npos)
-            return "в разборе нет: " + check;
+            return "parse output is missing: " + check;
 
     // В Debug-сборке отладочный вывод разрешён
-    if (!DEBUG && test.quiet && !trim(run.output).empty()) return "на успехе компилятор что-то напечатал";
-    if (test.expect != "ok" && test.expect != "parse" && test.expect != "run") return "неизвестная директива expect: " + test.expect;
+    if (!DEBUG && test.quiet && !trim(run.output).empty()) return "the compiler printed something on success";
+    if (test.expect != "ok" && test.expect != "parse" && test.expect != "run") return "unknown expect directive: " + test.expect;
     return "";
 }
 
@@ -437,20 +437,20 @@ static std::string padRight(const std::string& value, size_t width)
 static std::string groupTitle(const std::string& group)
 {
     static const std::map<std::string, std::string> titles = {
-        {"crash", "Падения компилятора"},
-        {"parser", "Парсер"},
-        {"lexer", "Лексер"},
-        {"types", "Типы пропускают лишнее"},
-        {"rejected_valid", "Отвергается верный код"},
-        {"unfinished", "Не доделано"},
-        {"modules", "Модули"},
-        {"diagnostics", "Диагностика"},
-        {"ok", "Контроль: уже работает"},
-        {"run", "Запуск программ"},
+        {"crash", "Compiler crashes"},
+        {"parser", "Parser"},
+        {"lexer", "Lexer"},
+        {"types", "Type checks"},
+        {"rejected_valid", "Valid code accepted"},
+        {"unfinished", "Unfinished"},
+        {"modules", "Modules"},
+        {"diagnostics", "Diagnostics"},
+        {"ok", "Control: already works"},
+        {"run", "Running programs"},
     };
     auto it = titles.find(group);
     if (it != titles.end()) return it->second;
-    return group.empty() ? "Без раздела" : group;
+    return group.empty() ? "Ungrouped" : group;
 }
 
 static void printGroup(const std::string& group, const std::vector<ReportEntry>& entries, bool verbose)
@@ -468,7 +468,7 @@ static void printGroup(const std::string& group, const std::vector<ReportEntry>&
     if (skipped == static_cast<int>(entries.size()))
     {
         std::cout << "\n" << termcolor::grey << "- " << groupTitle(group) << "  " << skipped
-                  << " пропущено: нужна сборка с LLVM, запусти ./ms --run_tests" << termcolor::reset << "\n";
+                  << " skipped: needs a build with LLVM, run ./ms --run_tests" << termcolor::reset << "\n";
         return;
     }
 
@@ -477,7 +477,7 @@ static void printGroup(const std::string& group, const std::vector<ReportEntry>&
     if (allPassed) std::cout << termcolor::green << "✓ ";
     else std::cout << termcolor::yellow << "▲ ";
     std::cout << termcolor::bold << groupTitle(group) << termcolor::reset << termcolor::grey << "  "
-              << passed << " из " << entries.size() << " проходит" << termcolor::reset << "\n";
+              << passed << " of " << entries.size() << " passed" << termcolor::reset << "\n";
 
     for (const auto& entry : entries)
     {
@@ -496,7 +496,7 @@ static void printGroup(const std::string& group, const std::vector<ReportEntry>&
                 break;
             case TestStatus::Fixed:
                 std::cout << "  " << termcolor::green << "★ " << padRight(entry.name, nameWidth)
-                          << "  починено, убери пометку xfail" << termcolor::reset << "\n";
+                          << "  fixed, remove the xfail mark" << termcolor::reset << "\n";
                 break;
             case TestStatus::Failed:
                 std::cout << "  " << termcolor::red << "✗ " << padRight(entry.name, nameWidth)
@@ -523,18 +523,18 @@ static void printSummary(int total, int passed, int knownBugs, int failed, int f
     for (int i = 0; i < filled; ++i) std::cout << "█";
     std::cout << termcolor::yellow;
     for (int i = filled; i < barWidth; ++i) std::cout << "░";
-    std::cout << termcolor::reset << "  " << passed << " из " << total << "\n\n";
+    std::cout << termcolor::reset << "  " << passed << " of " << total << "\n\n";
 
-    std::cout << "  " << termcolor::green << "Прошло:          " << passed << termcolor::reset << "\n";
-    std::cout << "  " << termcolor::yellow << "Известных багов: " << knownBugs << termcolor::reset << "\n";
-    if (skipped > 0) std::cout << "  " << termcolor::grey << "Пропущено:       " << skipped << " (нужна сборка с LLVM)" << termcolor::reset << "\n";
-    if (fixed > 0) std::cout << "  " << termcolor::green << "Починено:        " << fixed << " (убери xfail)" << termcolor::reset << "\n";
-    if (failed > 0) std::cout << "  " << termcolor::red << "Провалено:       " << failed << termcolor::reset << "\n";
+    std::cout << "  " << termcolor::green << "Passed:      " << passed << termcolor::reset << "\n";
+    std::cout << "  " << termcolor::yellow << "Known bugs:  " << knownBugs << termcolor::reset << "\n";
+    if (skipped > 0) std::cout << "  " << termcolor::grey << "Skipped:     " << skipped << " (needs a build with LLVM)" << termcolor::reset << "\n";
+    if (fixed > 0) std::cout << "  " << termcolor::green << "Fixed:       " << fixed << " (remove xfail)" << termcolor::reset << "\n";
+    if (failed > 0) std::cout << "  " << termcolor::red << "Failed:      " << failed << termcolor::reset << "\n";
 
     std::cout << "\n";
-    if (total == 0) std::cout << termcolor::red << termcolor::bold << "Ни одного теста не найдено";
-    else if (failed > 0 || fixed > 0) std::cout << termcolor::red << termcolor::bold << "Есть неожиданные результаты";
-    else std::cout << termcolor::green << termcolor::bold << "Неожиданных результатов нет";
+    if (total == 0) std::cout << termcolor::red << termcolor::bold << "No tests found";
+    else if (failed > 0 || fixed > 0) std::cout << termcolor::red << termcolor::bold << "Unexpected results";
+    else std::cout << termcolor::green << termcolor::bold << "No unexpected results";
     std::cout << termcolor::reset << std::endl;
 }
 
@@ -594,7 +594,7 @@ int runFrontendTests(const std::vector<std::string>& checkCommand, const std::ve
                 compiled.output += "\n[ exited with code " + std::to_string(compiled.exitCode) + "]\n";
 
             if (compiled.exitCode != run.exitCode)
-                entry.failure = "--compile: код выхода " + std::to_string(compiled.exitCode) + ", а через JIT " + std::to_string(run.exitCode);
+                entry.failure = "--compile: exit code " + std::to_string(compiled.exitCode) + ", through JIT " + std::to_string(run.exitCode);
             else if (const std::string failure = evaluate(test, compiled); !failure.empty())
                 entry.failure = "--compile: " + failure;
         }
@@ -611,7 +611,7 @@ int runFrontendTests(const std::vector<std::string>& checkCommand, const std::ve
 
     ui::clearProgress();
 
-    std::cout << "\n" << termcolor::bold << "MONOSCRIPT: тесты фронтенда" << termcolor::reset << "\n";
+    std::cout << "\n" << termcolor::bold << "MONOSCRIPT: tests" << termcolor::reset << "\n";
 
     std::vector<std::string> order = {"crash", "parser", "lexer", "types", "rejected_valid", "unfinished", "modules", "diagnostics", "ok"};
     for (const auto& [group, entries] : groups)
