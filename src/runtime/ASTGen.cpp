@@ -471,8 +471,7 @@ void ASTGen::visit(ForNode& node) {
     // Граница считается один раз, до начала цикла
     range->arguments[0]->accept(*this);
     llvm::Value* limit = TypeConversions::loadValueIfPointer(context, getResult(), "limit");
-    if (limit->getType() != counterType)
-        limit = context.Builder.CreateIntCast(limit, counterType, true, "limit_cast");
+    limit = TypeConversions::convertValueToType(context, limit, counterType, "limit_cast");
 
     llvm::AllocaInst* counter = context.createEntryAlloca(counterType, node.varName);
     context.Builder.CreateStore(llvm::ConstantInt::get(counterType, 0), counter);
@@ -655,66 +654,10 @@ void ASTGen::visit(CallNode& node) {
             return;
         }
 
-        // Приведение типа, если требуется
-        if (node.arguments[i]->implicitCastTo) {
-            llvm::Type* targetType = context.getLLVMType(node.arguments[i]->implicitCastTo, context.TheContext);
-            llvm::Type* argType = argVal->getType();
-            if (targetType && argType != targetType) {
-                if (argType->isIntegerTy() && targetType->isFloatingPointTy()) {
-                    argVal = context.Builder.CreateSIToFP(argVal, targetType, "cast_int2fp");
-                } else if (argType->isFloatingPointTy() && targetType->isIntegerTy()) {
-                    argVal = context.Builder.CreateFPToSI(argVal, targetType, "cast_fp2int");
-                } else if (argType->isIntegerTy() && targetType->isIntegerTy()) {
-                    LogWarning("!!!Неявное приведение целого числа к целому числу!!!");
-                    argVal = context.Builder.CreateIntCast(argVal, targetType, true, "cast_int2int");
-                } else if (argType->isPointerTy() && targetType->isPointerTy()) {
-                    LogWarning("!!!Неявное приведение указателя к указателю!!!");
-                    argVal = context.Builder.CreateBitCast(argVal, targetType, "cast_ptr2ptr");
-                } 
-            }
-        }
-
-        llvm::Type* expectedType = calleeFunc->getFunctionType()->getParamType(i);
-        llvm::Type* argType = argVal->getType();
-        if (argVal->getType()->isPointerTy()) {
-            if (llvm::AllocaInst* allocaInst = llvm::dyn_cast<llvm::AllocaInst>(argVal)) {
-                llvm::Type* loadedType = allocaInst->getAllocatedType();
-                argVal = context.Builder.CreateLoad(loadedType, argVal, "arg_load");
-                argType = argVal->getType();
-            } else if (llvm::GlobalVariable* globalVar = llvm::dyn_cast<llvm::GlobalVariable>(argVal)) {
-                llvm::Type* valueType = globalVar->getValueType();
-                if (valueType->isArrayTy() && valueType->getArrayElementType()->isIntegerTy(8)) {
-                    // Cтрока ебанная
-                    argVal = context.Builder.CreateInBoundsGEP(
-                        valueType,
-                        globalVar,
-                        {llvm::ConstantInt::get(context.TheContext, llvm::APInt(32, 0)),
-                         llvm::ConstantInt::get(context.TheContext, llvm::APInt(32, 0))}
-                    );
-                    argType = argVal->getType();
-                } else {
-                    // Обычная глобальная переменная
-                    argVal = context.Builder.CreateLoad(valueType, argVal, "arg_load");
-                    argType = argVal->getType();
-                }
-            }
-        }
-
-        if (argType != expectedType) {
-            if (argType->isIntegerTy(1) && expectedType->isIntegerTy()) {
-                argVal = context.Builder.CreateZExt(argVal, expectedType, "zext_i1_to_i32");
-            } else if (argType->isIntegerTy() && expectedType->isIntegerTy(1)) {
-                argVal = context.Builder.CreateTrunc(argVal, expectedType, "trunc_to_i1");
-            } else if (argType->isIntegerTy() && expectedType->isIntegerTy()) {
-                argVal = context.Builder.CreateIntCast(argVal, expectedType, true, "cast_int2int");
-            } else if (argType->isFloatingPointTy() && expectedType->isFloatingPointTy()) {
-                argVal = context.Builder.CreateFPCast(argVal, expectedType, "cast_fp2fp");
-            } else {
-                LogWarning("!!!Неизвестное неявное приведение аргумента " + std::to_string(i) + " для функции " + node.callee + "!!!");
-            }
-        }
-
-        
+        // Сначала значение переменной, потом приведение: и то, что выбрала семантика, и к типу параметра
+        argVal = TypeConversions::loadValueIfPointer(context, argVal, "arg");
+        argVal = TypeConversions::applyImplicitCast(context, argVal, node.arguments[i]->implicitCastTo);
+        argVal = TypeConversions::convertValueToType(context, argVal, calleeFunc->getFunctionType()->getParamType(i));
 
         argsV.push_back(argVal);
     }
