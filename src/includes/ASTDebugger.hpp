@@ -47,6 +47,18 @@ class ASTDebugger
             {
                 printIndent(indent); std::cout << "[Module Mark] " << moduleMark->moduleName << "\n";
             }   
+            else if (auto attempt = std::dynamic_pointer_cast<AttemptNode>(node)) {
+                printIndent(indent); std::cout << "[Attempt]\n";
+                debug(attempt->body, indent + 2);
+                if (attempt->errorBody) {
+                    printIndent(indent); std::cout << "[Else] " << attempt->errorName << "\n";
+                    debug(attempt->errorBody, indent + 2);
+                }
+                if (attempt->panicBody) {
+                    printIndent(indent); std::cout << "[Panic] " << attempt->panicName << "\n";
+                    debug(attempt->panicBody, indent + 2);
+                }
+            }
             else if(auto ifNode = std::dynamic_pointer_cast<IfNode>(node))
             {
                 printIndent(indent); std::cout << "[IF CONDITION]: \n";
@@ -145,6 +157,8 @@ class ASTDebugger
             else if (auto un = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
                 printIndent(indent); std::cout << "UnaryOp: " << un->op << "\n";
                 debug(un->operand, indent + 2);
+                if (un->fallback) debug(un->fallback, indent + 2);
+                if (un->errorBody) debug(un->errorBody, indent + 2);
             }
             else if (auto ident = std::dynamic_pointer_cast<IdentifierNode>(node)) {
                 printIndent(indent); std::cout << "Value: " << ident->name << " - <identifier>" << "\n";

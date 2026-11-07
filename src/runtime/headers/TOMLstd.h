@@ -38,8 +38,12 @@ inline llvm::Function* declareFunctionFromTOML(
             argTypes.push_back(argType);
         }
 
+        const bool checked = toml::find_or<bool>(func, "panic_context", false);
+        if (checked) argTypes.push_back(llvm::PointerType::getUnqual(ctx));
         llvm::FunctionType* ftype = llvm::FunctionType::get(retType, argTypes, false);
-        return llvm::cast<llvm::Function>(module->getOrInsertFunction(name, ftype).getCallee());
+        auto function = llvm::cast<llvm::Function>(module->getOrInsertFunction(name, ftype).getCallee());
+        if (checked) function->addFnAttr("ms.panic_context");
+        return function;
     }
     return nullptr;
 }

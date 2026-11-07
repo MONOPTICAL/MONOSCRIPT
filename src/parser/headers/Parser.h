@@ -45,6 +45,8 @@ private:
     std::shared_ptr<BlockNode> parseBlock(int);
     std::shared_ptr<ASTNode> parseAssignment(bool);
     std::shared_ptr<ASTNode> parseIf();
+    std::shared_ptr<ASTNode> parseAttempt();
+    std::shared_ptr<BlockNode> parseInlineHandler();
     std::shared_ptr<ASTNode> parseFor();
     std::shared_ptr<ASTNode> parseWhile();
     std::shared_ptr<ASTNode> parseReturn();

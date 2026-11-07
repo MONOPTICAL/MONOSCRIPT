@@ -6,7 +6,15 @@ llvm::Function* CodeGenContext::getOrDeclareFunction(const std::string& name, ll
     llvm::Function* func = TheModule->getFunction(name); // Проверяем, существует ли функция
     if (!func) {
         // Функция не найдена в модуле, объявляем ее как внешнюю
+        const bool checked = name == "ms_panic_index" || name == "ms_panic_result" ||
+            name == "ms_str_at" || name == "ms_map_get" || name == "ms_map_del" || name == "ms_map_next";
+        if (checked) {
+            std::vector<llvm::Type*> args(type->params().begin(), type->params().end());
+            args.push_back(Builder.getPtrTy());
+            type = llvm::FunctionType::get(type->getReturnType(), args, false);
+        }
         func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, name, TheModule.get());
+        if (checked) func->addFnAttr("ms.panic_context");
     }
     return func;
 }
@@ -132,27 +140,85 @@ llvm::Value* CodeGenContext::getArrayElementPtr(llvm::Value* array, llvm::Type* 
     Builder.SetInsertPoint(failBlock);
     llvm::Function* panic = getOrDeclareFunction("ms_panic_index",
         llvm::FunctionType::get(llvm::Type::getVoidTy(TheContext), {i64Type, i32Type, i32Type}, false));
-    panic->setDoesNotReturn();
-    Builder.CreateCall(panic, {wideIndex, length, Builder.getInt32(ErrorEngine::getInstance().displayLine(line))});
-    Builder.CreateUnreachable();
+    Builder.CreateCall(panic, {wideIndex, length, Builder.getInt32(ErrorEngine::getInstance().displayLine(line)), PanicContext});
+    propagatePanic();
 
     Builder.SetInsertPoint(okBlock);
     return Builder.CreateGEP(elementType, getArrayData(array), wideIndex, "element_ptr");
 }
 
 void CodeGenContext::emitPanic(const std::string& message, int line) {
-    llvm::Function* panic = getOrDeclareFunction("ms_panic",
-        llvm::FunctionType::get(
-            llvm::Type::getVoidTy(TheContext),
-            {llvm::PointerType::get(TheContext, 0), llvm::Type::getInt32Ty(TheContext)},
-            false
-        )
-    );
-    panic->setDoesNotReturn();
+    auto raise = getOrDeclareFunction("ms_raise", llvm::FunctionType::get(Builder.getVoidTy(),
+        {Builder.getPtrTy(), Builder.getInt32Ty(), Builder.getPtrTy()}, false));
+    Builder.CreateCall(raise, {createString(message),
+        Builder.getInt32(ErrorEngine::getInstance().displayLine(line)), PanicContext});
+    propagatePanic();
+}
 
-    const int sourceLine = ErrorEngine::getInstance().displayLine(line);
-    Builder.CreateCall(panic, {createString(message), Builder.getInt32(sourceLine)});
+llvm::StructType* CodeGenContext::getPanicStruct() {
+    return llvm::StructType::get(TheContext, {Builder.getInt8Ty(), Builder.getInt32Ty(), Builder.getPtrTy()});
+}
+
+void CodeGenContext::propagatePanic() {
+    if (!PanicHandlers.empty()) {
+        Builder.CreateBr(PanicHandlers.back());
+        return;
+    }
+    auto function = Builder.GetInsertBlock()->getParent();
+    if (function->hasFnAttribute("ms.panic_context")) {
+        if (function->getReturnType()->isVoidTy()) Builder.CreateRetVoid();
+        else Builder.CreateRet(llvm::Constant::getNullValue(function->getReturnType()));
+        return;
+    }
+    auto layout = getPanicStruct();
+    auto message = Builder.CreateLoad(Builder.getPtrTy(), Builder.CreateStructGEP(layout, PanicContext, 2));
+    auto line = Builder.CreateLoad(Builder.getInt32Ty(), Builder.CreateStructGEP(layout, PanicContext, 1));
+    auto fatal = getOrDeclareFunction("ms_panic", llvm::FunctionType::get(Builder.getVoidTy(),
+        {Builder.getPtrTy(), Builder.getInt32Ty()}, false));
+    fatal->setDoesNotReturn();
+    Builder.CreateCall(fatal, {message, line});
     Builder.CreateUnreachable();
+}
+
+void CodeGenContext::checkPanic() {
+    auto function = Builder.GetInsertBlock()->getParent();
+    auto fail = llvm::BasicBlock::Create(TheContext, "panic.propagate", function);
+    auto ok = llvm::BasicBlock::Create(TheContext, "panic.clear", function);
+    auto flag = Builder.CreateLoad(Builder.getInt8Ty(), Builder.CreateStructGEP(getPanicStruct(), PanicContext, 0));
+    Builder.CreateCondBr(Builder.CreateICmpNE(flag, Builder.getInt8(0)), fail, ok);
+    Builder.SetInsertPoint(fail);
+    auto lineSlot = Builder.CreateStructGEP(getPanicStruct(), PanicContext, 1);
+    auto line = Builder.CreateLoad(Builder.getInt32Ty(), lineSlot);
+    Builder.CreateStore(Builder.CreateSelect(Builder.CreateICmpEQ(line, Builder.getInt32(0)),
+        Builder.getInt32(ErrorEngine::getInstance().displayLine(CurrentLine)), line), lineSlot);
+    propagatePanic();
+    Builder.SetInsertPoint(ok);
+}
+
+llvm::Value* CodeGenContext::emitCall(llvm::Function* function, std::vector<llvm::Value*> arguments, const std::string& name) {
+    const bool checked = function->hasFnAttribute("ms.panic_context");
+    if (checked) arguments.push_back(PanicContext);
+    auto value = Builder.CreateCall(function, arguments, function->getReturnType()->isVoidTy() ? "" : name);
+    if (checked) checkPanic();
+    return value;
+}
+
+// Every func<> value uses the language calling convention, including native functions.
+llvm::Function* CodeGenContext::functionAdapter(llvm::Function* function) {
+    if (function->hasFnAttribute("ms.panic_context")) return function;
+    const std::string name = "__ms_adapter_" + function->getName().str();
+    if (auto existing = TheModule->getFunction(name)) return existing;
+    std::vector<llvm::Type*> types(function->getFunctionType()->params().begin(), function->getFunctionType()->params().end());
+    types.push_back(Builder.getPtrTy());
+    auto adapter = llvm::Function::Create(llvm::FunctionType::get(function->getReturnType(), types, false),
+        llvm::Function::PrivateLinkage, name, TheModule.get());
+    adapter->addFnAttr("ms.panic_context");
+    llvm::IRBuilder<> builder(llvm::BasicBlock::Create(TheContext, "entry", adapter));
+    std::vector<llvm::Value*> args;
+    for (unsigned i = 0; i < function->arg_size(); ++i) args.push_back(adapter->getArg(i));
+    auto value = builder.CreateCall(function, args);
+    if (function->getReturnType()->isVoidTy()) builder.CreateRetVoid(); else builder.CreateRet(value);
+    return adapter;
 }
 
 std::string CodeGenContext::findEntryName(const ProgramNode& program) {

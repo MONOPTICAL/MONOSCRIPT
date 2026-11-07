@@ -361,6 +361,7 @@ TokenType Lexer::IsKeyword(const std::string &value) const
         "and", // Logical AND
         "or", // Logical OR
         "else",  // Else statement
+        "attempt", "panic",
         "while",  // While loop
         "for",  // For loop
         "return", // Return statement

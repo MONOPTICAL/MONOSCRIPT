@@ -33,10 +33,11 @@ namespace Objects
         layout.type = llvm::StructType::create(context.TheContext, fieldTypes, "ms_struct_" + node.name);
 
         layout.constructor = llvm::Function::Create(
-            llvm::FunctionType::get(llvm::PointerType::get(context.TheContext, 0), false),
+            llvm::FunctionType::get(llvm::PointerType::get(context.TheContext, 0), {context.Builder.getPtrTy()}, false),
             llvm::Function::PrivateLinkage, "__ms_new_" + node.name, context.TheModule.get()
         );
 
+        layout.constructor->addFnAttr("ms.panic_context");
         context.Structs[node.name] = layout;
     }
 
@@ -51,6 +52,8 @@ namespace Objects
     {
         const StructLayout& layout = context.Structs.at(node.name);
 
+        auto outerPanicContext = context.PanicContext;
+        context.PanicContext = layout.constructor->getArg(0);
         auto outerNamedValues = context.NamedValues;
         context.NamedValues.clear();
 
@@ -66,11 +69,12 @@ namespace Objects
 
         context.Builder.ClearInsertionPoint();
         context.NamedValues = outerNamedValues;
+        context.PanicContext = outerPanicContext;
     }
 
     llvm::Value* emitNew(CodeGenContext& context, const std::string& name)
     {
-        return context.Builder.CreateCall(context.Structs.at(name).constructor, {}, "object");
+        return context.emitCall(context.Structs.at(name).constructor, {}, "object");
     }
 
     // Поверхностная копия: вложенные объекты остаются общими

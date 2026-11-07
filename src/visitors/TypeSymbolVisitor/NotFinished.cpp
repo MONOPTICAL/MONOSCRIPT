@@ -42,6 +42,20 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
         auto accessNode = std::dynamic_pointer_cast<AccessExpression>(currentLink);
         if (!accessNode) break;
 
+        if (!accessNode->memberName.empty() && currentType && currentType->toString() == "panic_info") {
+            auto member = std::dynamic_pointer_cast<AccessExpression>(accessNode->nextAccess);
+            const auto& name = accessNode->memberName;
+            if (name != "message" && name != "line")
+                LogError("panic_info has only message and line fields", accessNode);
+            if (member && std::dynamic_pointer_cast<CallNode>(member->expression))
+                LogError("panic_info members are fields, not methods", accessNode);
+            currentType = registry.findType(name == "line" ? "i32" : "string");
+            if (member) member->inferredType = currentType;
+            currentStructDef = nullptr;
+            lastAccessResultField = true;
+            currentLink = accessNode->nextAccess;
+            continue;
+        }
         // Поля result: ok, code, error, value. Писать в них нельзя
         if (!accessNode->memberName.empty() && currentType && std::dynamic_pointer_cast<GenericTypeNode>(currentType)
             && std::dynamic_pointer_cast<GenericTypeNode>(currentType)->baseName == "result") {
@@ -263,7 +277,7 @@ void TypeSymbolVisitor::checkPureAlias(const std::shared_ptr<ASTNode>& expr) {
             } else if (auto access = std::dynamic_pointer_cast<AccessExpression>(value)) {
                 result = borrowed(access->expression);
             } else if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(value)) {
-                result = borrowed(unary->operand);
+                result = borrowed(unary->operand) || borrowed(unary->fallback);
             } else if (auto call = std::dynamic_pointer_cast<CallNode>(value)) {
                 const bool builtinCopy = call->callee == "copy" &&
                     !contexts.back().functions.count("copy") && !declaredFunctions.count("copy");

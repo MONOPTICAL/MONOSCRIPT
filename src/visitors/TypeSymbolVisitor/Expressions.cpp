@@ -117,11 +117,43 @@ void TypeSymbolVisitor::visit(UnaryOpNode& node) {
         if (!source || source->baseName != "result")
             LogError("Postfix '?' requires result<T>", node.shared_from_this());
         auto destination = std::dynamic_pointer_cast<GenericTypeNode>(contexts.back().returnType);
-        if (!destination || destination->baseName != "result" || contexts.back().currentFunctionName.empty())
+        if (!node.fallback && !node.errorBody && contexts.back().resultHandlerDepth == 0 &&
+            (!destination || destination->baseName != "result" || contexts.back().currentFunctionName.empty()))
             LogError("Postfix '?' requires a function returning result<T>", node.shared_from_this());
         node.inferredType = source->typeParameters[0];
         if (node.inferredType->toString() == "void" && node.implicitCastTo)
             LogError("Cannot cast void after postfix '?'", node.shared_from_this());
+        if (node.fallback) {
+            if (node.inferredType->toString() == "void")
+                LogError("result<void> cannot have a fallback value", node.shared_from_this());
+            const auto type = node.inferredType->toString();
+            if (type.starts_with("array<") || type.starts_with("map<")) {
+                validateCollectionElements(node.inferredType, node.fallback, false);
+                node.fallback->inferredType = node.inferredType;
+            } else {
+                node.fallback->accept(*this);
+                checkConversion(node.fallback, type, "Fallback: ");
+            }
+        }
+        if (node.errorBody) {
+            if (contexts.back().currentFunctionName.empty())
+                LogError("Local action handler outside of function", node.shared_from_this());
+            const auto assigned = assignedFinals, maybe = maybeAssignedFinals;
+            contexts.push_back(contexts.back());
+            contexts.back().returnedValue = false;
+            auto errorType = std::make_shared<GenericTypeNode>("result");
+            errorType->typeParameters.push_back(std::make_shared<SimpleTypeNode>("void"));
+            auto error = std::make_shared<VariableAssignNode>("error", true, errorType, nullptr);
+            error->inferredType = errorType;
+            contexts.back().variables["error"] = error;
+            node.errorBody->accept(*this);
+            const auto& last = node.errorBody->statements.back();
+            if (!contexts.back().returnedValue && !std::dynamic_pointer_cast<BreakNode>(last) &&
+                !std::dynamic_pointer_cast<ContinueNode>(last))
+                LogError("Local action handler must end with return, break or continue", node.errorBody);
+            contexts.pop_back();
+            assignedFinals = assigned; maybeAssignedFinals = maybe;
+        }
         checkCharCast(node);
         return;
     }

@@ -63,8 +63,11 @@ llvm::Function* declareUserFunction(CodeGenContext& context, FunctionNode& node)
         returnLLVMType = llvm::Type::getInt32Ty(context.TheContext);
     }
 
+    paramTypes.push_back(context.Builder.getPtrTy());
     llvm::FunctionType* funcType = llvm::FunctionType::get(returnLLVMType, paramTypes, false);
-    return llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, symbol, context.TheModule.get());
+    auto function = llvm::Function::Create(funcType, llvm::Function::InternalLinkage, symbol, context.TheModule.get());
+    function->addFnAttr("ms.panic_context");
+    return function;
 }
 
 // Завершает стартовую функцию: вызывает функцию пользователя и возвращает её код.
@@ -82,10 +85,9 @@ static void finishStartFunction(CodeGenContext& context, ProgramNode& node, llvm
 
     context.Builder.SetInsertPoint(startBlock);
     std::vector<llvm::Value*> arguments;
-    for (auto& arg : entry->args()) {
-        arguments.push_back(llvm::Constant::getNullValue(arg.getType()));
-    }
-    context.Builder.CreateRet(context.Builder.CreateCall(entry, arguments));
+    for (unsigned i = 0; i + 1 < entry->arg_size(); ++i)
+        arguments.push_back(llvm::Constant::getNullValue(entry->getArg(i)->getType()));
+    context.Builder.CreateRet(context.emitCall(entry, arguments));
     context.Builder.ClearInsertionPoint();
 
     if (llvm::Function* userMain = context.TheModule->getFunction("main")) {
@@ -126,6 +128,8 @@ void ASTGen::visit(ProgramNode& node) {
     llvm::BasicBlock* startBlock = llvm::BasicBlock::Create(context.TheContext, "entry", context.StartFunction);
 
     context.Builder.SetInsertPoint(startBlock);
+    context.PanicContext = context.createEntryAlloca(context.getPanicStruct(), "panic.context");
+    context.Builder.CreateStore(llvm::Constant::getNullValue(context.getPanicStruct()), context.PanicContext);
     context.Builder.CreateCall(context.getOrDeclareFunction("ms_rt_init",
         llvm::FunctionType::get(llvm::Type::getVoidTy(context.TheContext), false)));
     context.Builder.ClearInsertionPoint();
@@ -173,6 +177,12 @@ void ASTGen::visit(FunctionNode& node) {
     llvm::Type* returnLLVMType = func->getReturnType();
     auto outerReturnType = context.CurrentReturnType;
     context.CurrentReturnType = node.returnType;
+    auto outerPanicContext = context.PanicContext;
+    auto outerResultHandlers = std::move(context.ResultHandlers);
+    auto outerPanicHandlers = std::move(context.PanicHandlers);
+    context.ResultHandlers.clear(); context.PanicHandlers.clear();
+    context.PanicContext = func->getArg(func->arg_size() - 1);
+    context.PanicContext->setName("panic.context");
 
 
     // Создаем блок входа в функцию
@@ -186,6 +196,7 @@ void ASTGen::visit(FunctionNode& node) {
     // Обрабатываем параметры функции
     unsigned idx = 0;
     for (auto &arg : func->args()) {
+        if (idx == node.parameters.size()) break;
         arg.setName(node.parameters[idx++].second);
         // Параметр это обычная переменная: его можно читать и присваивать
         llvm::AllocaInst* paramSlot = context.createEntryAlloca(arg.getType(), arg.getName().str());
@@ -231,6 +242,9 @@ void ASTGen::visit(FunctionNode& node) {
     // Восстанавливаем старую таблицу символов
     context.NamedValues = oldNamedValues;
     context.CurrentReturnType = outerReturnType;
+    context.PanicContext = outerPanicContext;
+    context.ResultHandlers = std::move(outerResultHandlers);
+    context.PanicHandlers = std::move(outerPanicHandlers);
     
     result = func;
 
@@ -674,7 +688,10 @@ void ASTGen::visit(CallNode& node) {
         }
         llvm::Type* returnType = context.getLLVMType(type->typeParameters.back(), context.TheContext);
         llvm::Value* target = context.Builder.CreateLoad(context.Builder.getPtrTy(), context.NamedValues.at(node.callee), "function");
+        parameterTypes.push_back(context.Builder.getPtrTy());
+        arguments.push_back(context.PanicContext);
         llvm::Value* call = context.Builder.CreateCall(llvm::FunctionType::get(returnType, parameterTypes, false), target, arguments);
+        context.checkPanic();
         result = returnType->isVoidTy() ? nullptr : TypeConversions::applyCharCast(context, node, call);
         return;
     }
@@ -811,7 +828,7 @@ void ASTGen::visit(CallNode& node) {
         throw std::runtime_error("Codegen Error: unknown function: " + node.callee);
     }
 
-    if (calleeFunc->arg_size() != node.arguments.size()) {
+    if (calleeFunc->arg_size() != node.arguments.size() + (calleeFunc->hasFnAttribute("ms.panic_context") ? 1 : 0)) {
         LogWarning("Неверное количество аргументов для функции " + node.callee);
         result = nullptr;
         return;
@@ -847,9 +864,9 @@ void ASTGen::visit(CallNode& node) {
 
     llvm::Type* retType = calleeFunc->getReturnType();
     if (retType->isVoidTy()) {
-        result = context.Builder.CreateCall(calleeFunc, argsV);
+        result = context.emitCall(calleeFunc, argsV);
     } else {
-        result = TypeConversions::applyCharCast(context, node, context.Builder.CreateCall(calleeFunc, argsV, "calltmp"));
+        result = TypeConversions::applyCharCast(context, node, context.emitCall(calleeFunc, argsV, "calltmp"));
     }
 }
 
@@ -963,7 +980,7 @@ void ASTGen::visit(IdentifierNode& node) {
         llvm::Function* function = context.TheModule->getFunction(node.name);
         if (!function) function = declareFunctionFromTOML(node.name, context.TheModule.get(), context.TheContext, loader::findTomlPath());
         if (!function) throw std::runtime_error("Codegen Error: unknown function: " + node.name);
-        result = function;
+        result = context.functionAdapter(function);
         return;
     }
 
@@ -1082,5 +1099,45 @@ void ASTGen::visit(ImportNode &node)
 void ASTGen::visit(LambdaNode &node)
 {
     LogWarning("visit не реализован для LambdaNode");
+    result = nullptr;
+}
+
+void ASTGen::visit(AttemptNode& node) {
+    auto function = context.Builder.GetInsertBlock()->getParent();
+    auto merge = llvm::BasicBlock::Create(context.TheContext, "attempt.end", function);
+    auto error = node.errorBody ? llvm::BasicBlock::Create(context.TheContext, "attempt.error", function) : nullptr;
+    auto panic = node.panicBody ? llvm::BasicBlock::Create(context.TheContext, "attempt.panic", function) : nullptr;
+    auto errorSlot = error ? context.createEntryAlloca(context.Builder.getPtrTy(), "attempt.error.value") : nullptr;
+    auto names = context.NamedValues;
+    if (error) context.ResultHandlers.push_back({error, errorSlot});
+    if (panic) context.PanicHandlers.push_back(panic);
+    node.body->accept(*this);
+    if (!context.Builder.GetInsertBlock()->getTerminator()) context.Builder.CreateBr(merge);
+    if (error) context.ResultHandlers.pop_back();
+    if (panic) context.PanicHandlers.pop_back();
+    context.NamedValues = names;
+    if (error) {
+        context.Builder.SetInsertPoint(error);
+        context.NamedValues[node.errorName] = errorSlot;
+        node.errorBody->accept(*this);
+        if (!context.Builder.GetInsertBlock()->getTerminator()) context.Builder.CreateBr(merge);
+        context.NamedValues = names;
+    }
+    if (panic) {
+        context.Builder.SetInsertPoint(panic);
+        auto layout = context.getPanicStruct();
+        // Copy before clearing: a retained info value survives later panics and recursion.
+        auto info = context.allocateObject(context.Builder.getInt64(context.TheModule->getDataLayout().getTypeAllocSize(layout)), true, "panic.info");
+        auto snapshot = context.Builder.CreateLoad(layout, context.PanicContext);
+        context.Builder.CreateStore(snapshot, info);
+        context.Builder.CreateStore(llvm::Constant::getNullValue(layout), context.PanicContext);
+        auto slot = context.createEntryAlloca(context.Builder.getPtrTy(), node.panicName);
+        context.Builder.CreateStore(info, slot);
+        context.NamedValues[node.panicName] = slot;
+        node.panicBody->accept(*this);
+        if (!context.Builder.GetInsertBlock()->getTerminator()) context.Builder.CreateBr(merge);
+        context.NamedValues = names;
+    }
+    context.Builder.SetInsertPoint(merge);
     result = nullptr;
 }

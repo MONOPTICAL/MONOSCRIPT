@@ -306,8 +306,15 @@ std::shared_ptr<ASTNode> Parser::parsePostfix(std::shared_ptr<ASTNode> expressio
     while (check(TokenType::Operator) && current().value == "?") {
         const int line = lineIndex, column = tokenIndex;
         advance();
-        expression = std::make_shared<UnaryOpNode>("try", expression);
+        auto unwrap = std::make_shared<UnaryOpNode>("try", expression);
+        expression = unwrap;
         expression->line = line; expression->column = column;
+        if (current().value == "else") {
+            advance();
+            if (match(TokenType::Colon)) unwrap->errorBody = parseInlineHandler();
+            else unwrap->fallback = parseExpression();
+            break;
+        }
         if (check(TokenType::Arrow)) expression = parseCast(expression);
     }
     return expression;

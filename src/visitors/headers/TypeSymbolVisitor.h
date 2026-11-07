@@ -17,6 +17,7 @@ struct Context {
     std::unordered_map<std::string, std::shared_ptr<ASTNode>> functions;
     std::string currentFunctionName;
     std::shared_ptr<TypeNode> returnType;
+    int resultHandlerDepth = 0;
     bool returnedValue = false;
 };
 
@@ -206,6 +207,7 @@ public:
     void                                                            visit(ReassignMemberNode& node) override;
     void                                                            visit(VariableReassignNode& node) override;
     void                                                            visit(IfNode& node) override;
+    void visit(AttemptNode& node) override;
     void                                                            visit(ForNode& node) override;
     void                                                            visit(WhileNode& node) override;
     void                                                            visit(ReturnNode& node) override;
