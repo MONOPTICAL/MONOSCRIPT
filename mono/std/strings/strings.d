@@ -1,9 +1,9 @@
 module mono.std.strings.strings;
 
-import mono.std.core.abi : MsArray, newArray;
+import mono.std.core.abi : MsArray, newArray, stringFromCString;
 import mono.std.core.rt : ms_panic;
 
-import mono.std.core.abi : GC_malloc_atomic;
+import mono.std.core.abi : newString, stringFromBytes, MsResult, resultOk, resultErr;
 
 // Склейка и поиск
 
@@ -14,7 +14,7 @@ extern(C) char* scat(const char* a, const char* b) nothrow @nogc
     size_t len_a = strlen(a);
     size_t len_b = strlen(b);
 
-    char* result = cast(char*)GC_malloc_atomic(len_a + len_b + 1);
+    char* result = newString(len_a + len_b);
 
     strcpy(result, a);
     strcat(result, b);
@@ -30,7 +30,7 @@ extern(C) char* substr(const char* str, int start, int length) nothrow @nogc
     if (start < 0 || length < 0 || start > total || length > total - start)
         ms_panic("substr: range is outside the string", 0);
 
-    char* result = cast(char*) GC_malloc_atomic(length + 1);
+    char* result = newString(length);
     memcpy(result, str + start, length);
     result[length] = 0;
     return result;
@@ -49,6 +49,16 @@ extern(C) bool startsWith(const char* str, const char* prefix) nothrow @nogc
     import core.stdc.string : strncmp, strlen;
     const size_t prefixLength = strlen(prefix);
     return strncmp(str, prefix, prefixLength) == 0;
+}
+
+extern(C) bool endsWith(const char* str, const char* suffix) nothrow @nogc
+{
+    import core.stdc.string : strncmp, strlen;
+    const size_t strLength = strlen(str);
+    const size_t suffixLength = strlen(suffix);
+    if (suffixLength > strLength)
+        return false;
+    return strncmp(str + strLength - suffixLength, suffix, suffixLength) == 0;
 }
 
 
@@ -72,7 +82,7 @@ extern(C) MsArray* split(const char* str, const char* delim) nothrow @nogc
         const(char)* end = strstr(start, delim);
         const size_t length = end !is null ? end - start : strlen(start);
 
-        parts[i] = cast(char*) GC_malloc_atomic(length + 1);
+        parts[i] = newString(length);
         memcpy(parts[i], start, length);
         parts[i][length] = 0;
 
@@ -119,20 +129,42 @@ extern(C) char* joinChars(MsArray* array) nothrow @nogc
 {
     import core.stdc.string : memcpy;
 
-    // data не C-строка: GC_malloc_atomic не ставит '\0', длина только в заголовке
-    char* result = cast(char*) GC_malloc_atomic(array.length + 1);
-    if (array.length > 0)
-        memcpy(result, array.data, array.length);
-    result[array.length] = 0;
-    return result;
+    return stringFromBytes(cast(const char*) array.data, array.length);
 }
 
 // Разбор
 
-extern(C) int toInt(const char* str) nothrow @nogc
+// Strict decimal parsing: optional leading sign, no whitespace or trailing junk.
+extern(C) MsResult!int* toInt(const char* str) nothrow @nogc
 {
-    import core.stdc.stdlib : strtol;
-    return cast(int) strtol(str, null, 10);
+    size_t i = 0;
+    bool negative = str[0] == '-';
+    if (negative || str[0] == '+') i++;
+    if (str[i] == 0) return resultErr!int(1, "expected a decimal integer");
+    uint value = 0;
+    const uint limit = negative ? 2147483648u : 2147483647u;
+    for (; str[i] != 0; i++)
+    {
+        if (str[i] < '0' || str[i] > '9')
+            return resultErr!int(1, "expected a decimal integer");
+        uint digit = str[i] - '0';
+        if (value > (limit - digit) / 10)
+            return resultErr!int(2, "integer is outside i32 range");
+        value = value * 10 + digit;
+    }
+    return resultOk!int(negative ? cast(int)(0u - value) : cast(int) value);
+}
+
+extern(C) char* reverse(const char* str) nothrow @nogc
+{
+    import core.stdc.string : strlen, memcpy;
+
+    size_t length = strlen(str);
+    char* result = newString(length);
+    for (size_t i = 0; i < length; i++)
+        result[i] = str[length - 1 - i];
+    result[length] = 0;
+    return result;
 }
 
 // В строку
@@ -147,7 +179,7 @@ extern(C) char* toString_int(const int a) nothrow @nogc
 
     size_t len_a = strlen(buffer.ptr);
 
-    char* result = cast(char*)GC_malloc_atomic(len_a + 1);
+    char* result = newString(len_a);
 
     strcpy(result, buffer.ptr);
 
@@ -164,7 +196,7 @@ extern(C) char* toString_long(const long a) nothrow @nogc
 
     size_t len_a = strlen(buffer.ptr);
 
-    char* result = cast(char*)GC_malloc_atomic(len_a + 1);
+    char* result = newString(len_a);
 
     strcpy(result, buffer.ptr);
 
@@ -178,7 +210,7 @@ extern(C) char* toString_bool(const bool a) nothrow @nogc
     const char* str = a ? "true" : "false";
     size_t len_a = strlen(str);
 
-    char* result = cast(char*)GC_malloc_atomic(len_a + 1);
+    char* result = newString(len_a);
 
     strcpy(result, str);
 
@@ -207,7 +239,7 @@ extern(C) char* toString_float(const float a) nothrow @nogc
         buffer[length] = 0;
     }
 
-    char* result = cast(char*)GC_malloc_atomic(length + 1);
+    char* result = newString(length);
     strcpy(result, buffer.ptr);
     return result;
 }
@@ -236,7 +268,7 @@ extern(C) char* toString_f64(const double a) nothrow @nogc
         buffer[length] = 0;
     }
 
-    char* result = cast(char*)GC_malloc_atomic(length + 1);
+    char* result = newString(length);
     strcpy(result, buffer.ptr);
     return result;
 }
@@ -244,7 +276,8 @@ extern(C) char* toString_f64(const double a) nothrow @nogc
 
 extern(C) char* toString_char(const char c) nothrow @nogc
 {
-    char* result = cast(char*) GC_malloc_atomic(2);
+    if (c == 0) ms_panic("strings cannot contain a NUL byte", 0);
+    char* result = newString(1);
     result[0] = c;
     result[1] = 0;
     return result;

@@ -151,7 +151,7 @@ void CodeGenContext::emitPanic(const std::string& message, int line) {
     panic->setDoesNotReturn();
 
     const int sourceLine = ErrorEngine::getInstance().displayLine(line);
-    Builder.CreateCall(panic, {Builder.CreateGlobalString(message), Builder.getInt32(sourceLine)});
+    Builder.CreateCall(panic, {createString(message), Builder.getInt32(sourceLine)});
     Builder.CreateUnreachable();
 }
 
@@ -181,4 +181,16 @@ void CodeGenContext::LogWarning(const std::string &message)
 #if DEBUG
     std::cerr << "Warning: " << message << std::endl;
 #endif
+}
+// Strings retain the C ABI data pointer; the preceding u64 stores the byte length.
+llvm::Constant* CodeGenContext::createString(const std::string& text, const std::string& name) {
+    if (text.find('\0') != std::string::npos)
+        throw std::runtime_error("Strings cannot contain a NUL byte");
+    auto bytes = llvm::ConstantDataArray::getString(TheContext, text, true);
+    auto value = llvm::ConstantStruct::getAnon({Builder.getInt64(text.size()), bytes});
+    auto global = new llvm::GlobalVariable(*TheModule, value->getType(), true,
+        llvm::GlobalValue::PrivateLinkage, value, name);
+    global->setAlignment(llvm::Align(8));
+    llvm::Constant* indices[] = {Builder.getInt32(0), Builder.getInt32(1), Builder.getInt32(0)};
+    return llvm::ConstantExpr::getInBoundsGetElementPtr(value->getType(), global, indices);
 }

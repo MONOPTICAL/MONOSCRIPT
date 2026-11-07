@@ -6,12 +6,8 @@
 #include "headers/ui.h"
 #include <llvm/IR/Module.h>
 #include <llvm/Support/raw_ostream.h>
-#include <llvm/IRReader/IRReader.h>
-#include <llvm/Support/MemoryBuffer.h>
-#include <llvm/Support/SourceMgr.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
-#include <llvm/ExecutionEngine/GenericValue.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/Error.h>
 #include <iostream>
@@ -21,7 +17,7 @@
 #include <llvm/IR/PassManager.h>
 #include <llvm/Passes/PassBuilder.h>
 
-int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimization) {
+int executeModule(std::unique_ptr<llvm::Module> module, std::unique_ptr<llvm::LLVMContext> Ctx, std::string mainFunction, bool offOptimization) {
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
     llvm::InitializeNativeTargetAsmParser();
@@ -53,33 +49,9 @@ int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimi
             JIT->getDataLayout().getGlobalPrefix()))
     );
 
-    // --- Клонирование модуля ---
-    auto Ctx = std::make_unique<llvm::LLVMContext>();
-    std::unique_ptr<llvm::Module> ClonedModule;
-
-    { // Ограничиваем область видимости буфера и потока
-        llvm::SmallString<0> IRBuffer;
-        llvm::raw_svector_ostream OS(IRBuffer);
-        module->print(OS, nullptr);
-
-        llvm::SMDiagnostic Err;
-        ClonedModule = llvm::parseIR(
-            // Парсер читает до нулевого байта, а в SmallString его нет: только копия буфера его добавляет
-            *llvm::MemoryBuffer::getMemBufferCopy(IRBuffer.str()),
-            Err,
-            *Ctx
-        );
-
-        if (!ClonedModule) {
-            std::cerr << "Error cloning module for JIT: ";
-            Err.print("executeModule", llvm::errs());
-            return RUN_FAILED;
-        }
-    }
-
 #if DEBUG
     std::cout << "\n--- LLVM IR ---" << std::endl;
-    ClonedModule->print(llvm::outs(), nullptr);
+    module->print(llvm::outs(), nullptr);
     std::cout << "--- END LLVM IR ---\n" << std::endl;
 #endif
 
@@ -102,19 +74,19 @@ int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimi
         llvm::ModulePassManager MPM = passBuilder.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
     
         // Прогоняем *оптимизейшен*
-        MPM.run(*ClonedModule, MAM);
+        MPM.run(*module, MAM);
     }
 
 #if DEBUG
     std::cout << "\n--- LLVM IR(O2) ---" << std::endl;
-    ClonedModule->print(llvm::outs(), nullptr);
+    module->print(llvm::outs(), nullptr);
     std::cout << "--- END LLVM IR(O2) ---\n" << std::endl;
 #endif
 
     ui::stage("JIT: compiling to machine code");
 
     // ThreadSafeModule
-    llvm::orc::ThreadSafeModule TSM(std::move(ClonedModule), std::move(Ctx));
+    llvm::orc::ThreadSafeModule TSM(std::move(module), std::move(Ctx));
     ExitOnErr(JIT->addIRModule(std::move(TSM)));
 
     auto MainSymbol = ExitOnErr(JIT->lookup(mainFunction));
@@ -141,9 +113,14 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
 #endif
     // Code generation
     ui::stage("Code generation: building LLVM IR");
-    CodeGenContext context(currentFilePath);
-    ASTGen codeGen(context);
-    combinedAST->accept(codeGen);
+    auto llvmContext = std::make_unique<llvm::LLVMContext>();
+    std::unique_ptr<llvm::Module> module;
+    {
+        CodeGenContext context(currentFilePath, llvmContext.get());
+        ASTGen codeGen(context);
+        combinedAST->accept(codeGen);
+        module = std::move(context.TheModule);
+    }
 
 #if DEBUG
     auto t_codegen = std::chrono::high_resolution_clock::now();
@@ -153,19 +130,19 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
 
     try {
         
-        if (context.TheModule != nullptr) { 
+        if (module != nullptr) {
             const std::string entryFunctionName = CodeGenContext::findEntryName(*combinedAST);
             
 #if DEBUG
             auto t_jit_start = std::chrono::high_resolution_clock::now();
 #endif
-            if (!context.TheModule->getFunction("main")) {
+            if (!module->getFunction("main")) {
                 ui::pipelineStop();
                 std::cerr << "Error: entry function not found: " << entryFunctionName << ", add main or mark a function with @entry" << std::endl;
                 return RUN_FAILED;
             }
 
-            int result = executeModule(context.TheModule.get(), "main", offOptimization);
+            int result = executeModule(std::move(module), std::move(llvmContext), "main", offOptimization);
 #if DEBUG
             auto t_jit_end = std::chrono::high_resolution_clock::now();
 #endif

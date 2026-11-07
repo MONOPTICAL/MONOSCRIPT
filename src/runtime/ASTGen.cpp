@@ -707,7 +707,7 @@ void ASTGen::visit(CallNode& node) {
         context.Builder.CreateStore(context.Builder.getInt8(node.callee == "ok"), context.Builder.CreateStructGEP(layout, object, 0));
         if (node.callee == "ok") {
             context.Builder.CreateStore(context.Builder.getInt32(0), context.Builder.CreateStructGEP(layout, object, 1));
-            context.Builder.CreateStore(context.Builder.CreateGlobalString("", "no_error"), context.Builder.CreateStructGEP(layout, object, 2));
+            context.Builder.CreateStore(context.createString("", "no_error"), context.Builder.CreateStructGEP(layout, object, 2));
             if (!node.arguments.empty()) {
                 auto valueType = std::dynamic_pointer_cast<GenericTypeNode>(node.inferredType)->typeParameters[0];
                 context.Builder.CreateStore(Arrays::emitValue(context, node.arguments[0], valueType), context.Builder.CreateStructGEP(layout, object, 3));
@@ -1013,7 +1013,7 @@ void ASTGen::visit(FloatNumberNode& node) {
 
 void ASTGen::visit(StringNode& node) {
     LogWarning("visit для StringNode: \"" + node.value + "\"");
-    result = context.Builder.CreateGlobalString(node.value, "str");
+    result = context.createString(node.value, "str");
 }
 
 void ASTGen::visit(NullNode& node) {

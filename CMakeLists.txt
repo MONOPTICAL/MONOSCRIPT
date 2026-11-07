@@ -157,6 +157,7 @@ add_test(NAME frontend COMMAND run_tests $<TARGET_FILE:ms_check> ${CMAKE_SOURCE_
 
 # Все сочетания типа, источника значения и контекста: около минуты на режим, поэтому отдельно от обычных тестов
 if(LLVM_FOUND)
+  add_test(NAME cli-paths COMMAND python3 -I ${CMAKE_SOURCE_DIR}/tests/cli_paths.py $<TARGET_FILE:ms>)
   add_custom_target(test-matrix
       COMMAND python3 -I ${CMAKE_SOURCE_DIR}/tests/matrix.py $<TARGET_FILE:ms>
       DEPENDS ms

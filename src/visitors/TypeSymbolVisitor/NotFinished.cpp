@@ -1,5 +1,6 @@
 #include "../headers/TypeSymbolVisitor.h"
 #include <algorithm>
+#include <functional>
 
 // Заглушки для visit-методов
 
@@ -220,23 +221,60 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
 }
 
 void TypeSymbolVisitor::checkPureAlias(const std::shared_ptr<ASTNode>& expr) {
-    if (!checkLabels("@pure") || !expr->inferredType) return;
-
-    // Числа и строки не меняются на месте, опасны только объекты
-    const std::string type = expr->inferredType->toString();
-    if (!type.starts_with("array") && !type.starts_with("map") && !registry.findStruct(type)) return;
-
-    std::shared_ptr<ASTNode> base = expr;
-    if (auto access = std::dynamic_pointer_cast<AccessExpression>(expr)) base = access->expression;
-
-    auto id = std::dynamic_pointer_cast<IdentifierNode>(base);
-    if (!id) return;
-
-    auto it = contexts.back().variables.find(id->name);
-    if (it == contexts.back().variables.end()) return;
-
-    if (auto var = std::dynamic_pointer_cast<VariableAssignNode>(it->second); var && !var->expression)
-        LogError("Pure function cannot create a new reference to object passed to it, use copy(" + id->name + ")", expr);
+    if (!checkLabels("@pure") || !expr) return;
+    std::function<bool(const std::shared_ptr<TypeNode>&)> mutableType;
+    mutableType = [&](const std::shared_ptr<TypeNode>& type) {
+        if (!type) return false;
+        if (auto generic = std::dynamic_pointer_cast<GenericTypeNode>(type); generic && generic->baseName == "result") {
+            for (const auto& parameter : generic->typeParameters)
+                if (mutableType(parameter)) return true;
+            return false;
+        }
+        const auto name = type->toString();
+        return name.starts_with("array<") || name.starts_with("map<") || registry.findStruct(name) != nullptr;
+    };
+    auto nestedReferences = [&](const std::shared_ptr<TypeNode>& type) {
+        if (auto generic = std::dynamic_pointer_cast<GenericTypeNode>(type)) {
+            for (const auto& element : generic->typeParameters)
+                if (mutableType(element)) return true;
+        } else if (auto structure = registry.findStruct(type->toString())) {
+            if (auto body = std::dynamic_pointer_cast<BlockNode>(structure->body))
+                for (const auto& member : body->statements)
+                    if (auto field = std::dynamic_pointer_cast<VariableAssignNode>(member))
+                        if (mutableType(field->type)) return true;
+        }
+        return false;
+    };
+    std::set<const ASTNode*> visiting;
+    std::function<bool(const std::shared_ptr<ASTNode>&)> borrowed;
+    borrowed = [&](const std::shared_ptr<ASTNode>& value) -> bool {
+        if (!value || !visiting.insert(value.get()).second) return false;
+        bool result = false;
+        if (auto block = std::dynamic_pointer_cast<BlockNode>(value)) {
+            for (const auto& item : block->statements) result = borrowed(item) || result;
+        } else if (auto pair = std::dynamic_pointer_cast<KeyValueNode>(value)) {
+            result = borrowed(pair->value);
+        } else if (mutableType(value->inferredType)) {
+            if (auto id = std::dynamic_pointer_cast<IdentifierNode>(value)) {
+                auto it = contexts.back().variables.find(id->name);
+                if (it != contexts.back().variables.end())
+                    if (auto variable = std::dynamic_pointer_cast<VariableAssignNode>(it->second))
+                        result = !variable->expression || borrowed(variable->expression);
+            } else if (auto access = std::dynamic_pointer_cast<AccessExpression>(value)) {
+                result = borrowed(access->expression);
+            } else if (auto call = std::dynamic_pointer_cast<CallNode>(value)) {
+                const bool builtinCopy = call->callee == "copy" &&
+                    !contexts.back().functions.count("copy") && !declaredFunctions.count("copy");
+                // Flat copies own all mutable storage. Nested copies still share it.
+                if (!builtinCopy || nestedReferences(value->inferredType))
+                    for (const auto& argument : call->arguments) result = borrowed(argument) || result;
+            }
+        }
+        visiting.erase(value.get());
+        return result;
+    };
+    if (borrowed(expr))
+        LogError("Pure function cannot create a new reference to object passed to it; copy only detaches the outer object", expr);
 }
 
 void TypeSymbolVisitor::visit(ReassignMemberNode& node) {
@@ -269,6 +307,7 @@ void TypeSymbolVisitor::visit(ReassignMemberNode& node) {
     }
 
     access->accept(*this);
+    checkPureAlias(access->expression);
     auto targetType = access->inferredType;
     if (!targetType)
         LogError("Could not resolve type of assignment target", node.accessExpression);

@@ -446,6 +446,7 @@ static std::string groupTitle(const std::string& group)
         {"unfinished", "Unfinished"},
         {"modules", "Modules"},
         {"diagnostics", "Diagnostics"},
+        {"examples", "Examples"},
         {"ok", "Control: already works"},
         {"run", "Running programs"},
     };
@@ -614,7 +615,7 @@ int runFrontendTests(const std::vector<std::string>& checkCommand, const std::ve
 
     std::cout << "\n" << termcolor::bold << "MONOSCRIPT: tests" << termcolor::reset << "\n";
 
-    std::vector<std::string> order = {"crash", "parser", "lexer", "types", "lib", "rejected_valid", "unfinished", "modules", "diagnostics", "ok"};
+    std::vector<std::string> order = {"crash", "parser", "lexer", "types", "lib", "examples", "rejected_valid", "unfinished", "modules", "diagnostics", "ok"};
     for (const auto& [group, entries] : groups)
         if (std::find(order.begin(), order.end(), group) == order.end())
             order.push_back(group);

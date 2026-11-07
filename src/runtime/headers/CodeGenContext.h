@@ -29,7 +29,8 @@ struct StructLayout {
 
 class CodeGenContext {
 public:
-    llvm::LLVMContext                   TheContext; // Контекст LLVM(он отвечает за управление памятью)
+    std::unique_ptr<llvm::LLVMContext>   OwnedContext;
+    llvm::LLVMContext&                  TheContext; // Контекст LLVM(он отвечает за управление памятью)
     llvm::IRBuilder<>                   Builder; // IRBuilder - это класс, который помогает создавать IR-код
     std::unique_ptr<llvm::Module>       TheModule; // Модуль - это контейнер для IR-кода
     std::map<std::string, llvm::Value*> NamedValues; // Простая таблица символов для переменных/параметров
@@ -43,6 +44,8 @@ public:
     std::vector<llvm::BasicBlock*> loopCondBlocks;   // Стек для блоков условия цикла (для continue)
 
     llvm::Function*                     getOrDeclareFunction(const std::string& name, llvm::FunctionType* type);
+
+    llvm::Constant* createString(const std::string& text, const std::string& name = "str");
 
     static llvm::Type*                  getLLVMType(std::shared_ptr<TypeNode> typeNode, llvm::LLVMContext& ctx);
 
@@ -118,7 +121,9 @@ public:
     llvm::Value*                        getArrayElementPtr(llvm::Value* array, llvm::Type* elementType, llvm::Value* index, int line);
 
 
-    CodeGenContext(const std::string& moduleName = "ms_module") : Builder(TheContext) {
+    CodeGenContext(const std::string& moduleName = "ms_module", llvm::LLVMContext* externalContext = nullptr)
+        : OwnedContext(externalContext ? nullptr : std::make_unique<llvm::LLVMContext>()),
+          TheContext(externalContext ? *externalContext : *OwnedContext), Builder(TheContext) {
         TheModule = std::make_unique<llvm::Module>(moduleName, TheContext); // Создаем новый модуль
     }
 };

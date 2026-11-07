@@ -125,6 +125,8 @@ void TypeSymbolVisitor::visit(FloatNumberNode& node)
 
 void TypeSymbolVisitor::visit(StringNode& node)
 {
+    if (node.value.find('\0') != std::string::npos)
+        LogError("Strings cannot contain a NUL byte", node.shared_from_this());
     node.inferredType = registry.findType("string");
 }
 
