@@ -6,5 +6,5 @@
 |   while i >= 0
 |   |   push(r, x[i])
 |   |   i = i - 1
-|   echo(joinChars(r))
+|   echo(cstr(r))
 |   return 0

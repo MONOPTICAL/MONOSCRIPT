@@ -6,5 +6,5 @@
 |   push(x, 'l')
 |   push(x, 'l')
 |   push(x, 'o')
-|   echo(joinChars(x))
+|   echo(cstr(x))
 |   return 0

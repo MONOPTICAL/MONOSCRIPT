@@ -4,7 +4,7 @@
 [i32]main()
 |   array<char> x = toArray("test")
 |   pop(x)
-|   string s = joinChars(x)
+|   string s = cstr(x)
 |   echo(s)
 |   echo(cstr(len(s)))
 |   return 0

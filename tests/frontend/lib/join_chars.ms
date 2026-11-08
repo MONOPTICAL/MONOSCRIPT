@@ -2,5 +2,5 @@
 // Правая часть сама создаёт блоки: деление и вложенный and
 [i32]main()
 |   array<char> x = toArray("test")
-|   echo(joinChars(x))
+|   echo(cstr(x))
 |   return 0

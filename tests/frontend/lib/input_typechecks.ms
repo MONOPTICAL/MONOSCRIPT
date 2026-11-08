@@ -1,6 +1,7 @@
 // expect: ok
-// input() возвращает string, без stdin запускать нельзя, поэтому только проверка типов
+// input() возвращает result<string>, без stdin запускать нельзя, поэтому только проверка типов
 [i32]main()
-|   string s = input()
+|   result<string> r = input()
+|   string s = r.value
 |   echo("got " + s)
 |   return 0

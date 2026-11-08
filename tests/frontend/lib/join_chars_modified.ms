@@ -2,5 +2,5 @@
 [i32]main()
 |   array<char> x = toArray("test")
 |   x[0] = 'T'
-|   echo(joinChars(x))
+|   echo(cstr(x))
 |   return 0

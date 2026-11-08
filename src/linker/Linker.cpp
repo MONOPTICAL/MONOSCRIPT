@@ -1,6 +1,7 @@
 #include "headers/Linker.h"
 #include "../parser/headers/Parser.h" 
 #include "../includes/ASTDebugger.hpp"
+#include <algorithm>
 #include <fstream>
 #include <filesystem>
 #include <iostream>
@@ -143,16 +144,19 @@ bool Linker::loadModule(const std::string& moduleName) {
     std::string filePath;
     std::string moduleContent;
     
-    // Проверяем стандартную библиотеку
-    std::string stdPath = stdLibPath + "/" + moduleName + ".ms";
-    if (std::filesystem::exists(stdPath)) {
-        filePath = stdPath;
+    // std хуйня ищеться только в стандартной библиотеке
+    if (moduleName.starts_with("mono.")) {
+        std::string relative = moduleName.substr(4);
+        std::replace(relative.begin(), relative.end(), '.', '/');
+        std::string stdPath = stdLibPath + "/" + relative + ".ms";
+        if (std::filesystem::exists(stdPath)) filePath = stdPath;
     } else {
         // Проверяем относительные пути
         for (const auto& [name, module] : modules) {
             if (module.path.empty()) continue;
             
             std::string dirPath = std::filesystem::path(module.path).parent_path().string();
+            if (dirPath.empty()) dirPath = "."; // ms run main.ms: модуль рядом, в текущей папке
             std::string relativePath = dirPath + "/" + moduleName + ".ms";
             
             if (std::filesystem::exists(relativePath)) {

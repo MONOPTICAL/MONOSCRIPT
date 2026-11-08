@@ -14,7 +14,7 @@
 |   |   echo(info.message)
 |   attempt
 |   |   array<char> chars = ['A', 0->char]
-|   |   echo(joinChars(chars))
+|   |   echo(cstr(chars))
 |   panic info
 |   |   echo(info.message)
 |   attempt

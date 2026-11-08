@@ -585,6 +585,11 @@ std::shared_ptr<ASTNode> Parser::parseUse()
         do {
             path.push_back(current().value);
             consume(TokenType::Identifier, "Expected identifier in import path");
+            // std.strings.utf8
+            while (match(TokenType::Dot)) {
+                path.back() += "." + current().value;
+                consume(TokenType::Identifier, "Expected identifier after '.' in module name");
+            }
             if (!current().value.empty() && !(check(TokenType::Arrow) || check(TokenType::Colon)))
                 throwError("Import path must be a single word without spaces");
         } while (match(TokenType::Arrow));
