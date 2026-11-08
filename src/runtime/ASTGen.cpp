@@ -194,6 +194,8 @@ void ASTGen::visit(FunctionNode& node) {
     
     // Сохраняем старую таблицу символов и создаем новую
     auto oldNamedValues = context.NamedValues;
+    // Тело локальной функции не должно видеть alloca внешней: остаются только глобальные
+    std::erase_if(context.NamedValues, [](const auto& entry) { return !llvm::isa_and_nonnull<llvm::GlobalValue>(entry.second); });
     
     // Обрабатываем параметры функции
     unsigned idx = 0;

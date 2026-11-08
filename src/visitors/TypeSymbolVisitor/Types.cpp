@@ -68,7 +68,11 @@ void TypeSymbolVisitor::visit(IdentifierNode& node)
             auto visible = scope->second.find(node.name);
             if (visible != scope->second.end()) internalName = visible->second->name;
         }
-        if (auto declared = declaredFunctions.find(internalName); declared != declaredFunctions.end())
+        if (auto local = findLocalFunction(contexts.back(), node.name)) {
+            function = local;
+            internalName = local->name;
+        }
+        else if (auto declared = declaredFunctions.find(internalName); declared != declaredFunctions.end())
             function = std::dynamic_pointer_cast<FunctionNode>(declared->second);
         else if (auto builtin = registry.findFunction(node.name))
             function = std::dynamic_pointer_cast<FunctionNode>(builtin);

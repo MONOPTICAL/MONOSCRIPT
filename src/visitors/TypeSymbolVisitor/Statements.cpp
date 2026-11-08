@@ -332,6 +332,12 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
         LogError("Function already defined: " + node.name);
     }
 
+    // У каждой локальной функции свой символ LLVM, иначе одноимённые в разных функциях сольются в одну
+    static int localFunctions = 0;
+    const std::string visibleName = node.name;
+    if (contexts.size() > 1 && node.associated.empty())
+        node.name += "::local" + std::to_string(++localFunctions);
+
     std::vector<std::string> labels = contexts.back().labels;
     labels.insert(labels.end(), node.labels.begin(), node.labels.end()); // Добавляем метки функции в текущий контекст
 
@@ -373,8 +379,8 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
 
     if(std::find(labels.begin(), labels.end(), "@pure") == labels.end())
     {
-        // Контекст структуры пустой: метод, как и обычная функция, видит глобальные переменные
-        variables = node.associated.empty() ? contexts.back().variables : contexts[0].variables;
+        // Только глобальные: локальная функция живёт в своём кадре стека и чужие alloca читать не может
+        variables = contexts[0].variables;
         functions = node.associated.empty() ? contexts.back().functions : contexts[0].functions;
     }
     else
@@ -425,10 +431,13 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
     if(node.associated.empty()) {
         if(contexts.size() == 1)
             contexts[0].functions[node.name] = node.shared_from_this();
-        else
+        else {
             contexts.back().functions[node.name] = node.shared_from_this();
+            contexts.back().functions[visibleName] = node.shared_from_this();
+        }
 
         currentFunction.functions[node.name] = node.shared_from_this(); // Добавляем функцию в текущий контекст
+        currentFunction.functions[visibleName] = node.shared_from_this();
     }
     
     // Добавляем функцию в реестр
@@ -989,9 +998,11 @@ void TypeSymbolVisitor::visit(CallNode& node) {
         return;
     }
 
-    // Имя в коде превращаем во внутреннее имя функции: свои и импортированные функции, алиасы
+    // Имя в коде превращаем во внутреннее имя функции: локальные, свои и импортированные функции, алиасы
     auto scope = moduleScopes.find(moduleNameOf(currentModuleName));
-    if (scope != moduleScopes.end()) {
+    if (auto local = findLocalFunction(contexts.back(), node.callee)) {
+        node.callee = local->name;
+    } else if (scope != moduleScopes.end()) {
         auto visible = scope->second.find(node.callee);
         if (visible != scope->second.end())
             node.callee = visible->second->name;
