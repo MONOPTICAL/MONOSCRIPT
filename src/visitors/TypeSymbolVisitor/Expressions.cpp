@@ -138,6 +138,8 @@ void TypeSymbolVisitor::visit(UnaryOpNode& node) {
         if (node.errorBody) {
             if (contexts.back().currentFunctionName.empty())
                 LogError("Local action handler outside of function", node.shared_from_this());
+            if (contexts.back().variables.count("error"))
+                LogError("Variable already defined: error, the local handler binds error itself; rename the variable", node.shared_from_this());
             const auto assigned = assignedFinals, maybe = maybeAssignedFinals;
             contexts.push_back(contexts.back());
             contexts.back().returnedValue = false;
