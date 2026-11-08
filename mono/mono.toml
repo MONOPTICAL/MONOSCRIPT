@@ -31,6 +31,27 @@ ret = "i32"
 args = ["string", "string"]
 
 [[function]]
+name = "isNumeric"
+panic_context = true
+pure = true
+ret = "i1"
+args = ["string"]
+
+[[function]]
+name = "isSpace"
+panic_context = true
+pure = true
+ret = "i1"
+args = ["string"]
+
+[[function]]
+name = "strim"
+panic_context = true
+pure = true
+ret = "string"
+args = ["string"]
+
+[[function]]
 name = "split"
 panic_context = true
 pure = true
@@ -39,6 +60,20 @@ args = ["string", "string"]
 
 [[function]]
 name = "reverse"
+panic_context = true
+pure = true
+ret = "string"
+args = ["string"]
+
+[[function]]
+name = "lower"
+panic_context = true
+pure = true
+ret = "string"
+args = ["string"]
+
+[[function]]
+name = "upper"
 panic_context = true
 pure = true
 ret = "string"
