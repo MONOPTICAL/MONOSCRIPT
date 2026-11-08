@@ -195,6 +195,13 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     {
         return parseExpression();
     }
+    // panic function call
+    else if(currentToken.type == TokenType::Keyword && currentToken.value == "panic" && peek().type == TokenType::LeftParen)
+    {
+        lines[lineIndex][tokenIndex].type = TokenType::Identifier;
+        auto funcCall = parseCall();
+        return funcCall;
+    }
     else
     {
         if(currentToken.line != -1)
