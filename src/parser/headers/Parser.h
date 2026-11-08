@@ -97,6 +97,7 @@ return [expression]
     std::shared_ptr<ASTNode> parsePostfix(std::shared_ptr<ASTNode> expression);
     std::shared_ptr<ASTNode> parsePrimary();
     std::shared_ptr<ASTNode> parseMemberExpression();
+    std::shared_ptr<ASTNode> parseAccessChain(std::shared_ptr<AccessExpression> root);
     
     void parseDotNotation(std::shared_ptr<AccessExpression>);
     void parseArrayNotation(std::shared_ptr<AccessExpression>);

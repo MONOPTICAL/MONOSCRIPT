@@ -35,7 +35,8 @@ extern(C) void ms_panic(const char* message, int line) nothrow @nogc
 extern(C) void ms_raise(const char* message, int line, MsPanicContext* panic) nothrow @nogc
 {
     if (panic is null) { ms_panic(message, line); return; }
-    if (panic.pending) return;
+    // A second raise means someone skipped the pending check: fail loudly instead of losing it.
+    if (panic.pending) { ms_panic("internal: panic raised while another one is pending", line); return; }
     panic.message = stringFromCString(message);
     panic.line = line;
     panic.pending = true;
@@ -92,6 +93,31 @@ extern(C) void ms_rt_init() nothrow @nogc
 {
     GC_init();
     GC_set_oom_fn(&ms_out_of_memory);
+}
+
+private extern(C) nothrow @nogc
+{
+    import core.sys.posix.sys.types : pthread_t, pthread_attr_t;
+    pthread_t pthread_self();
+    int pthread_getattr_np(pthread_t, pthread_attr_t*);
+    int pthread_attr_getstack(const pthread_attr_t*, void**, size_t*);
+    int pthread_attr_destroy(pthread_attr_t*);
+}
+
+// Room left for ms_raise and the GC after the limit is hit.
+enum STACK_RESERVE = 256 * 1024;
+
+// Function prologues compare the stack pointer with stackLimit, so deep recursion becomes a panic.
+// shortcut: glibc-only (pthread_getattr_np); on failure the limit stays null and the check is off.
+extern(C) void ms_stack_init(MsPanicContext* panic) nothrow @nogc
+{
+    pthread_attr_t attr;
+    if (pthread_getattr_np(pthread_self(), &attr) != 0) return;
+    void* low;
+    size_t size;
+    if (pthread_attr_getstack(&attr, &low, &size) == 0 && size > 2 * STACK_RESERVE)
+        panic.stackLimit = cast(char*) low + STACK_RESERVE;
+    pthread_attr_destroy(&attr);
 }
 
 extern(C) void gc_collect() nothrow @nogc

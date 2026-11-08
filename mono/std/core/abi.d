@@ -3,12 +3,13 @@ module mono.std.core.abi;
 // Как объекты языка лежат в памяти. Раскладка совпадает с кодгеном (CodeGenContext::getArrayStruct):
 // функция на D, которая принимает или возвращает array<T>, работает с этим заголовком
 // Explicit per-call panic channel; no process-wide or thread-local error state.
-// LLVM layout: { i8 pending, i32 line, ptr message }.
+// LLVM layout: { i8 pending, i32 line, ptr message, ptr stackLimit }.
 struct MsPanicContext
 {
     bool pending;
     int line;
     const(char)* message;
+    const(void)* stackLimit; // set once by ms_stack_init, survives caught panics
 }
 
 struct MsArray

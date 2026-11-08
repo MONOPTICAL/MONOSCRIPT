@@ -132,6 +132,8 @@ void ASTGen::visit(ProgramNode& node) {
     context.Builder.CreateStore(llvm::Constant::getNullValue(context.getPanicStruct()), context.PanicContext);
     context.Builder.CreateCall(context.getOrDeclareFunction("ms_rt_init",
         llvm::FunctionType::get(llvm::Type::getVoidTy(context.TheContext), false)));
+    context.Builder.CreateCall(context.getOrDeclareFunction("ms_stack_init",
+        llvm::FunctionType::get(llvm::Type::getVoidTy(context.TheContext), {context.Builder.getPtrTy()}, false)), {context.PanicContext});
     context.Builder.ClearInsertionPoint();
 
     for (auto& n : node.body) {
@@ -202,6 +204,18 @@ void ASTGen::visit(FunctionNode& node) {
         llvm::AllocaInst* paramSlot = context.createEntryAlloca(arg.getType(), arg.getName().str());
         context.Builder.CreateStore(&arg, paramSlot);
         context.NamedValues[arg.getName().str()] = paramSlot;
+    }
+
+    // Переполнение стека это обычная паника: указатель стека ниже предела из ms_stack_init
+    {
+        auto limit = context.Builder.CreateLoad(context.Builder.getPtrTy(),
+            context.Builder.CreateStructGEP(context.getPanicStruct(), context.PanicContext, 3), "stack.limit");
+        auto overflow = llvm::BasicBlock::Create(context.TheContext, "stack.overflow", func);
+        auto fine = llvm::BasicBlock::Create(context.TheContext, "stack.ok", func);
+        context.Builder.CreateCondBr(context.Builder.CreateICmpULT(context.Builder.CreateStackSave("sp"), limit), overflow, fine);
+        context.Builder.SetInsertPoint(overflow);
+        context.emitPanic("stack overflow", node.line);
+        context.Builder.SetInsertPoint(fine);
     }
 
     // Генерируем тело функции, если оно есть
@@ -1130,7 +1144,9 @@ void ASTGen::visit(AttemptNode& node) {
         auto info = context.allocateObject(context.Builder.getInt64(context.TheModule->getDataLayout().getTypeAllocSize(layout)), true, "panic.info");
         auto snapshot = context.Builder.CreateLoad(layout, context.PanicContext);
         context.Builder.CreateStore(snapshot, info);
-        context.Builder.CreateStore(llvm::Constant::getNullValue(layout), context.PanicContext);
+        // Clear the panic but keep the stack limit, or the overflow check turns off after the first catch.
+        context.Builder.CreateStore(context.Builder.CreateInsertValue(llvm::Constant::getNullValue(layout),
+            context.Builder.CreateExtractValue(snapshot, 3), 3), context.PanicContext);
         auto slot = context.createEntryAlloca(context.Builder.getPtrTy(), node.panicName);
         context.Builder.CreateStore(info, slot);
         context.NamedValues[node.panicName] = slot;

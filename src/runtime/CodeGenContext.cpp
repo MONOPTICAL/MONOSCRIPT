@@ -156,7 +156,7 @@ void CodeGenContext::emitPanic(const std::string& message, int line) {
 }
 
 llvm::StructType* CodeGenContext::getPanicStruct() {
-    return llvm::StructType::get(TheContext, {Builder.getInt8Ty(), Builder.getInt32Ty(), Builder.getPtrTy()});
+    return llvm::StructType::get(TheContext, {Builder.getInt8Ty(), Builder.getInt32Ty(), Builder.getPtrTy(), Builder.getPtrTy()});
 }
 
 void CodeGenContext::propagatePanic() {
