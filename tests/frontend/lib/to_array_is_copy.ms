@@ -6,5 +6,5 @@
 |   array<char> x = toArray(s)
 |   x[0] = 'X'
 |   echo(s)
-|   echo(joinChars(x))
+|   echo(cstr(x))
 |   return 0

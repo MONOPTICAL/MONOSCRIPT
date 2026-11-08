@@ -33,9 +33,7 @@ std::shared_ptr<ProgramNode> parseAndLinkModules(
 
     ui::stage("Linker: resolving modules and imports");
     
-    // Получаем путь текущего файла
-    std::string currentFilePath = std::filesystem::current_path().string();
-    Linker linker(currentFilePath);
+    Linker linker(STDLIB_MS_PATH);
     
     // Добавляем основной модуль
     if (!linker.addModule(std::filesystem::path(inputFile).stem().string(), inputFile, program)) {

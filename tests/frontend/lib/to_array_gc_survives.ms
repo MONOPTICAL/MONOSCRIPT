@@ -11,7 +11,7 @@
 |   gc_collect()
 |   churn()
 |   gc_collect()
-|   string s = joinChars(x)
+|   string s = cstr(x)
 |   churn()
 |   gc_collect()
 |   echo(s)

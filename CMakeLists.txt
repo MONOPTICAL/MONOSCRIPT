@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_definitions(-DSTDLIB_TOML_PATH="${CMAKE_SOURCE_DIR}/mono/mono.toml") # Путь к toml файлу
+add_definitions(-DSTDLIB_MS_PATH="${CMAKE_SOURCE_DIR}/mono/std") # Модули std.* на MONOSCRIPT
 add_definitions(-DFRONTEND_TESTS_PATH="${CMAKE_SOURCE_DIR}/tests/frontend") # Путь к тестам для -run_tests
 
 # Фронтенд не зависит от LLVM, поэтому тесты собираются и без него

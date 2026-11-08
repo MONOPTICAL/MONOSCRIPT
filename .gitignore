@@ -6,4 +6,5 @@
 ms
 *.ms
 !/tests/**/*.ms
+!/mono/std/**/*.ms
 /msTests

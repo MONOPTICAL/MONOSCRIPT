@@ -198,8 +198,19 @@ std::string TypeSymbolVisitor::instantiateGeneric(const std::shared_ptr<Function
 #include <string_view>
 #include <filesystem>
 
+// Путь файла -> имя модуля, как в use: mono/std/a/b.ms -> std.a.b, dir/lib.ms -> lib.
+// Уже готовое имя (std.a.b, lib) возвращается как есть
 std::string moduleNameOf(const std::string& path) {
-    return std::filesystem::path(path).stem().string();
+    if (!path.ends_with(".ms") && path.find('/') == std::string::npos) return path;
+    const auto file = std::filesystem::weakly_canonical(path);
+    const auto std = std::filesystem::weakly_canonical(STDLIB_MS_PATH);
+    auto relative = file.lexically_relative(std);
+    if (!relative.empty() && *relative.begin() != "..") {
+        std::string name = relative.replace_extension().generic_string();
+        std::replace(name.begin(), name.end(), '/', '.');
+        return "std." + name;
+    }
+    return file.stem().string();
 }
 
 static bool hasLabel(const std::shared_ptr<FunctionNode>& function, const std::string& label) {
