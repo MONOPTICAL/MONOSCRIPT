@@ -172,6 +172,90 @@ extern(C) char* reverse(const char* str, MsPanicContext* panic) nothrow @nogc
     return result;
 }
 
+extern(C) char* lower(const char* str, MsPanicContext* panic) nothrow @nogc
+{
+    import core.stdc.string : strlen;
+
+    size_t length = strlen(str);
+    char* result = newString(length, panic);
+    if (result is null) return null;
+    for (size_t i = 0; i < length; i++)
+    {
+        char c = str[i];
+        if (c >= 'A' && c <= 'Z')
+            c += 'a' - 'A';
+        result[i] = c;
+    }
+    result[length] = 0;
+    return result;
+}
+
+extern(C) char* upper(const char* str, MsPanicContext* panic) nothrow @nogc
+{
+    import core.stdc.string : strlen;
+
+    size_t length = strlen(str);
+    char* result = newString(length, panic);
+    if (result is null) return null;
+    for (size_t i = 0; i < length; i++)
+    {
+        char c = str[i];
+        if (c >= 'a' && c <= 'z')
+            c -= 'a' - 'A';
+        result[i] = c;
+    }
+    result[length] = 0;
+    return result;
+}
+
+extern(C) char* strim(const char* str, MsPanicContext* panic) nothrow @nogc
+{
+    import core.stdc.string : strlen;
+
+    if (str is null) return null;
+    size_t start = 0;
+    size_t end = strlen(str);
+    while (start < end && (str[start] == ' ' || str[start] == '\t' || str[start] == '\n' || str[start] == '\r'))
+        start++;
+    while (end > start && (str[end - 1] == ' ' || str[end - 1] == '\t' || str[end - 1] == '\n' || str[end - 1] == '\r'))
+        end--;
+    size_t length = end - start;
+    char* result = newString(length, panic);
+    if (result is null) return null;
+    for (size_t i = 0; i < length; i++)
+        result[i] = str[start + i];
+    result[length] = 0;
+    return result;
+}
+
+// Проверка
+
+extern(C) bool isNumeric(const char* str, MsPanicContext* panic) nothrow @nogc
+{
+    if (str is null) return false;
+    size_t i = 0;
+    if (str[0] == '-' || str[0] == '+') i++;
+    if (str[i] == 0) return false;
+    for (; str[i] != 0; i++)
+    {
+        if (str[i] < '0' || str[i] > '9')
+            return false;
+    }
+    return true;
+}
+
+extern(C) bool isSpace(const char* str, MsPanicContext* panic) nothrow @nogc
+{
+    if (str is null) return false;
+    for (size_t i = 0; str[i] != 0; i++)
+    {
+        char c = str[i];
+        if (c != ' ' && c != '\t' && c != '\n' && c != '\r')
+            return false;
+    }
+    return true;
+}
+
 // В строку
 
 extern(C) char* toString_int(const int a, MsPanicContext* panic) nothrow @nogc
