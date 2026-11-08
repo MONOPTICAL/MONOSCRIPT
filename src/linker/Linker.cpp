@@ -146,7 +146,7 @@ bool Linker::loadModule(const std::string& moduleName) {
     
     // std хуйня ищеться только в стандартной библиотеке
     if (moduleName.starts_with("mono.")) {
-        std::string relative = moduleName.substr(4);
+        std::string relative = moduleName.substr(5);
         std::replace(relative.begin(), relative.end(), '.', '/');
         std::string stdPath = stdLibPath + "/" + relative + ".ms";
         if (std::filesystem::exists(stdPath)) filePath = stdPath;

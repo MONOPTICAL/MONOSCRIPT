@@ -208,7 +208,7 @@ std::string moduleNameOf(const std::string& path) {
     if (!relative.empty() && *relative.begin() != "..") {
         std::string name = relative.replace_extension().generic_string();
         std::replace(name.begin(), name.end(), '/', '.');
-        return "std." + name;
+        return "mono." + name;
     }
     return file.stem().string();
 }
