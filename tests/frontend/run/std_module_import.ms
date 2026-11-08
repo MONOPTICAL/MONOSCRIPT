@@ -1,7 +1,7 @@
 // expect-output: hello mono!
 // expect-output: 7
 use
-|> std._test.hello
+|> mono._test.hello
 
 [i32]main()
 |   echo(greet("mono"))

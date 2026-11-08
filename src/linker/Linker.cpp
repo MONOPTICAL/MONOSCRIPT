@@ -2,9 +2,12 @@
 #include "../parser/headers/Parser.h" 
 #include "../includes/ASTDebugger.hpp"
 #include <algorithm>
+#include <map>
 #include <fstream>
 #include <filesystem>
 #include <iostream>
+
+std::string moduleNameOf(const std::string& path); // TypeSymbolVisitor/Statements.cpp
 
 Linker::Linker(const std::string& stdLibPath) : stdLibPath(stdLibPath) {}
 
@@ -67,19 +70,27 @@ bool Linker::processImports(ModuleContext& module) {
     // Проходимся по AST и обрабатываем импорты
     for (auto& node : module.ast->body) {
         if (auto importNode = std::dynamic_pointer_cast<ImportNode>(node)) {
+            // use |> littletest внутри mono/std/_test/ это модуль mono._test.littletest: имя в use
+            // переписывается на настоящее, по нему семантика ищет функции модуля
+            std::map<std::vector<std::string>, std::string> resolvedPaths;
+            for (const auto& [importPath, alias] : importNode->paths) {
+                std::vector<std::string> path = importPath;
+                if (!path.empty()) {
+                    const std::string resolved = resolveModule(path[0], module);
+                    if (resolved.empty()) {
+                        std::cerr << "Error: could not find module " << path[0] << std::endl;
+                        return false;
+                    }
+                    path[0] = resolved;
+                }
+                resolvedPaths.insert({path, alias});
+            }
+            importNode->paths = resolvedPaths;
+
             for (const auto& [path, alias] : importNode->paths) {
                 if (path.empty()) continue;
                 
                 std::string moduleName = path[0];
-
-                // Проверяем существует ли модуль ваще
-                if (modules.find(moduleName) == modules.end()) {
-                    // Пытаемся загрузить модуль, если он ещё не загружен
-                    if (!loadModule(moduleName)) {
-                        std::cerr << "Error: could not find module " << moduleName << std::endl;
-                        return false;
-                    }
-                }
                 collectModuleInfo(modules[moduleName]);
 
                 // Если путь длиннее 1, значит импортируется конкретный символ
@@ -140,36 +151,28 @@ bool Linker::processImports(ModuleContext& module) {
     return true;
 }
 
-bool Linker::loadModule(const std::string& moduleName) {
+// Имя из use -> настоящее имя модуля (как его назовёт семантика), модуль загружается при первом use.
+// mono.a.b ищется только в библиотеке, короткое имя только рядом с импортирующим модулем
+std::string Linker::resolveModule(const std::string& name, const ModuleContext& importer) {
     std::string filePath;
-    std::string moduleContent;
-    
-    // std хуйня ищеться только в стандартной библиотеке
-    if (moduleName.starts_with("mono.")) {
-        std::string relative = moduleName.substr(5);
+    if (name.starts_with("mono.")) {
+        std::string relative = name.substr(std::string("mono.").size());
         std::replace(relative.begin(), relative.end(), '.', '/');
-        std::string stdPath = stdLibPath + "/" + relative + ".ms";
-        if (std::filesystem::exists(stdPath)) filePath = stdPath;
+        filePath = stdLibPath + "/" + relative + ".ms";
     } else {
-        // Проверяем относительные пути
-        for (const auto& [name, module] : modules) {
-            if (module.path.empty()) continue;
-            
-            std::string dirPath = std::filesystem::path(module.path).parent_path().string();
-            if (dirPath.empty()) dirPath = "."; // ms run main.ms: модуль рядом, в текущей папке
-            std::string relativePath = dirPath + "/" + moduleName + ".ms";
-            
-            if (std::filesystem::exists(relativePath)) {
-                filePath = relativePath;
-                break;
-            }
-        }
+        std::string dirPath = std::filesystem::path(importer.path).parent_path().string();
+        if (dirPath.empty()) dirPath = "."; // ms run main.ms: модуль рядом, в текущей папке
+        filePath = dirPath + "/" + name + ".ms";
     }
-    
-    // Если файл не найден
-    if (filePath.empty()) {
-        return false;
-    }
+    if (!std::filesystem::exists(filePath)) return "";
+
+    const std::string resolved = moduleNameOf(filePath);
+    if (!modules.count(resolved) && !loadModule(resolved, filePath)) return "";
+    return resolved;
+}
+
+bool Linker::loadModule(const std::string& moduleName, const std::string& filePath) {
+    std::string moduleContent;
     
     // Чтение файла модуля
     std::ifstream file(filePath);
