@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory(prefix="ms paths ") as directory:
         assert built.returncode == 0, (name, built.stdout, built.stderr)
         executed = run([str(binary)])
         assert executed.returncode == 0 and executed.stdout == "hello\n", executed
-    source.write_text('[i32]main()\n|   string s = input()\n|   echo("" + len(s))\n|   echo(s)\n|   return 0\n')
+    source.write_text('[i32]main()\n|   result<string> r = input()\n|   if !r.ok\n|   |   echo("error " + r.code)\n|   |   echo(r.error)\n|   |   return 0\n|   string s = r.value\n|   echo("" + len(s))\n|   echo(s)\n|   return 0\n')
     binary = root / "input"
     built = run([compiler, "--compile", str(binary), str(source)])
     assert built.returncode == 0, built.stderr
@@ -33,4 +33,8 @@ with tempfile.TemporaryDirectory(prefix="ms paths ") as directory:
             assert result.returncode == 0 and result.stdout.startswith(expected), (command, result)
         result = run(command, input="a\0b\n")
         assert result.returncode == 101 and "strings cannot contain a NUL byte" in result.stderr, result
+        result = run(command, input="x" * 65535 + "\n")
+        assert result.returncode == 0 and result.stdout.startswith("65535\n" + "x" * 65535 + "\n"), result
+        result = run(command, input="x" * 65536 + "\n")
+        assert result.returncode == 0 and result.stdout.startswith("error 2\ninput line is too long\n"), result
 print("CLI paths and input ABI passed")

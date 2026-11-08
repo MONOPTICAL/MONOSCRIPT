@@ -1,7 +1,8 @@
 module mono.std.io.io;
 
 import core.stdc.stdio : FILE, stdin;
-import mono.std.core.abi : GC_malloc_atomic, stringFromBytes, MsPanicContext;
+import mono.std.core.abi : GC_malloc_atomic, stringFromBytes, MsPanicContext, MsResult, resultOk, resultErr;
+import mono.std.core.rt : CODE;
 
 extern(C) void echo(const char* str) nothrow
 {
@@ -10,7 +11,21 @@ extern(C) void echo(const char* str) nothrow
     printf("%s\n", str);
 }
 
-char* readline(FILE* file, MsPanicContext* panic) nothrow @nogc
+extern(C) void print(const char* str) nothrow
+{
+    import core.stdc.stdio : printf;
+
+    printf("%s", str);
+}
+
+extern(C) void eecho(const char* str) nothrow
+{
+    import core.stdc.stdio : fprintf, stderr;
+
+    fprintf(stderr, "%s\n", str);
+}
+
+MsResult!(char*)* readline(FILE* file, MsPanicContext* panic) nothrow @nogc
 {
     import core.stdc.stdio : fgetc, ungetc, EOF;
     import core.stdc.string : memcpy;
@@ -38,14 +53,21 @@ char* readline(FILE* file, MsPanicContext* panic) nothrow @nogc
             memcpy(grown, buffer, length);
             buffer = grown;
         }
+        // if capacity is more than 64kb, than return an error
+        if (capacity > 64 * 1024)
+            return resultErr!(char*)(CODE.OUT_OF_RANGE, "input line is too long");
         buffer[length++] = cast(char) c;
     }
 
     buffer[length] = 0;
-    return stringFromBytes(buffer, length, panic);
+    return resultOk!(char*)(stringFromBytes(buffer, length, panic));
 }
 
-extern(C) char* input(MsPanicContext* panic) nothrow
+/*
+Надо будет сделать перегрузку на readlineMax потому что ясен красен 64КБ не хватит для некоторых операций
+*/
+
+extern(C) MsResult!(char*)* input(MsPanicContext* panic) nothrow
 {
     return readline(stdin, panic);
 }
