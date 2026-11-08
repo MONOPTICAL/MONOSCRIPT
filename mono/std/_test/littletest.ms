@@ -1,0 +1,2 @@
+[string]suffix()
+|   return "!"
