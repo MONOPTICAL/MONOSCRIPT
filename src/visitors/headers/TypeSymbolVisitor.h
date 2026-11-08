@@ -21,6 +21,14 @@ struct Context {
     bool returnedValue = false;
 };
 
+// Локальная функция видна под своим именем, а её настоящее имя другое (h::local1)
+inline std::shared_ptr<FunctionNode> findLocalFunction(const Context& context, const std::string& name) {
+    auto found = context.functions.find(name);
+    if (found == context.functions.end()) return nullptr;
+    auto function = std::dynamic_pointer_cast<FunctionNode>(found->second);
+    return function && function->name != name ? function : nullptr;
+}
+
 inline bool isFloatType(const std::string& type) {
     return type == "float" || type == "f64";
 }
