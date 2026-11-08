@@ -476,12 +476,24 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
                 } while (match(TokenType::Comma));
             }
 
+                
             consume(TokenType::RightParen, "Expected ')' after function arguments"); // Проверяем наличие правой скобки
             
-            auto ASTnode = std::make_shared<CallNode>(currentToken.value, arguments); // Создаём узел вызова функции
-            ASTnode->line = lineIndex; ASTnode->column = tokenIndex; // Устанавливаем строку и колонку для узла
+            auto ASTnode = std::make_shared<CallNode>(currentToken.value, arguments); 
+            ASTnode->line = lineIndex; ASTnode->column = tokenIndex;
+
+            // divide(4, 2).value, mk()[1]
+            if (check(TokenType::Dot) || check(TokenType::LeftBracket)) {
+                auto root = std::make_shared<AccessExpression>();
+                root->line = ASTnode->line; root->column = ASTnode->column;
+                root->baseName = ASTnode->callee;
+                root->expression = ASTnode;
+                return parseAccessChain(root);
+            }
             
             if(check(TokenType::Arrow)) return parseCast(ASTnode); // Если есть каст, то кастим
+
+           
             
             return ASTnode; // Возвращаем узел вызова функции
         }
@@ -735,8 +747,7 @@ std::shared_ptr<ASTNode> Parser::parseMemberExpression()
 {
     std::shared_ptr<AccessExpression> root = std::make_shared<AccessExpression>();
     root->line = lineIndex; root->column = tokenIndex; // Устанавливаем строку и колонку для узла
-    auto currentNode = root;
-    
+
     if (!(check(TokenType::Identifier) || check(TokenType::Type)))
     {
         throwError("Expected type or identifier in member expression");
@@ -745,7 +756,13 @@ std::shared_ptr<ASTNode> Parser::parseMemberExpression()
     root->baseName= current().value;
     root->expression = std::make_shared<IdentifierNode>(root->baseName); // Изначально выражение - это идентификатор
     advance();
-    
+
+    return parseAccessChain(root);
+}
+
+std::shared_ptr<ASTNode> Parser::parseAccessChain(std::shared_ptr<AccessExpression> root)
+{
+    auto currentNode = root;
     while (check(TokenType::Dot) || check(TokenType::LeftBracket) || 
            (check(TokenType::LeftParen) && currentNode->baseName.size() > 0))
     {
