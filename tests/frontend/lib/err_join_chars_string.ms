@@ -1,4 +1,4 @@
-// expect-error:
+// expect-output: abc
 [i32]main()
-|   echo(joinChars("abc"))
+|   echo(cstr("abc"))
 |   return 0

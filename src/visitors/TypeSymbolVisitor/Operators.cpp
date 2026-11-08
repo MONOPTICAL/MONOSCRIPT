@@ -15,6 +15,9 @@ std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSym
     else
         type = node->inferredType;
 
+    if (type && type->toString() == "array<char>")
+        return std::make_shared<CallNode>("toString_char_array", std::vector<std::shared_ptr<ASTNode>>{node});
+
     if (auto numberNode = std::dynamic_pointer_cast<NumberNode>(node)) {
         // Важен тип после каста: 65->char печатается как A, а 'a'->i32 как 97
         if(type->toString() == "char")
@@ -51,6 +54,18 @@ std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSym
             type->toString() == "f64" ? "toString_f64" : "toString_float",
             std::vector<std::shared_ptr<ASTNode>>{literal}
         );
+    } else if (auto charArrayNode = std::dynamic_pointer_cast<BlockNode>(node)) {
+        if (!charArrayNode->statements.empty())
+        {
+            auto firstStatement = std::dynamic_pointer_cast<NumberNode>(charArrayNode->statements.front());
+            if (firstStatement && firstStatement->isCharLiteral)
+            {
+                callNode = std::make_shared<CallNode>(
+                    "toString_char_array",
+                    std::vector<std::shared_ptr<ASTNode>>{charArrayNode}
+                );
+            }
+        }
     } else if (std::dynamic_pointer_cast<BinaryOpNode>(node) || std::dynamic_pointer_cast<UnaryOpNode>(node)) {
         auto binary = std::dynamic_pointer_cast<BinaryOpNode>(node);
         auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node);

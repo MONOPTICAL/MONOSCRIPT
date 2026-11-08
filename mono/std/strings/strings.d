@@ -129,13 +129,6 @@ extern(C) MsArray* toArray(const char* str) nothrow @nogc
     return array;
 }
 
-extern(C) char* joinChars(MsArray* array, MsPanicContext* panic) nothrow @nogc
-{
-    import core.stdc.string : memcpy;
-
-    return stringFromBytes(cast(const char*) array.data, array.length, panic);
-}
-
 // Разбор
 
 // Strict decimal parsing: optional leading sign, no whitespace or trailing junk.
@@ -376,4 +369,11 @@ extern(C) char* toString_char(const char c, MsPanicContext* panic) nothrow @nogc
     result[0] = c;
     result[1] = 0;
     return result;
+}
+
+extern(C) char* toString_char_array(MsArray* array, MsPanicContext* panic) nothrow @nogc
+{
+    import core.stdc.string : memcpy;
+
+    return stringFromBytes(cast(const char*) array.data, array.length, panic);
 }

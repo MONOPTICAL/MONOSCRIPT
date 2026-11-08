@@ -140,22 +140,32 @@ ret = "array<char>"
 args = ["string"]
 
 [[function]]
-name = "joinChars"
-panic_context = true
-pure = true
-ret = "string"
-args = ["array<char>"]
+name = "echo"
+ret = "void"
+args = ["string"]
 
 [[function]]
-name = "echo"
+name = "eecho"
+ret = "void"
+args = ["string"]
+
+[[function]]
+name = "print"
 ret = "void"
 args = ["string"]
 
 [[function]]
 name = "input"
 panic_context = true
-ret = "string"
+ret = "result<string>"
 args = []
+
+[[function]]
+name = "toString_char_array"
+panic_context = true
+pure = true
+ret = "string"
+args = ["array<char>"]
 
 [[function]]
 name = "gc_collect"

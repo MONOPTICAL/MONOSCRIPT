@@ -1033,7 +1033,14 @@ void TypeSymbolVisitor::visit(CallNode& node) {
             node.inferredType = registry.findType("string");
             return;
         }
-        if (getTypeRank(argumentType) == 0 && argumentType != "char") {
+        auto isCharArrayLiteral = [&]() -> bool {
+            auto blockNode = std::dynamic_pointer_cast<BlockNode>(node.arguments[0]);
+            if (!blockNode || blockNode->statements.empty()) return false;
+            auto firstStatement = std::dynamic_pointer_cast<NumberNode>(blockNode->statements[0]);
+            return firstStatement && firstStatement->isCharLiteral;
+        }();
+
+        if (getTypeRank(argumentType) == 0 && argumentType != "char" && !isCharArrayLiteral && argumentType != "array<char>") {
             LogError("cstr expects a number, char or string, got " + argumentType, node.arguments[0]);
         }
         if (std::dynamic_pointer_cast<BinaryOpNode>(node.arguments[0]) || std::dynamic_pointer_cast<UnaryOpNode>(node.arguments[0])) {
