@@ -112,7 +112,8 @@ private:
     bool                                                                                                processImports(ModuleContext& module);
     
     // Загрузка модуля по пути
-    bool                                                                                                loadModule(const std::string& modulePath);
+    bool                                                                                                loadModule(const std::string& moduleName, const std::string& filePath);
+    std::string                                                                                         resolveModule(const std::string& name, const ModuleContext& importer);
     
     // Вспомогательная хуйня
     bool                                                                                                symbolExists(const std::string& moduleName, 

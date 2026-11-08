@@ -1,6 +1,6 @@
-// expect-error: std.nosuch
+// expect-error: mono.nosuch
 use
-|> std.nosuch
+|> mono.nosuch
 
 [i32]main()
 |   return 0
