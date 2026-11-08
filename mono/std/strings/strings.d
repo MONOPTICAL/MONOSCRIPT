@@ -1,7 +1,7 @@
 module mono.std.strings.strings;
 
 import mono.std.core.abi : MsArray, newArray, stringFromCString;
-import mono.std.core.rt : ms_raise;
+import mono.std.core.rt : ms_raise, CODE;
 import mono.std.core.abi : MsPanicContext;
 
 import mono.std.core.abi : newString, stringFromBytes, MsResult, resultOk, resultErr;
@@ -144,16 +144,16 @@ extern(C) MsResult!int* toInt(const char* str) nothrow @nogc
     size_t i = 0;
     bool negative = str[0] == '-';
     if (negative || str[0] == '+') i++;
-    if (str[i] == 0) return resultErr!int(1, "expected a decimal integer");
+    if (str[i] == 0) return resultErr!int(CODE.INVALID, "expected a decimal integer");
     uint value = 0;
     const uint limit = negative ? 2147483648u : 2147483647u;
     for (; str[i] != 0; i++)
     {
         if (str[i] < '0' || str[i] > '9')
-            return resultErr!int(1, "expected a decimal integer");
+            return resultErr!int(CODE.INVALID, "expected a decimal integer");
         uint digit = str[i] - '0';
         if (value > (limit - digit) / 10)
-            return resultErr!int(2, "integer is outside i32 range");
+            return resultErr!int(CODE.OUT_OF_RANGE, "integer is outside i32 range");
         value = value * 10 + digit;
     }
     return resultOk!int(negative ? cast(int)(0u - value) : cast(int) value);

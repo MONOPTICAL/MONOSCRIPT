@@ -16,6 +16,18 @@ extern(C) nothrow @nogc
 
 // Код выхода при ошибке выполнения: программа может сама вернуть 1, с ним не спутать
 enum PANIC_EXIT_CODE = 101;
+// Коды ошибок
+enum CODE
+{
+    INVALID = 1, // Invalid argument
+    OUT_OF_RANGE = 2, // Value out of range
+    NOT_FOUND = 3, // Item not found
+    PERMISSION_DENIED = 4, // Permission denied
+    EXITS = 5, // Program exits
+    IO_ERROR = 6, // Input/output error
+    EOF = 7, // End of file
+    TIMEOUT = 8 // Operation timed out
+}
 
 // line = 0 значит, что строка неизвестна
 extern(C) void ms_panic(const char* message, int line) nothrow @nogc
@@ -29,6 +41,17 @@ extern(C) void ms_panic(const char* message, int line) nothrow @nogc
     fprintf(stderr, "\n");
     exit(PANIC_EXIT_CODE);
 }
+
+// Panic and raise functions for error handling
+extern(C) void panic(const char* message, MsPanicContext* panic) nothrow @nogc
+{
+    if (panic is null) { ms_panic(message, 0); return; }
+    if (panic.pending) { ms_panic("internal: panic called while another one is pending", 0); return; }
+    panic.message = stringFromCString(message);
+    panic.line = 0;
+    panic.pending = true;
+}
+
 
 // A controlled failure returns normally; callers must check pending before using a value.
 // The message is copied because callers may pass a stack buffer.

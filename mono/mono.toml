@@ -45,6 +45,12 @@ ret = "i1"
 args = ["string"]
 
 [[function]]
+name = "panic"
+panic_context = true
+ret = "void"
+args = ["string"]
+
+[[function]]
 name = "strim"
 panic_context = true
 pure = true
