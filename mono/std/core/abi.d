@@ -6,10 +6,34 @@ module mono.std.core.abi;
 // LLVM layout: { i8 pending, i32 line, ptr message, ptr stackLimit }.
 struct MsPanicContext
 {
-    bool pending;
+    /** 
+     * Вот эта истеричка передаётся в каждую функцию, и она именно та самая которая отвечает за панику
+     * pending - Меняеться с помощью ms_raise, он нужен чтобы программа не вылетала к хуям собачим сразу
+     *           А только когда паника обрабатываеться
+     * line - Номер строки, на которой произошла паника
+     * message - Сообщение о панике
+     * stackLimit - Ограничение стека, устанавливается один раз через ms_stack_init, сохраняется при пойманных паниках
+     *              Проверяется в каждом entry функции, чтобы не выйти за пределы стека
+     * entry:
+        %0 = getelementptr inbounds nuw { i8, i32, ptr, ptr }, ptr %panic.context, i32 0, i32 3
+        %stack.limit = load ptr, ptr %0, align 8
+        %sp = call ptr @llvm.stacksave.p0()
+        %1 = icmp ult ptr %sp, %stack.limit
+        br i1 %1, label %stack.overflow, label %stack.ok
+     * Сначала получаем этот самый истеричный контекст из аргументов функции, обычно это MsPanicContext* panic(ptr %panic.context)
+     * Потом получаем лимит стека из этого контекста, и сравниваем его с результатом llvm.stacksave, чтобы понять, не вышли ли мы за пределы стека 
+     * llvm.stacksave.p0() - сохраняет указатель текущео стека
+     * %1 - Сравнивает указатель текущего стека с лимитом стека оператором ult (unsigned less than)
+     * Если %1 истинно, значит произошёл stack overflow потому что указатель текущего стека стал меньше лимита стека
+     * Стек растёт вниз в сторону меньших адресов
+     * 0x9000 - Начало стека
+     * 0x8800 - Свободное место
+     * 0x8000 - Лимит стека
+     */
+    bool pending; 
     int line;
     const(char)* message;
-    const(void)* stackLimit; // set once by ms_stack_init, survives caught panics
+    const(void)* stackLimit;
 }
 
 struct MsArray

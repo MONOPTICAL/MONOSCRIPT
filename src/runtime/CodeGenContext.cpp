@@ -2,18 +2,26 @@
 #include "../errors/headers/ErrorEngine.h"
 #include <iostream>
 
+// Получает или объявляет функцию в модуле, если она ещё не существует
 llvm::Function* CodeGenContext::getOrDeclareFunction(const std::string& name, llvm::FunctionType* type) {
-    llvm::Function* func = TheModule->getFunction(name); // Проверяем, существует ли функция
-    if (!func) {
-        // Функция не найдена в модуле, объявляем ее как внешнюю
+    llvm::Function* func = TheModule->getFunction(name); // Получаем функцию с модуля
+    if (!func) // Проверяем существует ли уже эта самая функция
+    { // Если функция не найдена в модуле, создаём её 
         const bool checked = name == "ms_panic_index" || name == "ms_panic_result" ||
             name == "ms_str_at" || name == "ms_map_get" || name == "ms_map_del" || name == "ms_map_next";
+            
+        // Если функция является одной из проверяемых, добавляем дополнительный аргумент для контекста паники
         if (checked) {
+            // Копируем все аргументы существующего типа функции в новый вектор
             std::vector<llvm::Type*> args(type->params().begin(), type->params().end());
+            // Втюхиваем дополнительный аргумент для контекста паники
             args.push_back(Builder.getPtrTy());
+            // Создаём новый тип функции с дополнительным аргументом
             type = llvm::FunctionType::get(type->getReturnType(), args, false);
         }
+        // Создаём функцию в модуле
         func = llvm::Function::Create(type, llvm::Function::ExternalLinkage, name, TheModule.get());
+        // Если функция была успешно создана, добавляем атрибут для проверяемых функций
         if (checked) func->addFnAttr("ms.panic_context");
     }
     return func;
@@ -23,16 +31,16 @@ llvm::Type* CodeGenContext::getLLVMType(std::shared_ptr<TypeNode> typeNode, llvm
     // TODO: Реализовать хуйню для сложных типов как array<array<array<i16>>>
 
     if (auto simpleType = std::dynamic_pointer_cast<SimpleTypeNode>(typeNode)) {
-        if (simpleType->name == "i1") return llvm::Type::getInt1Ty(ctx);
-        if (simpleType->name == "i8") return llvm::Type::getInt8Ty(ctx);
-        if (simpleType->name == "i16") return llvm::Type::getInt16Ty(ctx);
-        if (simpleType->name == "i32") return llvm::Type::getInt32Ty(ctx);
-        if (simpleType->name == "i64") return llvm::Type::getInt64Ty(ctx);
-        if (simpleType->name == "float") return llvm::Type::getFloatTy(ctx);
-        if (simpleType->name == "f64") return llvm::Type::getDoubleTy(ctx);
-        if (simpleType->name == "char") return llvm::Type::getInt8Ty(ctx);
+        if (simpleType->name == "i1") return llvm::Type::getInt1Ty(ctx); // bool
+        if (simpleType->name == "i8") return llvm::Type::getInt8Ty(ctx); // 8-битное целое
+        if (simpleType->name == "i16") return llvm::Type::getInt16Ty(ctx); // 16-битное целое
+        if (simpleType->name == "i32") return llvm::Type::getInt32Ty(ctx); // 32-битное целое
+        if (simpleType->name == "i64") return llvm::Type::getInt64Ty(ctx); // 64-битное целое
+        if (simpleType->name == "float") return llvm::Type::getFloatTy(ctx); // 32-битное число с плавающей точкой
+        if (simpleType->name == "f64") return llvm::Type::getDoubleTy(ctx); // 64-битное число с плавающей точкой
+        if (simpleType->name == "char") return llvm::Type::getInt8Ty(ctx); // символ
         if (simpleType->name == "string") return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0); // Строки как char*
-        if (simpleType->name == "void") return llvm::Type::getVoidTy(ctx);
+        if (simpleType->name == "void") return llvm::Type::getVoidTy(ctx); // пустой тип
         if (simpleType->name == "null") return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0); // null как указатель на i8
         if (simpleType->name == "auto") return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0); // auto как указатель на i8
     }
@@ -41,9 +49,10 @@ llvm::Type* CodeGenContext::getLLVMType(std::shared_ptr<TypeNode> typeNode, llvm
         return llvm::PointerType::getUnqual(ctx);
     }
     
-    return llvm::PointerType::getUnqual(ctx);
+    return llvm::PointerType::getUnqual(ctx); // По умолчанию возвращаем указатель на i8 для неизвестных типов
 }
 
+// Получает тип по AST-узлу, используемый для инференса типов переменных и выражений
 std::shared_ptr<TypeNode> CodeGenContext::getTypeByASTNode(std::shared_ptr<ASTNode> node) {
     if (auto typeNode = std::dynamic_pointer_cast<TypeNode>(node)) {
         return typeNode;
@@ -93,72 +102,108 @@ llvm::Value* CodeGenContext::allocateObject(llvm::Value* bytes, bool hasReferenc
 }
 
 llvm::Value* CodeGenContext::createArray(llvm::Type* elementType, llvm::Value* size) {
-    llvm::StructType* arrayStruct = getArrayStruct();
+    llvm::StructType* arrayStruct = getArrayStruct(); // Получаем LLVM'овское описание структуры массива
+                                                      // array = {ptr, i32, i32} - data, length, capacity
     const llvm::DataLayout& layout = TheModule->getDataLayout();
+    // Это справочник для llvm как ложаться типы в памяти, о их размерах и выравнивании
+    // Он его подбирает под архитектуру и ABI платформы на которой запущен компилятор так что тут н3хуй надумывать особо
 
-    // В заголовке лежит ссылка на данные
+    // В заголовке лежит ссылка на {ptr, i32, i32} - data, length, capacity
     llvm::Value* header = allocateObject(Builder.getInt64(layout.getTypeAllocSize(arrayStruct)), true, "array");
+    // TODO: layout не подстраивается под систему, а просто ебашит дефотлный x86-64, нужно учитывать архитектуру целевой платформы
 
-    llvm::Value* bytes = Builder.CreateMul(
-        Builder.CreateZExt(size, Builder.getInt64Ty()),
-        Builder.getInt64(layout.getTypeAllocSize(elementType)),
-        "array_bytes"
+    llvm::Value* bytes = Builder.CreateMul( // А вот тута мы вычисляем сколько байтов надо для data основываясь на size
+        Builder.CreateZExt(size, Builder.getInt64Ty()), // 3башим размер в 64-битное целое чтобы умножать его на кличество элементов
+        Builder.getInt64(layout.getTypeAllocSize(elementType)), // Получаем размер одного элемента в байтах
+        "array_bytes" // Имя для temp в котором будет храниться количество байтов для data
     );
-    llvm::Value* data = allocateObject(bytes, elementType->isPointerTy(), "array_data");
-
-    Builder.CreateStore(data, Builder.CreateStructGEP(arrayStruct, header, 0));
-    Builder.CreateStore(size, Builder.CreateStructGEP(arrayStruct, header, 1));
-    Builder.CreateStore(size, Builder.CreateStructGEP(arrayStruct, header, 2));
+    llvm::Value* data = allocateObject(bytes, elementType->isPointerTy(), "array_data"); // аллоцируем память для data массива
+                                                                                         // bytes - количество байтов для data массива
+                                                                                         // elementType->isPointerTy() - говорит, содержит ли элемент указатель, чтобы GC мог правильно обрабатывать память
+                                                                                         // "array_data" - имя для temp в котором будет храниться указатель на data массива
+    Builder.CreateStore(data, Builder.CreateStructGEP(arrayStruct, header, 0)); // Сохраняем указатель на data в структуре массива
+    Builder.CreateStore(size, Builder.CreateStructGEP(arrayStruct, header, 1)); // Сохраняем длину массива
+    Builder.CreateStore(size, Builder.CreateStructGEP(arrayStruct, header, 2)); // Сохраняем capacity массива
     return header;
 }
-
+// Пиздит с {ptr data ,i32 size ,i32 capacity} data
 llvm::Value* CodeGenContext::getArrayData(llvm::Value* array) {
     llvm::Value* field = Builder.CreateStructGEP(getArrayStruct(), array, 0);
     return Builder.CreateLoad(llvm::PointerType::get(TheContext, 0), field, "array_data");
 }
 
+// Пиздит с {ptr data ,i32 size ,i32 capacity} size
 llvm::Value* CodeGenContext::getArrayLength(llvm::Value* array) {
     llvm::Value* field = Builder.CreateStructGEP(getArrayStruct(), array, 1);
     return Builder.CreateLoad(llvm::Type::getInt32Ty(TheContext), field, "array_len");
 }
 
 llvm::Value* CodeGenContext::getArrayElementPtr(llvm::Value* array, llvm::Type* elementType, llvm::Value* index, int line) {
-    llvm::Type* i64Type = llvm::Type::getInt64Ty(TheContext);
-    llvm::Type* i32Type = llvm::Type::getInt32Ty(TheContext);
+    llvm::Type* i64Type = llvm::Type::getInt64Ty(TheContext); // Получаем тип i64, чтобы не вызывать llvm::Type::getInt64Ty каждый раз
+    llvm::Type* i32Type = llvm::Type::getInt32Ty(TheContext); // Тут одно и тоже только теперь для i32
 
-    // i1 это 0 или 1, а не 0 или -1. Отрицательный индекс после расширения станет огромным беззнаковым и не пройдёт проверку
+    // Если индекс у нас i1(0 и 1 в семантике получают i1, почему? потому что проект мой и я делаю чё хочу блять)
+    // То расширяем его в i64, чтобы корректно сравнивать с длиной массива, а если нет то всё равно расширяем в i64 просто методы разные для этих операций.
     llvm::Value* wideIndex = index->getType()->isIntegerTy(1)
         ? Builder.CreateZExt(index, i64Type, "index")
         : Builder.CreateSExt(index, i64Type, "index");
-    llvm::Value* length = getArrayLength(array);
 
-    llvm::Function* function = Builder.GetInsertBlock()->getParent();
+    // Получаем длину массива, благо это не проблема, просто берём size из {ptr, i32, i32}(data,size,capacity)
+    llvm::Value* length = getArrayLength(array); // Метод getArrayLength сверху этого если чё
+
+    llvm::Function* function = Builder.GetInsertBlock()->getParent(); // Получаем текущую функцию, чтобы в правильный блок поставить а не хуй пойми куда
+
+    // А теперь наш любимый error-handling
+    // Как ещё дохуя других действий мы можем получить по еблу от компилятора, например тот же OUT_OF_RANGE
+    // Так чтобы такие вещи ловить мы делаем два блока, bounds.fail и bounds.ok, и в зависимости от условия переходим в один из них
     llvm::BasicBlock* failBlock = llvm::BasicBlock::Create(TheContext, "bounds.fail", function);
     llvm::BasicBlock* okBlock = llvm::BasicBlock::Create(TheContext, "bounds.ok", function);
-    Builder.CreateCondBr(Builder.CreateICmpUGE(wideIndex, Builder.CreateZExt(length, i64Type)), failBlock, okBlock);
 
+    Builder.CreateCondBr(Builder.CreateICmpUGE(wideIndex, Builder.CreateZExt(length, i64Type)), failBlock, okBlock);
+    // Теперь чтобы понять пошло ли у нас всё по пизде мы сравниваем индекс с длиной массива оператором чтобы понять является ли индекс больше или равен размеру
+    // Если индекс больше или равен длине массива, то переходим в failBlock, а если нет то тогда заебись и мы переходим в okBlock
+    // okBlock теперь является блоком в котором мы продолжаем все дальнейшие действия в функции до пока не перейдём в другой блок или не завершится функция
+
+    // Ну а теперь надо этот failBlock чем-то заполнить, в нём особо нихуя и нет кроме вызова ms_panic_index который прописан в rt.d
     Builder.SetInsertPoint(failBlock);
+
+    // Создаём или получаем объявление функции ms_panic_index(long index, int length, int line, MsPanicContext* panic) 
     llvm::Function* panic = getOrDeclareFunction("ms_panic_index",
         llvm::FunctionType::get(llvm::Type::getVoidTy(TheContext), {i64Type, i32Type, i32Type}, false));
-    Builder.CreateCall(panic, {wideIndex, length, Builder.getInt32(ErrorEngine::getInstance().displayLine(line)), PanicContext});
-    propagatePanic();
 
-    Builder.SetInsertPoint(okBlock);
+    // Вызываем чисто эту самую функцию 
+    Builder.CreateCall(panic, {wideIndex, length, Builder.getInt32(ErrorEngine::getInstance().displayLine(line)), PanicContext});
+    propagatePanic(); // И также как и для любого другого call'а, мы должны обработать панику после вызова функции
+    
+    // Потом переходим в okBlock
+    Builder.SetInsertPoint(okBlock); 
     return Builder.CreateGEP(elementType, getArrayData(array), wideIndex, "element_ptr");
 }
 
+// Вызывает панику
 void CodeGenContext::emitPanic(const std::string& message, int line) {
-    auto raise = getOrDeclareFunction("ms_raise", llvm::FunctionType::get(Builder.getVoidTy(),
-        {Builder.getPtrTy(), Builder.getInt32Ty(), Builder.getPtrTy()}, false));
+    // Создаём или получаем объявление функции void ms_raise(const char* message, int line, MsPanicContext* panic)
+    auto raise = getOrDeclareFunction("ms_raise", llvm::FunctionType::get(
+        Builder.getVoidTy(), // void
+        {
+            Builder.getPtrTy(), // const char* message
+            Builder.getInt32Ty(), // int line
+            Builder.getPtrTy()}, // MsPanicContext* panic
+            false // а вот это означает, что функция не принимает переменное число аргументов
+        ));
+
+    // Вызываем функцию ms_raise с переданными аргументами
     Builder.CreateCall(raise, {createString(message),
         Builder.getInt32(ErrorEngine::getInstance().displayLine(line)), PanicContext});
     propagatePanic();
 }
 
+// Возвращает тип структуры паники
 llvm::StructType* CodeGenContext::getPanicStruct() {
     return llvm::StructType::get(TheContext, {Builder.getInt8Ty(), Builder.getInt32Ty(), Builder.getPtrTy(), Builder.getPtrTy()});
 }
 
+// Пропагирует панику дальше по стеку или завершает выполнение функции, если обработчиков нет
 void CodeGenContext::propagatePanic() {
     if (!PanicHandlers.empty()) {
         Builder.CreateBr(PanicHandlers.back());
@@ -194,6 +239,7 @@ void CodeGenContext::checkPanic() {
     propagatePanic();
     Builder.SetInsertPoint(ok);
 }
+
 
 llvm::Value* CodeGenContext::emitCall(llvm::Function* function, std::vector<llvm::Value*> arguments, const std::string& name) {
     const bool checked = function->hasFnAttribute("ms.panic_context");
@@ -248,15 +294,29 @@ void CodeGenContext::LogWarning(const std::string &message)
     std::cerr << "Warning: " << message << std::endl;
 #endif
 }
-// Strings retain the C ABI data pointer; the preceding u64 stores the byte length.
+
 llvm::Constant* CodeGenContext::createString(const std::string& text, const std::string& name) {
+    // TODO: Дедупликация строк существует("stack overflow" к примеру), надо чисто добавить кэш и заебашить Constant*
+    // Первым делом проверяю, что строка не содержит NUL-байт, потому что она может сломать некоторын функции как strlen, strcmp и т.д
     if (text.find('\0') != std::string::npos)
         throw std::runtime_error("Strings cannot contain a NUL byte");
+    // Создаю LLVM-константу для строки, которая хранит длину и данные строки в формате C ABI
     auto bytes = llvm::ConstantDataArray::getString(TheContext, text, true);
+    // Создаю анонимную структуру, которая содержит длину строки и массив байтов с её содержимым
     auto value = llvm::ConstantStruct::getAnon({Builder.getInt64(text.size()), bytes});
+    // ┌──────────────┬───┬───┬───┬───┬────┐  
+    // │ i64 len = 4  │ t │ e │ x │ t │ \0 │
+    // └──────────────┴───┴───┴───┴───┴────┘
+    
+    // Любая строка это глобальная констанат, чтобы её можно было юзать безопастно
+    // @str = private constant { i64, [15 x i8] } { i64 14, [15 x i8] c"stack overflow\00" }, align 8
     auto global = new llvm::GlobalVariable(*TheModule, value->getType(), true,
         llvm::GlobalValue::PrivateLinkage, value, name);
+
+    // Выравнивание глобальной переменной на 8 байт, чтобы C ABI не быковал
     global->setAlignment(llvm::Align(8));
+
+    // Получаю указатель на массив байтов внутри структуры, чтобы его можно было использовать как C-строку
     llvm::Constant* indices[] = {Builder.getInt32(0), Builder.getInt32(1), Builder.getInt32(0)};
     return llvm::ConstantExpr::getInBoundsGetElementPtr(value->getType(), global, indices);
 }

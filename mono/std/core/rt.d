@@ -32,7 +32,7 @@ enum CODE
 // line = 0 значит, что строка неизвестна
 extern(C) void ms_panic(const char* message, int line) nothrow @nogc
 {
-    // Сначала то, что программа успела напечатать, потом ошибка
+    // То что делает ms_panic, это допечатывает что программа не допиздела, и просто делает exit() с кодом 101(PANIC_EXIT_CODE)
     fflush(stdout);
     const bool color = isatty(2) && getenv("NO_COLOR") is null;
     fprintf(stderr, "%sRuntime Error%s: %s", color ? "\033[1;31m".ptr : "".ptr, color ? "\033[0m".ptr : "".ptr, message);
@@ -53,13 +53,13 @@ extern(C) void panic(const char* message, MsPanicContext* panic) nothrow @nogc
 }
 
 
-// A controlled failure returns normally; callers must check pending before using a value.
-// The message is copied because callers may pass a stack buffer.
+// Функция которая поднимает панику с указанным сообщением и контекстом, но не завершает программу сразу.
 extern(C) void ms_raise(const char* message, int line, MsPanicContext* panic) nothrow @nogc
 {
-    if (panic is null) { ms_panic(message, line); return; }
-    // A second raise means someone skipped the pending check: fail loudly instead of losing it.
-    if (panic.pending) { ms_panic("internal: panic raised while another one is pending", line); return; }
+    if (panic is null) { ms_panic(message, line); return; } // Если контекст паники не передан, вызываем ms_panic сразу, потому что контекст передаётся в каждуб функцию
+    if (panic.pending) { ms_panic("internal: panic raised while another one is pending", line); return; } // Если есть уже паника в ожидании, то вызываем сразу панику чтобы не про3бать её
+    
+    // А если н1хуя из верхнего не выполняется, то просто делаем текущий контекст паники 'ожидающим' чтобы его в следующем raise можно было обработать
     panic.message = stringFromCString(message);
     panic.line = line;
     panic.pending = true;
@@ -114,8 +114,9 @@ private extern(C) void* ms_out_of_memory(size_t) nothrow @nogc
 // Первое, что делает программа: и через JIT, и в собранном файле
 extern(C) void ms_rt_init() nothrow @nogc
 {
-    GC_init();
-    GC_set_oom_fn(&ms_out_of_memory);
+    GC_init(); // Иницилизирую гарбидж спортика 
+    GC_set_oom_fn(&ms_out_of_memory); // Когда пизда памяти то вызывается ms_out_of_memory
+                                      // Который в свою очередь просто паникует и возвращает null
 }
 
 private extern(C) nothrow @nogc
@@ -134,8 +135,14 @@ enum STACK_RESERVE = 256 * 1024;
 // shortcut: glibc-only (pthread_getattr_np); on failure the limit stays null and the check is off.
 extern(C) void ms_stack_init(MsPanicContext* panic) nothrow @nogc
 {
-    pthread_attr_t attr;
-    if (pthread_getattr_np(pthread_self(), &attr) != 0) return;
+    pthread_attr_t attr; // Чисто переменная чтобы хранить в ней атрибуты тякущего потока
+                         // Какие атрибуты есть у потока?
+                         // stack size - размер стека потока
+                         // stack base - адрес начала стека потока
+                         // 
+    if (pthread_getattr_np(pthread_self(), &attr) != 0) return; // Не смогли получить аттрибуты потока, выходим
+                                                                // pthread_self() - текущий поток, &attr - куда записать аттрибуты потока
+    
     void* low;
     size_t size;
     if (pthread_attr_getstack(&attr, &low, &size) == 0 && size > 2 * STACK_RESERVE)
