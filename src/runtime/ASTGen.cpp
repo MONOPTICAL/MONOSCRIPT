@@ -45,13 +45,14 @@ void ASTGen::visit(GenericTypeNode& node) {
 llvm::Function* declareUserFunction(CodeGenContext& context, FunctionNode& node) {
     // Метод P.get не конфликтует ни с функцией get, ни с get другой структуры
     const std::string symbol = node.associated.empty() ? node.name : node.associated + "." + node.name;
+
     if (llvm::Function* existing = context.TheModule->getFunction(symbol)) {
-        return existing;
+        return existing; // Если функция уже объявлена, возвращаем её
     }
 
     std::vector<llvm::Type*> paramTypes;
     for (auto& param : node.parameters) {
-        paramTypes.push_back(context.getLLVMType(param.first, context.TheContext));
+        paramTypes.push_back(context.getLLVMType(param.first, context.TheContext)); // Получаем LLVM-тип параметра функции
     }
 
     bool isMain = node.associated.empty() && (node.name == "main" || std::find(node.labels.begin(), node.labels.end(), "@entry") != node.labels.end());
@@ -73,9 +74,10 @@ llvm::Function* declareUserFunction(CodeGenContext& context, FunctionNode& node)
 // Завершает стартовую функцию: вызывает функцию пользователя и возвращает её код.
 // Стартовая функция становится настоящим main, поэтому JIT и собранный файл запускаются одинаково
 static void finishStartFunction(CodeGenContext& context, ProgramNode& node, llvm::BasicBlock* startBlock) {
-    llvm::Function* start = context.StartFunction;
-    context.StartFunction = nullptr;
+    llvm::Function* start = context.StartFunction; // Получаем указатель на стартовую функцию
+    context.StartFunction = nullptr; // Сбрасываем наху указатель чтобы случайно ещё один раз не использовать
 
+    // Получаем главную функцию программы, или main или любая другая у которой есть label "@entry"
     llvm::Function* entry = context.TheModule->getFunction(CodeGenContext::findEntryName(node));
     if (!entry) {
         // Запускать нечего, об этом сообщит тот, кто запускает
@@ -83,16 +85,19 @@ static void finishStartFunction(CodeGenContext& context, ProgramNode& node, llvm
         return;
     }
 
-    context.Builder.SetInsertPoint(startBlock);
+    context.Builder.SetInsertPoint(startBlock); // Устанавливаем точку вставки в начало стартовой функции
     std::vector<llvm::Value*> arguments;
     for (unsigned i = 0; i + 1 < entry->arg_size(); ++i)
         arguments.push_back(llvm::Constant::getNullValue(entry->getArg(i)->getType()));
-    context.Builder.CreateRet(context.emitCall(entry, arguments));
-    context.Builder.ClearInsertionPoint();
+    context.Builder.CreateRet(context.emitCall(entry, arguments)); // Создаём возврат из стартовой функции с результатом вызова главной функции программы
+    context.Builder.ClearInsertionPoint(); // Очищаем точку вставки, чтобы больше не вставлять инструкции в стартовую функцию
 
+    // Переименовываем пользовательскую main, чтобы не было конфликта с нашей стартовой функцией
     if (llvm::Function* userMain = context.TheModule->getFunction("main")) {
         userMain->setName("__ms_user_main");
     }
+
+    // Переименовываем стартовую функцию в main, чтобы она стала точкой входа программы
     start->setName("main");
 }
 
@@ -101,20 +106,21 @@ void ASTGen::visit(ProgramNode& node) {
     result = nullptr;
 
     // Раскладка структур нужна раньше всего: P() можно вызвать до объявления структуры
+    // TODO: Локальных структур нет, они все переносятся в глобалку
     for (auto& n : node.body) {
         if (auto structure = std::dynamic_pointer_cast<StructNode>(n)) {
             Objects::registerStruct(context, *structure);
         }
     }
 
-    // Методы можно вызывать до определения, как и функции
+    // Сигнатуры методов в стркутурах объявляем заранее, чтобы методы можно было вызывать до их определения
     for (auto& [name, layout] : context.Structs) {
         for (auto& [methodName, method] : layout.methods) {
             declareUserFunction(context, *method);
         }
     }
 
-    // Сначала объявляем все функции, чтобы их можно было вызывать до определения
+    // И так же с функциями объявляем сигнатуры заранее, чтобы их можно было вызывать до определения
     for (auto& n : node.body) {
         if (auto function = std::dynamic_pointer_cast<FunctionNode>(n); function && function->associated.empty() && function->typeParameters.empty()) {
             declareUserFunction(context, *function);
@@ -124,16 +130,20 @@ void ASTGen::visit(ProgramNode& node) {
     context.StartFunction = llvm::Function::Create(
         llvm::FunctionType::get(llvm::Type::getInt32Ty(context.TheContext), false),
         llvm::Function::ExternalLinkage, "__ms_start", context.TheModule.get()
-    );
+    ); // Создаём стартовую функцию программы, которая будет вызываться первой
     llvm::BasicBlock* startBlock = llvm::BasicBlock::Create(context.TheContext, "entry", context.StartFunction);
 
-    context.Builder.SetInsertPoint(startBlock);
+    context.Builder.SetInsertPoint(startBlock); // Переходим в entry
+
+    // Инициализируем контекст паники и стек программы
     context.PanicContext = context.createEntryAlloca(context.getPanicStruct(), "panic.context");
     context.Builder.CreateStore(llvm::Constant::getNullValue(context.getPanicStruct()), context.PanicContext);
     context.Builder.CreateCall(context.getOrDeclareFunction("ms_rt_init",
         llvm::FunctionType::get(llvm::Type::getVoidTy(context.TheContext), false)));
     context.Builder.CreateCall(context.getOrDeclareFunction("ms_stack_init",
         llvm::FunctionType::get(llvm::Type::getVoidTy(context.TheContext), {context.Builder.getPtrTy()}, false)), {context.PanicContext});
+
+    // После инициализации контекста паники и стека можно продолжать генерацию кода программы
     context.Builder.ClearInsertionPoint();
 
     for (auto& n : node.body) {
@@ -145,7 +155,7 @@ void ASTGen::visit(ProgramNode& node) {
             context.Builder.SetInsertPoint(startBlock);
             n->accept(*this);
             startBlock = context.Builder.GetInsertBlock(); // Выражение могло создать новые блоки
-            context.Builder.ClearInsertionPoint();
+            context.Builder.ClearInsertionPoint(); // Очищаем точку вставки после обработки глобальной переменной
             continue;
         }
 
@@ -162,11 +172,13 @@ void ASTGen::visit(ProgramNode& node) {
 void ASTGen::visit(FunctionNode& node) {
     if (!node.typeParameters.empty()) return; // Генерируются только копии шаблона
     LogWarning("visit не полностью реализован для FunctionNode: " + node.name);
-    ui::stageDetail(node.name);
+    ui::stageDetail(node.name); // Отображаем детали текущей стадии для функции
 
     // Сохраняем текущую точку вставки
     llvm::BasicBlock* currentBlock = nullptr;
     llvm::Function* currentFunction = nullptr;
+    
+    // Сохраняем текущую точку вставки и функцию, чтобы можно было восстановить их после генерации кода функции
     if (context.Builder.GetInsertBlock()) {
         currentBlock = context.Builder.GetInsertBlock();
         currentFunction = currentBlock->getParent();
@@ -177,15 +189,18 @@ void ASTGen::visit(FunctionNode& node) {
     // Создаем минимальную заглушку функции
     llvm::Function* func = declareUserFunction(context, node);
     llvm::Type* returnLLVMType = func->getReturnType();
+
+    // Сохраняем текущий контекст возврата и контекст паники, чтобы можно было восстановить их после генерации кода функции
     auto outerReturnType = context.CurrentReturnType;
     context.CurrentReturnType = node.returnType;
     auto outerPanicContext = context.PanicContext;
     auto outerResultHandlers = std::move(context.ResultHandlers);
     auto outerPanicHandlers = std::move(context.PanicHandlers);
+
+    // Очищаем обработчики результатов и паники для новой функции
     context.ResultHandlers.clear(); context.PanicHandlers.clear();
     context.PanicContext = func->getArg(func->arg_size() - 1);
     context.PanicContext->setName("panic.context");
-
 
     // Создаем блок входа в функцию
     llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(
@@ -200,11 +215,11 @@ void ASTGen::visit(FunctionNode& node) {
     // Обрабатываем параметры функции
     unsigned idx = 0;
     for (auto &arg : func->args()) {
-        if (idx == node.parameters.size()) break;
-        arg.setName(node.parameters[idx++].second);
+        if (idx == node.parameters.size()) break; // Прекращаем обработку параметров, если достигли конца списка параметров функции
+        arg.setName(node.parameters[idx++].second); // Устанавливаем имя аргумента функции согласно имени параметра в AST
         // Параметр это обычная переменная: его можно читать и присваивать
-        llvm::AllocaInst* paramSlot = context.createEntryAlloca(arg.getType(), arg.getName().str());
-        context.Builder.CreateStore(&arg, paramSlot);
+        llvm::AllocaInst* paramSlot = context.createEntryAlloca(arg.getType(), arg.getName().str()); // Создаём alloca для параметра функции в начале блока
+        context.Builder.CreateStore(&arg, paramSlot); // Сохраняем значение параметра в выделенной памяти
         context.NamedValues[arg.getName().str()] = paramSlot;
     }
 
@@ -311,7 +326,7 @@ void ASTGen::visit(VariableAssignNode& node) {
     LogWarning("visit для VariableAssignNode: " + node.name);
     
     // _ ^= f(): значение вычисляется, а имя можно занимать повторно
-    if (node.name == "_") context.NamedValues.erase("_");
+    if (node.name == "_") context.NamedValues.erase("_"); 
 
     // Проверяем, существует ли переменная в таблице символов
     if (context.NamedValues.find(node.name) != context.NamedValues.end()) {
@@ -329,9 +344,9 @@ void ASTGen::visit(VariableAssignNode& node) {
     std::cerr << "Имя " << node.name << std::endl;
 #endif
 
-    if (node.inferredType) 
+    if (node.inferredType) // Если есть выведенный тип, используем его
         varType = context.getLLVMType(node.inferredType, context.TheContext);
-    else if(node.type)
+    else if(node.type) // Если есть явный тип, используем его
         varType = context.getLLVMType(node.type, context.TheContext);
     else 
         LogWarning("Не удалось получить тип для переменной " + node.name);
@@ -347,16 +362,16 @@ void ASTGen::visit(VariableAssignNode& node) {
         return;
     }
 
-    llvm::BasicBlock* currentBlock = context.Builder.GetInsertBlock();
-    bool isGlobalContext = (currentBlock->getParent() == context.StartFunction);
+    llvm::BasicBlock* currentBlock = context.Builder.GetInsertBlock(); // Получаем текущий блок 
+    bool isGlobalContext = (currentBlock->getParent() == context.StartFunction); // Проверяем, находимся ли мы в глобальном контексте
     
     if (isGlobalContext) {
-        result = Declarations::handleGlobalVariable(context, node, varType);
+        result = Declarations::handleGlobalVariable(context, node, varType); // Обрабатываем глобальную переменную
         return;
     }
     
-    if (Arrays::isLiteral(node.expression)) {
-        result = Arrays::handleArrayInitialization(context, node, varType, declaredType);
+    if (Arrays::isLiteral(node.expression)) { // Если выражение является литералом массива
+        result = Arrays::handleArrayInitialization(context, node, varType, declaredType); // Обрабатываем инициализацию массива
         return;
     }
     

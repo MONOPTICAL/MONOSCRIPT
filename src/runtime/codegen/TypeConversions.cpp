@@ -57,21 +57,23 @@ llvm::Value* TypeConversions::loadValueIfPointer(CodeGenContext& context, llvm::
     std::cerr << std::endl;
 #endif
 
-    if (llvm::AllocaInst* allocaInst = llvm::dyn_cast<llvm::AllocaInst>(value)) {
-        llvm::Type* loadedType = allocaInst->getAllocatedType();
-        if (loadedType->isArrayTy() && loadedType->getArrayElementType()->isIntegerTy(8)) {
+    // Если значение alloca, то-есть локальная переменная на стеке
+    if (llvm::AllocaInst* allocaInst = llvm::dyn_cast<llvm::AllocaInst>(value)) { 
+        llvm::Type* loadedType = allocaInst->getAllocatedType(); // Получаем тип, который выделен alloca
+        if (loadedType->isArrayTy() && loadedType->getArrayElementType()->isIntegerTy(8)) { // Если это массив i8, обрабатываем как строку
             
-            llvm::Value* zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(context.TheContext), 0);
-            llvm::Value* gep = context.Builder.CreateInBoundsGEP(
-                loadedType,
-                allocaInst,
-                {zero, zero},
-                loadName + "_gep"
+            llvm::Value* zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(context.TheContext), 0); // Тупо константа нуля
+            llvm::Value* gep = context.Builder.CreateInBoundsGEP( // Создаём GEP для доступа к элементам массива i8 внутри alloca
+                loadedType, // Тип, к которому применяем GEP
+                allocaInst, // Указатель на alloca, к которому применяем GEP
+                {zero, zero}, // Индексы для доступа к первому элементу массива i8 внутри alloca
+                loadName + "_gep" // Имя для GEP
             );
-            return gep;
+            return gep; 
         }
-        return context.Builder.CreateLoad(loadedType, value, loadName);
+        return context.Builder.CreateLoad(loadedType, value, loadName); // Если это не массив i8, просто загружаем значение из alloca
     } 
+    // Если значение глобальная переменная
     else if (llvm::GlobalVariable* globalVar = llvm::dyn_cast<llvm::GlobalVariable>(value)) {
         llvm::Type* valueType = globalVar->getValueType();
         // Специальная обработка для строк (массив i8)
@@ -89,7 +91,7 @@ llvm::Value* TypeConversions::loadValueIfPointer(CodeGenContext& context, llvm::
 #endif
             return gep;
         }
-        return context.Builder.CreateLoad(valueType, value, loadName);
+        return context.Builder.CreateLoad(valueType, value, loadName); // Если это не массив i8, просто загружаем значение из глобальной переменной
     }
  
     return value;  // Для других указателей оставляем как есть

@@ -203,49 +203,55 @@ llvm::StructType* CodeGenContext::getPanicStruct() {
     return llvm::StructType::get(TheContext, {Builder.getInt8Ty(), Builder.getInt32Ty(), Builder.getPtrTy(), Builder.getPtrTy()});
 }
 
-// Пропагирует панику дальше по стеку или завершает выполнение функции, если обработчиков нет
+// Наполняет вертку panic.propagate которая обрабатывает что делать с истерикой
 void CodeGenContext::propagatePanic() {
-    if (!PanicHandlers.empty()) {
-        Builder.CreateBr(PanicHandlers.back());
+    if (!PanicHandlers.empty()) { // attempt создаёт panic handler и если он есть значит вызов был внутри attempt
+        Builder.CreateBr(PanicHandlers.back()); // Переходим в panic info
         return;
     }
+    // Если обработчика нет, значит паника произошла вне attempt, нужно завершить функцию
     auto function = Builder.GetInsertBlock()->getParent();
     if (function->hasFnAttribute("ms.panic_context")) {
-        if (function->getReturnType()->isVoidTy()) Builder.CreateRetVoid();
+        // Каждая функция в языке имеет атрибут "ms.panic_context"
+        // Если тип возвращаемого значения void, просто возвращаемся, иначе возвращаем null значение
+        if (function->getReturnType()->isVoidTy()) Builder.CreateRetVoid(); 
         else Builder.CreateRet(llvm::Constant::getNullValue(function->getReturnType()));
         return;
     }
-    auto layout = getPanicStruct();
-    auto message = Builder.CreateLoad(Builder.getPtrTy(), Builder.CreateStructGEP(layout, PanicContext, 2));
-    auto line = Builder.CreateLoad(Builder.getInt32Ty(), Builder.CreateStructGEP(layout, PanicContext, 1));
+
+    // А если мы оказываемся тут значит мы в @__ms_user_main и бежать особо некуда, так что просто вызываем функцию ms_panic и крашаем всё к хуям собачийм
+    auto layout = getPanicStruct(); // Получаем структуру паники
+    auto message = Builder.CreateLoad(Builder.getPtrTy(), Builder.CreateStructGEP(layout, PanicContext, 2)); // Берём сообщение из структуры паники
+    auto line = Builder.CreateLoad(Builder.getInt32Ty(), Builder.CreateStructGEP(layout, PanicContext, 1)); // Берём номер строки из структуры паники
     auto fatal = getOrDeclareFunction("ms_panic", llvm::FunctionType::get(Builder.getVoidTy(),
-        {Builder.getPtrTy(), Builder.getInt32Ty()}, false));
-    fatal->setDoesNotReturn();
-    Builder.CreateCall(fatal, {message, line});
-    Builder.CreateUnreachable();
+        {Builder.getPtrTy(), Builder.getInt32Ty()}, false)); // Вызываем функцию ms_panic с сообщением и номером строки
+    fatal->setDoesNotReturn(); // Указываем, что функция не возвращает управление
+    Builder.CreateCall(fatal, {message, line}); // Вызываем функцию ms_panic с сообщением и номером строки
+    Builder.CreateUnreachable(); // Указываем, что этот блок кода недостижим после вызова ms_panic
 }
 
+// Проверяем, произошла ли паника, и если да, обрабатываем её
 void CodeGenContext::checkPanic() {
-    auto function = Builder.GetInsertBlock()->getParent();
-    auto fail = llvm::BasicBlock::Create(TheContext, "panic.propagate", function);
-    auto ok = llvm::BasicBlock::Create(TheContext, "panic.clear", function);
-    auto flag = Builder.CreateLoad(Builder.getInt8Ty(), Builder.CreateStructGEP(getPanicStruct(), PanicContext, 0));
-    Builder.CreateCondBr(Builder.CreateICmpNE(flag, Builder.getInt8(0)), fail, ok);
+    auto function = Builder.GetInsertBlock()->getParent(); // Получаем текущую функцию
+    auto fail = llvm::BasicBlock::Create(TheContext, "panic.propagate", function); // Блок для обработки паники
+    auto ok = llvm::BasicBlock::Create(TheContext, "panic.clear", function); // Блок для продолжения выполнения, если паники нет
+    auto flag = Builder.CreateLoad(Builder.getInt8Ty(), Builder.CreateStructGEP(getPanicStruct(), PanicContext, 0)); // Загружаем флаг паники
+    Builder.CreateCondBr(Builder.CreateICmpNE(flag, Builder.getInt8(0)), fail, ok); // Если флаг не равен 0, переходим в блок fail, иначе в ok
     Builder.SetInsertPoint(fail);
-    auto lineSlot = Builder.CreateStructGEP(getPanicStruct(), PanicContext, 1);
-    auto line = Builder.CreateLoad(Builder.getInt32Ty(), lineSlot);
+    auto lineSlot = Builder.CreateStructGEP(getPanicStruct(), PanicContext, 1); // Получаем указатель на поле с номером строки
+    auto line = Builder.CreateLoad(Builder.getInt32Ty(), lineSlot); // Загружаем номер строки
     Builder.CreateStore(Builder.CreateSelect(Builder.CreateICmpEQ(line, Builder.getInt32(0)),
-        Builder.getInt32(ErrorEngine::getInstance().displayLine(CurrentLine)), line), lineSlot);
+        Builder.getInt32(ErrorEngine::getInstance().displayLine(CurrentLine)), line), lineSlot); // Если номер строки равен 0, подставляем текущую строку, иначе оставляем как есть
     propagatePanic();
-    Builder.SetInsertPoint(ok);
+    Builder.SetInsertPoint(ok); // Продолажаем читать программу в блоке ok, если паники нетx`
 }
 
-
+// 
 llvm::Value* CodeGenContext::emitCall(llvm::Function* function, std::vector<llvm::Value*> arguments, const std::string& name) {
-    const bool checked = function->hasFnAttribute("ms.panic_context");
-    if (checked) arguments.push_back(PanicContext);
-    auto value = Builder.CreateCall(function, arguments, function->getReturnType()->isVoidTy() ? "" : name);
-    if (checked) checkPanic();
+    const bool checked = function->hasFnAttribute("ms.panic_context"); // Если в функции есть ms.panic_context {bool pending, int line, char* message, ptr stackLimit}
+    if (checked) arguments.push_back(PanicContext); // То добавляем контекст паники в аргументы функции
+    auto value = Builder.CreateCall(function, arguments, function->getReturnType()->isVoidTy() ? "" : name); // Зовём функцию с аргументами
+    if (checked) checkPanic(); // Если функция использует контекст паники, проверяем его после вызова функции
     return value;
 }
 

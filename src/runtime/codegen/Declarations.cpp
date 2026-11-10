@@ -22,16 +22,18 @@ namespace Declarations
         ASTGen codeGen(context);
 
         if (hasNoValue(node)) {
-            llvm::AllocaInst* variable = context.createEntryAlloca(varType, node.name);
-            context.NamedValues[node.name] = variable;
-            context.Builder.CreateStore(emitDefaultValue(context, node, varType), variable);
-            return variable;
+            llvm::AllocaInst* variable = context.createEntryAlloca(varType, node.name); // Создаем alloca для переменной в текущем блоке
+            context.NamedValues[node.name] = variable; // Сохраняем alloca в таблице символов
+            context.Builder.CreateStore(emitDefaultValue(context, node, varType), variable); // Инициализируем переменную с дефолтным значением
+            return variable; // Возвращаем alloca переменной
         }
 
         // Генерируем код для выражения
         node.expression->accept(codeGen);
         llvm::Value* value = codeGen.getResult();
 
+
+        // 
         std::shared_ptr<TypeNode> typeNode;
         if (node.expression->inferredType)
             typeNode = node.expression->inferredType;
