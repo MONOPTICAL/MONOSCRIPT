@@ -306,8 +306,14 @@ llvm::Constant* CodeGenContext::createString(const std::string& text, const std:
     // Первым делом проверяю, что строка не содержит NUL-байт, потому что она может сломать некоторын функции как strlen, strcmp и т.д
     if (text.find('\0') != std::string::npos)
         throw std::runtime_error("Strings cannot contain a NUL byte");
+
+    if (auto it = stringCache.find(text); it != stringCache.end())
+        return it->second;
+
     // Создаю LLVM-константу для строки, которая хранит длину и данные строки в формате C ABI
     auto bytes = llvm::ConstantDataArray::getString(TheContext, text, true);
+
+
     // Создаю анонимную структуру, которая содержит длину строки и массив байтов с её содержимым
     auto value = llvm::ConstantStruct::getAnon({Builder.getInt64(text.size()), bytes});
     // ┌──────────────┬───┬───┬───┬───┬────┐  
@@ -316,13 +322,21 @@ llvm::Constant* CodeGenContext::createString(const std::string& text, const std:
     
     // Любая строка это глобальная констанат, чтобы её можно было юзать безопастно
     // @str = private constant { i64, [15 x i8] } { i64 14, [15 x i8] c"stack overflow\00" }, align 8
+
     auto global = new llvm::GlobalVariable(*TheModule, value->getType(), true,
         llvm::GlobalValue::PrivateLinkage, value, name);
 
     // Выравнивание глобальной переменной на 8 байт, чтобы C ABI не быковал
     global->setAlignment(llvm::Align(8));
 
-    // Получаю указатель на массив байтов внутри структуры, чтобы его можно было использовать как C-строку
+    // Устанавливаю unnamed_addr, чтобы LLVM мог оптимизировать одинаковые строки
+    global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+
     llvm::Constant* indices[] = {Builder.getInt32(0), Builder.getInt32(1), Builder.getInt32(0)};
-    return llvm::ConstantExpr::getInBoundsGetElementPtr(value->getType(), global, indices);
+    auto ptr = llvm::ConstantExpr::getInBoundsGetElementPtr(value->getType(), global, indices);
+
+    stringCache.emplace(text, ptr);
+
+    // Получаю указатель на массив байтов внутри структуры, чтобы его можно было использовать как C-строку
+    return ptr;
 }
