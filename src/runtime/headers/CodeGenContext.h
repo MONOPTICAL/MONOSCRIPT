@@ -34,6 +34,7 @@ public:
     llvm::IRBuilder<>                   Builder; // IRBuilder - это класс, который помогает создавать IR-код
     std::unique_ptr<llvm::Module>       TheModule; // Модуль - это контейнер для IR-кода
     std::map<std::string, llvm::Value*> NamedValues; // Простая таблица символов для переменных/параметров
+    std::unordered_map<std::string, llvm::Constant*> stringCache;
 
     llvm::Function*                     StartFunction = nullptr; // Точка входа программы: инициализирует рантайм и глобальные переменные
     std::shared_ptr<TypeNode>           CurrentReturnType; // Что возвращает функция, которая генерируется сейчас
