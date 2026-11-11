@@ -1,6 +1,30 @@
 #include "headers/CodeGenContext.h"
 #include "../errors/headers/ErrorEngine.h"
 #include <iostream>
+#include <cstdlib>
+#include <llvm/MC/TargetRegistry.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/TargetParser/Host.h>
+#include <llvm/TargetParser/Triple.h>
+
+llvm::TargetMachine& CodeGenContext::targetMachine() {
+    static std::unique_ptr<llvm::TargetMachine> machine = [] {
+        llvm::InitializeNativeTarget();
+        llvm::InitializeNativeTargetAsmPrinter();
+        llvm::InitializeNativeTargetAsmParser();
+
+        const llvm::Triple triple(llvm::sys::getDefaultTargetTriple());
+        std::string error;
+        const llvm::Target* target = llvm::TargetRegistry::lookupTarget(triple, error);
+        if (!target) {
+            std::cerr << "No LLVM target for " << triple.str() << ": " << error << std::endl;
+            std::exit(1);
+        }
+        return std::unique_ptr<llvm::TargetMachine>(target->createTargetMachine(
+            triple, "generic", "", llvm::TargetOptions(), llvm::Reloc::PIC_));
+    }();
+    return *machine;
+}
 
 // Получает или объявляет функцию в модуле, если она ещё не существует
 llvm::Function* CodeGenContext::getOrDeclareFunction(const std::string& name, llvm::FunctionType* type) {
@@ -106,20 +130,23 @@ llvm::Value* CodeGenContext::createArray(llvm::Type* elementType, llvm::Value* s
                                                       // array = {ptr, i32, i32} - data, length, capacity
     const llvm::DataLayout& layout = TheModule->getDataLayout();
     // Это справочник для llvm как ложаться типы в памяти, о их размерах и выравнивании
-    // Он его подбирает под архитектуру и ABI платформы на которой запущен компилятор так что тут н3хуй надумывать особо
+    // Сам он не подбирается: его ставит конструктор CodeGenContext из targetMachine()
 
     // В заголовке лежит ссылка на {ptr, i32, i32} - data, length, capacity
     llvm::Value* header = allocateObject(Builder.getInt64(layout.getTypeAllocSize(arrayStruct)), true, "array");
-    // TODO: layout не подстраивается под систему, а просто ебашит дефотлный x86-64, нужно учитывать архитектуру целевой платформы
 
-    llvm::Value* bytes = Builder.CreateMul( // А вот тута мы вычисляем сколько байтов надо для data основываясь на size
-        Builder.CreateZExt(size, Builder.getInt64Ty()), // 3башим размер в 64-битное целое чтобы умножать его на кличество элементов
-        Builder.getInt64(layout.getTypeAllocSize(elementType)), // Получаем размер одного элемента в байтах
-        "array_bytes" // Имя для temp в котором будет храниться количество байтов для data
-    );
-    llvm::Value* data = allocateObject(bytes, elementType->isPointerTy(), "array_data"); // аллоцируем память для data массива
-                                                                                         // bytes - количество байтов для data массива
-                                                                                         // elementType->isPointerTy() - говорит, содержит ли элемент указатель, чтобы GC мог правильно обрабатывать память
+    llvm::Value* data;
+    auto* constSize = llvm::dyn_cast<llvm::ConstantInt>(size);
+    if (constSize && constSize->isZero()) {
+        // Если размер массива равен нулю, то и нехуй выделять память для data
+        data = llvm::ConstantPointerNull::get(llvm::PointerType::get(TheContext, 0));
+    } else {
+        llvm::Value* bytes = Builder.CreateMul(
+            Builder.CreateZExt(size, Builder.getInt64Ty()),
+            Builder.getInt64(layout.getTypeAllocSize(elementType)), "array_bytes");
+        data = allocateObject(bytes, elementType->isPointerTy(), "array_data");
+    }
+                                                                        // elementType->isPointerTy() - говорит, содержит ли элемент указатель, чтобы GC мог правильно обрабатывать память
                                                                                          // "array_data" - имя для temp в котором будет храниться указатель на data массива
     Builder.CreateStore(data, Builder.CreateStructGEP(arrayStruct, header, 0)); // Сохраняем указатель на data в структуре массива
     Builder.CreateStore(size, Builder.CreateStructGEP(arrayStruct, header, 1)); // Сохраняем длину массива

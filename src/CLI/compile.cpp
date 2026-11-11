@@ -94,7 +94,7 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath) {
     return true;
 }
 
-bool compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::string& outputFile) {
+bool compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::string& outputFile, bool offOptimization) {
     CodeGenContext context(outputFile);
     ASTGen codeGen(context);
     ui::stage("Code generation: building LLVM IR");
@@ -106,9 +106,11 @@ bool compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::st
         context.TheModule->print(llvm::outs(), nullptr);
         std::cerr << "--- END LLVM IR ---\n" << std::endl;
 #endif
-        {
+        // Без оптимизаций тесты ловят то, что O2 случайно маскирует: так прятался баг с раскладкой структур
+        if (offOptimization) ui::stage("Optimizer: skipped");
+        else {
             ui::stage("Optimizer: running LLVM O2 passes");
-            llvm::PassBuilder passBuilder;
+            llvm::PassBuilder passBuilder(&CodeGenContext::targetMachine()); // без машины цели O2 не знает стоимость инструкций и почти не векторизует
             llvm::LoopAnalysisManager LAM;
             llvm::FunctionAnalysisManager FAM;
             llvm::CGSCCAnalysisManager CGAM;

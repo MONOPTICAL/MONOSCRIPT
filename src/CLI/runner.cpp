@@ -58,7 +58,7 @@ int executeModule(std::unique_ptr<llvm::Module> module, std::unique_ptr<llvm::LL
     ui::stage(offOptimization ? "Optimizer: skipped" : "Optimizer: running LLVM O2 passes");
     if(!offOptimization)
     {
-        llvm::PassBuilder passBuilder;
+        llvm::PassBuilder passBuilder(&CodeGenContext::targetMachine()); // без машины цели O2 не знает стоимость инструкций и почти не векторизует
         llvm::LoopAnalysisManager LAM;
         llvm::FunctionAnalysisManager FAM;
         llvm::CGSCCAnalysisManager CGAM;

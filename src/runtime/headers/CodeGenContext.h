@@ -8,6 +8,7 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/Target/TargetMachine.h>
 #include <map>
 #include <string>
 #include <vector>
@@ -136,7 +137,16 @@ public:
         : OwnedContext(externalContext ? nullptr : std::make_unique<llvm::LLVMContext>()),
           TheContext(externalContext ? *externalContext : *OwnedContext), Builder(TheContext) {
         TheModule = std::make_unique<llvm::Module>(moduleName, TheContext); // Создаем новый модуль
+        // Раскладку нужно поставить до первого getTypeAllocSize: пустая строка в модуле —
+        // это не "раскладка текущей машины", а встроенная по умолчанию (i64 выровнен по 4)
+        TheModule->setTargetTriple(targetMachine().getTargetTriple());
+        TheModule->setDataLayout(targetMachine().createDataLayout());
     }
+
+    // Одна машина цели на весь процесс: по ней считаются размеры типов в кодгене,
+    // её же получает оптимизатор (стоимость инструкций, векторизация) и llc через triple в модуле.
+    // CPU обобщённый, как у gcc/clang по умолчанию, чтобы собранный файл запускался не только здесь
+    static llvm::TargetMachine&         targetMachine();
 };
 
 #endif // CODEGENCONTEXT_H
