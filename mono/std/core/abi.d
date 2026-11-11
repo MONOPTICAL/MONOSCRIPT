@@ -57,7 +57,8 @@ MsArray* newArray(size_t elementSize, int length, bool hasReferences) nothrow @n
 {
     auto array = cast(MsArray*) GC_malloc(MsArray.sizeof);
     const size_t bytes = elementSize * length;
-    array.data = hasReferences ? GC_malloc(bytes) : GC_malloc_atomic(bytes);
+    array.data = bytes == 0 ? null
+               : hasReferences ? GC_malloc(bytes) : GC_malloc_atomic(bytes);
     array.length = length;
     array.capacity = length;
     return array;

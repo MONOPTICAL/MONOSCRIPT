@@ -12,6 +12,7 @@ extern(C) nothrow @nogc
     void GC_init();
     void GC_gcollect();
     void GC_set_oom_fn(GC_oom_func);
+    void GC_set_free_space_divisor(size_t divisor);
 }
 
 // Код выхода при ошибке выполнения: программа может сама вернуть 1, с ним не спутать
@@ -117,7 +118,25 @@ extern(C) void ms_rt_init() nothrow @nogc
     GC_init(); // Иницилизирую гарбидж спортика 
     GC_set_oom_fn(&ms_out_of_memory); // Когда пизда памяти то вызывается ms_out_of_memory
                                       // Который в свою очередь просто паникует и возвращает null
+    tuneHeap();
 }
+
+// Boehm по умолчанию собирает, как только выделено больше трети кучи (делитель 3).
+// Программы, которые плодят много короткоживущих объектов при большом живом наборе,
+// тогда по сто раз заново размечают одни и те же живые данные: bintree делал 131 сборку.
+// Делитель 1 — сборка, когда выделено столько же, сколько вся куча, примерно как GOGC=100 в Go.
+// Стартовую кучу не раздуваем: на маленьком живом наборе большая куча только хуже,
+// аллокации уходят из кэша и RSS растёт у всех программ (замер: strings 3M -> 72M RSS)
+private void tuneHeap() nothrow @nogc
+{
+    import core.stdc.stdlib : getenv;
+
+    // Переменную окружения Boehm сам читает в GC_init, если её задали, не перебиваем
+    if (getenv("GC_FREE_SPACE_DIVISOR") is null)
+        GC_set_free_space_divisor(FREE_SPACE_DIVISOR);
+}
+
+enum size_t FREE_SPACE_DIVISOR = 1;
 
 private extern(C) nothrow @nogc
 {
