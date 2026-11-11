@@ -394,10 +394,10 @@ void TypeSymbolVisitor::checkConversion(const std::shared_ptr<ASTNode>& node, co
         auto cast = node->implicitCastTo;
         auto inferred = node->inferredType;
 
-        // если выражение float, операнды приводятся к его типу (f64)
-        // потому что тогда выходит такой пиздец; 2.0/3.0 * 1000.0 = 0
-        std::string operandType = cast->toString() == "i1" ? sourceType : cast->toString();
-        if (inferred && isFloatType(inferred->toString())) operandType = inferred->toString();
+        std::string operandType = resolveExprType(bin->left);
+        const std::string rightOperandType = resolveExprType(bin->right);
+        if (getTypeRank(rightOperandType) > getTypeRank(operandType)) operandType = rightOperandType; // Выбираем более широкий тип из операндов
+        if (operandType.empty()) operandType = cast->toString(); // одни литералы (1 + 1)->i8 считаем всё сразу в i8
 
         castAllNumbersToType(bin->left, operandType);
         castAllNumbersToType(bin->right, operandType);
