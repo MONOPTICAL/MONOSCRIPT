@@ -8,3 +8,5 @@ ms
 !/tests/**/*.ms
 !/mono/std/**/*.ms
 /msTests
+# Локальные бенчмарки (не коммитятся)
+/bench/

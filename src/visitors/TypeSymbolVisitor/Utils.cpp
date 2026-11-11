@@ -393,8 +393,14 @@ void TypeSymbolVisitor::checkConversion(const std::shared_ptr<ASTNode>& node, co
     if (node->implicitCastTo && bin && !(bin->op == "and" || bin->op == "or")) {
         auto cast = node->implicitCastTo;
         auto inferred = node->inferredType;
-        castAllNumbersToType(bin->left, cast->toString() == "i1" ? sourceType : cast->toString());
-        castAllNumbersToType(bin->right, cast->toString() == "i1" ? sourceType : cast->toString());
+
+        // если выражение float, операнды приводятся к его типу (f64)
+        // потому что тогда выходит такой пиздец; 2.0/3.0 * 1000.0 = 0
+        std::string operandType = cast->toString() == "i1" ? sourceType : cast->toString();
+        if (inferred && isFloatType(inferred->toString())) operandType = inferred->toString();
+
+        castAllNumbersToType(bin->left, operandType);
+        castAllNumbersToType(bin->right, operandType);
         node->inferredType = inferred;
         return;
     }

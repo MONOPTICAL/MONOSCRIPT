@@ -316,6 +316,7 @@ void TypeSymbolVisitor::visit(ProgramNode &node)
 
     // Кодгену копии шаблонов нужны как обычные функции
     node.body.insert(node.body.end(), genericInstances.begin(), genericInstances.end());
+    node.body.insert(node.body.begin(), hoistedStructs.begin(), hoistedStructs.end());
 }
 
 void TypeSymbolVisitor::visit(FunctionNode &node)
@@ -413,7 +414,10 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
         .returnType = node.returnType,          // Тип возвращаемого значения
         .returnedValue = false                  // Возвращаемое значение
     };
+    const std::string& parent = contexts.back().scopePath;
+    currentFunction.scopePath = parent.empty() ? visibleName : parent + "." + visibleName;
 
+    std::cout << "Current scope path: " << currentFunction.scopePath << std::endl;
     // Добавляем параметры функции в текущий контекст
     for (const auto& param : args) {
         auto varNode = std::make_shared<VariableAssignNode>(
@@ -493,6 +497,8 @@ void TypeSymbolVisitor::visit(BlockNode &node)
                 LogError("The result is not used: check it, or write _ ^= ... to ignore it on purpose", statement);
         }
     }
+    std::erase_if(node.statements, [](auto& s) { return std::dynamic_pointer_cast<StructNode>(s) != nullptr; });
+
 }
 
 static std::string getType(std::shared_ptr<ASTNode> expression, std::string type) {
@@ -1006,6 +1012,10 @@ void TypeSymbolVisitor::visit(CallNode& node) {
         auto visible = scope->second.find(node.callee);
         if (visible != scope->second.end())
             node.callee = visible->second->name;
+    }
+
+    if (contexts.back().structsFullName.count(node.callee)) {
+        node.callee = contexts.back().structsFullName[node.callee];
     }
 
     // copy(x): поверхностная копия объекта. Функция с таким же именем важнее

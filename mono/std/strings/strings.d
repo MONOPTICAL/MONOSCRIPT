@@ -10,16 +10,22 @@ import mono.std.core.abi : newString, stringFromBytes, MsResult, resultOk, resul
 
 extern(C) char* scat(const char* a, const char* b, MsPanicContext* panic) nothrow @nogc
 {
-    import core.stdc.string : strlen, strcpy, strcat;
+    import core.stdc.string : memcpy;
+    import mono.std.core.rt : ms_str_len;
 
-    size_t len_a = strlen(a);
-    size_t len_b = strlen(b);
+    // Берём из метаданных длину строки
+    // {i64 len, [len x i8] data}
+    //           a здесь указывает на data внутри структуры, а не на начало структуры
+
+    // потому что мы получаем ссылку на data то нам надо передвинуть указатель на 8 байт назад
+    size_t len_a = ms_str_len(a);
+    size_t len_b = ms_str_len(b);
 
     char* result = newString(len_a + len_b, panic);
     if (result is null) return null;
 
-    strcpy(result, a);
-    strcat(result, b);
+    memcpy(result, a, len_a);
+    memcpy(result + len_a, b, len_b);
 
     return result;
 }

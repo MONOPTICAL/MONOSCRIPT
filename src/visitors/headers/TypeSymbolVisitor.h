@@ -15,6 +15,8 @@ struct Context {
     std::vector<std::string> labels;
     std::unordered_map<std::string, std::shared_ptr<ASTNode>> variables;
     std::unordered_map<std::string, std::shared_ptr<ASTNode>> functions;
+    std::unordered_map<std::string, std::string> structsFullName; // Полное имя структуры по её локальному имени
+    std::string scopePath; // Путь области видимости, например "h" для h::local1
     std::string currentFunctionName;
     std::shared_ptr<TypeNode> returnType;
     int resultHandlerDepth = 0;
@@ -39,6 +41,8 @@ private:
     std::unique_ptr<ErrorEngine>                                    errorEngine;
 
     std::vector<Context>                                            contexts;
+    std::vector<std::shared_ptr<ASTNode>>                           hoistedStructs;
+
     bool                                                            lastAccessResultField = false; // r.value и прочие поля result только для чтения
     bool                                                            checkResultLiteral(const std::shared_ptr<ASTNode>& node, const std::string& targetType);
     // Копии шаблонов: добавляются в программу после обхода, из какого модуля шаблон

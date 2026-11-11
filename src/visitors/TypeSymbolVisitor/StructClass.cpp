@@ -51,9 +51,18 @@ void TypeSymbolVisitor::visit(StructNode& node) {
         .returnType = nullptr
     };
 
+    std::string path = contexts.back().scopePath;
+    std::string fullName = !path.empty() ? path + "." + node.name : node.name;
+    if (contexts.back().structsFullName.count(node.name)) LogError("Struct already defined: " + node.name);
+
+    contexts.back().structsFullName.emplace(node.name, fullName);
+    node.name = fullName;
+
+    std::cout << "Processing struct: " << fullName << std::endl;
+    std::cout << "Current context: " << contexts.back().currentFunctionName << std::endl;
     contexts.push_back(structContext);
 
-    registry.addStruct(node.name, std::make_shared<StructNode>(node.name, node.body));
+    registry.addStruct(fullName, std::make_shared<StructNode>(node.name, node.body));
 
     // Обрабатываем тело структуры
     if (auto blockNode = std::dynamic_pointer_cast<BlockNode>(node.body)) {
@@ -94,4 +103,6 @@ void TypeSymbolVisitor::visit(StructNode& node) {
 #endif
     // Возвращаемся к предыдущему контексту
     contexts.pop_back();
+
+    if (contexts.size() > 1) hoistedStructs.push_back(node.shared_from_this());
 }
