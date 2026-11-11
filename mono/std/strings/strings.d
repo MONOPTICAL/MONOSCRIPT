@@ -314,6 +314,8 @@ extern(C) char* toString_float(const float a, MsPanicContext* panic) nothrow @no
     import core.stdc.stdlib : strtof;
     import core.stdc.string : strlen, strcpy, strpbrk;
 
+    if (a != a) return stringFromCString("nan", panic);
+
     // Самая короткая запись, которая читается обратно в то же число, как у toString_f64
     char[40] buffer;
     foreach (precision; 6 .. 10)
@@ -343,6 +345,8 @@ extern(C) char* toString_f64(const double a, MsPanicContext* panic) nothrow @nog
     import core.stdc.stdio : snprintf;
     import core.stdc.stdlib : strtod;
     import core.stdc.string : strlen, strcpy, strpbrk;
+
+    if (a != a) return stringFromCString("nan", panic);
 
     char[40] buffer;
     foreach (precision; 15 .. 18)
