@@ -20,13 +20,18 @@ void Lexer::tokenize()
         {
             currentIndex++;
             if (this->isInMultilineComment)
-                if(y!='*' && peek(0)!='/')
+                if(y!='*' || peek(1)!='/') // Комментарий закрывает только пара */
                     continue;
                 else
                     this->isInMultilineComment=false;
             else if (isStringnotFinished)
             {
-                if (y == '"' && currentTokenValue[currentTokenValue.size()-1] != '\\')
+                // Кавычка экранирована, только если перед ней нечётное число обратных слешей
+                size_t backslashes = 0;
+                while (backslashes < currentTokenValue.size() && currentTokenValue[currentTokenValue.size()-1-backslashes] == '\\')
+                    backslashes++;
+
+                if (y == '"' && backslashes % 2 == 0)
                 {
                     currentTokenValue += y;
                     isStringnotFinished = false;
@@ -36,6 +41,34 @@ void Lexer::tokenize()
                 }
                 else
                     currentTokenValue += y;
+                continue;
+            }
+            else if (isCharNotFinished)
+            {
+                // Как у строк: кавычка экранирована, только если перед ней нечётное число обратных слешей
+                size_t backslashes = 0;
+                while (backslashes < currentTokenValue.size() && currentTokenValue[currentTokenValue.size()-1-backslashes] == '\\')
+                    backslashes++;
+
+                currentTokenValue += y;
+                if (y == '\'' && backslashes % 2 == 0)
+                {
+                    isCharNotFinished = false;
+                    addToken(TokenType::Char, currentTokenValue);
+                    resetValues();
+                }
+                continue;
+            }
+            else if (y == '\'' && currentTokenType != TokenType::String)
+            {
+                if (currentTokenValue != "")
+                {
+                    TokenType keyword = IsKeyword(currentTokenValue);
+                    keyword == TokenType::Identifier ? addToken(currentTokenType, currentTokenValue) : addToken(keyword, currentTokenValue);
+                    resetValues();
+                }
+                currentTokenValue = "'";
+                isCharNotFinished = true;
                 continue;
             }
 
@@ -65,7 +98,7 @@ void Lexer::tokenize()
                     currentIndex++;
                     continue;
                 }
-                if(peekChar.has_value() && IdentifyTokenType(peekChar.value())!=TokenType::Identifier)
+                if(peekChar.has_value() && IdentifyTokenType(peekChar.value())!=TokenType::Identifier && IdentifyTokenType(peekChar.value())!=TokenType::Number)
                 {
                     addToken(keywordCheck, currentTokenValue);
                     resetValues();
@@ -141,7 +174,7 @@ void Lexer::tokenize()
                 /*
                 TODO: Проверь що всё намана ёпт
                 */
-                if ( y == '>' && currentTokens.back().type == TokenType::Pipe )
+                if ( y == '>' && !currentTokens.empty() && currentTokens.back().type == TokenType::Pipe )
                 {
                     currentTokenValue = "|>";
                     currentTokens.pop_back();
@@ -160,7 +193,20 @@ void Lexer::tokenize()
 
                 // Просто скипает */
                 if (currentTokenValue == "*/"){resetValues();continue;}
-                
+
+                // Склеиваем только настоящие пары, иначе x=-1 станет оператором =-
+                static const std::vector<std::string> operatorPairs = {
+                    "==", "!=", "<=", ">=", "^=", "**", "//", "/*", "->", ">>"
+                };
+                if (std::find(operatorPairs.begin(), operatorPairs.end(), currentTokenValue) == operatorPairs.end())
+                {
+                    currentIndex--;
+                    addToken(currentTokenType, currentTokenValue.substr(0, 1));
+                    currentIndex++;
+                    currentTokenValue = y;
+                    continue;
+                }
+
                 if (currentTokenValue != "//" && currentTokenValue != "/*" && currentTokenValue != "->" && currentTokenValue != ">>")
                 {
                     addToken(currentTokenType, currentTokenValue); // Add the token to the current line
@@ -219,6 +265,8 @@ void Lexer::tokenize()
             addToken(currentTokenType, currentTokenValue); // Add the token to the current line
             resetValues();
         }
+        if (isCharNotFinished)
+            throw std::runtime_error("Lexer Error: char literal is not closed: " + currentTokenValue);
         if(currentTokenType != TokenType::None)
             if (currentTokenType == TokenType::Identifier)
                 addToken(IsKeyword(currentTokenValue), currentTokenValue); // Add the token to the current line
@@ -313,6 +361,7 @@ TokenType Lexer::IsKeyword(const std::string &value) const
         "and", // Logical AND
         "or", // Logical OR
         "else",  // Else statement
+        "attempt", "panic",
         "while",  // While loop
         "for",  // For loop
         "return", // Return statement
@@ -334,7 +383,7 @@ TokenType Lexer::IsKeyword(const std::string &value) const
     }; 
 
     std::vector<std::string> builtinTypes = {
-        "i1", "i8", "i16","i32", "i64", "string", "void", "array", "map", "float", "struct", "func"
+        "i1", "i8", "i16","i32", "i64", "string", "void", "array", "map", "float", "f64", "char", "struct", "func"
     };
 
     std::vector<std::string> labels = {
@@ -344,7 +393,7 @@ TokenType Lexer::IsKeyword(const std::string &value) const
         "@public",
         "@private",
         "@test",
-        "@decl"
+        "@overwrite"
     };
 
     std::string trimmedValue = ParsingFunctions::trim(value);

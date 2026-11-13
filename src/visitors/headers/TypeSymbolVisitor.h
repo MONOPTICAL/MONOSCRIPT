@@ -1,10 +1,12 @@
 #ifndef SYMANTICVISITOR_H
 #define SYMANTICVISITOR_H
 
+#include <set>
+#include <map>
 #include "../../parser/headers/AST.h"
 #include "../../errors/headers/ErrorEngine.h"
 #include "../../loader/headers/loader.h"
-#include "../../includes/icecream.hpp"
+#include "../../includes/ic.hpp"
 #include "Register.h"
 #include "BuiltIn.h"
 #include <fstream>
@@ -13,10 +15,25 @@ struct Context {
     std::vector<std::string> labels;
     std::unordered_map<std::string, std::shared_ptr<ASTNode>> variables;
     std::unordered_map<std::string, std::shared_ptr<ASTNode>> functions;
+    std::unordered_map<std::string, std::string> structsFullName; // Полное имя структуры по её локальному имени
+    std::string scopePath; // Путь области видимости, например "h" для h::local1
     std::string currentFunctionName;
     std::shared_ptr<TypeNode> returnType;
+    int resultHandlerDepth = 0;
     bool returnedValue = false;
 };
+
+// Локальная функция видна под своим именем, а её настоящее имя другое (h::local1)
+inline std::shared_ptr<FunctionNode> findLocalFunction(const Context& context, const std::string& name) {
+    auto found = context.functions.find(name);
+    if (found == context.functions.end()) return nullptr;
+    auto function = std::dynamic_pointer_cast<FunctionNode>(found->second);
+    return function && function->name != name ? function : nullptr;
+}
+
+inline bool isFloatType(const std::string& type) {
+    return type == "float" || type == "f64";
+}
 
 class TypeSymbolVisitor : public ASTNodeVisitor {
 
@@ -24,6 +41,29 @@ private:
     std::unique_ptr<ErrorEngine>                                    errorEngine;
 
     std::vector<Context>                                            contexts;
+    std::vector<std::shared_ptr<ASTNode>>                           hoistedStructs;
+
+    bool                                                            lastAccessResultField = false; // r.value и прочие поля result только для чтения
+    bool                                                            checkResultLiteral(const std::shared_ptr<ASTNode>& node, const std::string& targetType);
+    // Копии шаблонов: добавляются в программу после обхода, из какого модуля шаблон
+    std::vector<std::shared_ptr<ASTNode>>                           genericInstances;
+    std::map<std::string, std::string>                              genericModules;
+    std::string                                                     instantiateGeneric(const std::shared_ptr<FunctionNode>& generic, CallNode& call,
+                                                                        const std::vector<std::shared_ptr<TypeNode>>& argTypes);
+    bool                                                            lastAccessIndexedString = false; // Последнее звено цепочки это s[i]: писать туда нельзя
+    void                                                            checkCharCast(ASTNode& node);
+    bool                                                            insideMethod = false;
+    void                                                            checkCallArguments(std::vector<std::shared_ptr<ASTNode>>& arguments,
+                                                                        const std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>>& parameters,
+                                                                        size_t firstParameter, const std::string& name);
+    // final без значения: присвоена точно, присвоена хотя бы на одном пути, и в каком цикле объявлена
+    std::set<const ASTNode*>                                        assignedFinals;
+    std::set<const ASTNode*>                                        maybeAssignedFinals;
+    std::map<const ASTNode*, int>                                   finalLoopDepth;
+    // Узлы живут до конца проверки: иначе адрес освобождённого занял бы новый узел и выглядел бы уже присвоенным
+    std::vector<std::shared_ptr<ASTNode>>                           deferredFinals;
+    int                                                             loopDepth = 0;
+    void                                                            checkFinalAssigned(const std::shared_ptr<ASTNode>& variable, const std::string& name, const std::shared_ptr<ASTNode>& usage);
 
     std::vector<std::string>                                        types;
 
@@ -32,6 +72,18 @@ private:
     std::shared_ptr<ProgramNode>                                    program; // Только для отладки
 
     std::string                                                     currentModuleName;
+
+    // Все функции верхнего уровня по внутреннему имени, собранные до проверки тел
+    std::unordered_map<std::string, std::shared_ptr<ASTNode>>       declaredFunctions;
+
+    // Что видно каждому модулю: имя в коде -> функция. Свои функции плюс импортированные
+    std::unordered_map<std::string,
+        std::unordered_map<std::string, std::shared_ptr<FunctionNode>>> moduleScopes;
+
+    void                                                            collectDeclarations(ProgramNode& node);
+
+    // В @pure нельзя завести новую ссылку на объект, который передали снаружи
+    void                                                            checkPureAlias(const std::shared_ptr<ASTNode>& expr);
 
     /*
     Проверяет, существует ли переменная в реестре(если переданный node является идентификатором)
@@ -93,6 +145,16 @@ private:
                                                                             const std::shared_ptr<ASTNode>& node, 
                                                                             const std::string& targetType, 
                                                                             TypeSymbolVisitor* visitor);
+
+    // Настоящий тип выражения; пустая строка - выражение только из литералов
+    std::string                                                     resolveExprType(
+                                                                            const std::shared_ptr<ASTNode>& node);
+
+    // Единые правила приведения: ставит нужные касты или выдаёт ошибку
+    void                                                            checkConversion(
+                                                                            const std::shared_ptr<ASTNode>& node,
+                                                                            const std::string& targetType,
+                                                                            const std::string& errorPrefix = "");
 
     bool                                                            checkLabels(
                                                                             const std::string& label);
@@ -157,6 +219,7 @@ public:
     void                                                            visit(ReassignMemberNode& node) override;
     void                                                            visit(VariableReassignNode& node) override;
     void                                                            visit(IfNode& node) override;
+    void visit(AttemptNode& node) override;
     void                                                            visit(ForNode& node) override;
     void                                                            visit(WhileNode& node) override;
     void                                                            visit(ReturnNode& node) override;

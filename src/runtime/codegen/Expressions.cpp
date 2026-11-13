@@ -10,6 +10,41 @@
 #include <string>
 #include <vector>
 
+// Целочисленное деление на ноль останавливает программу с понятным сообщением
+static void emitDivisionByZeroCheck(CodeGenContext& context, llvm::Value* divisor, int line) {
+    llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
+    llvm::BasicBlock* errorBlock = llvm::BasicBlock::Create(context.TheContext, "div.zero", function);
+    llvm::BasicBlock* okBlock = llvm::BasicBlock::Create(context.TheContext, "div.ok", function);
+
+    llvm::Value* isZero = context.Builder.CreateICmpEQ(
+        divisor, llvm::ConstantInt::get(divisor->getType(), 0), "is_zero_check"
+    );
+    context.Builder.CreateCondBr(isZero, errorBlock, okBlock);
+
+    context.Builder.SetInsertPoint(errorBlock);
+    context.emitPanic("division by zero", line);
+
+    context.Builder.SetInsertPoint(okBlock);
+}
+
+// Самое маленькое число, делённое на -1, не помещается в свой тип, а для LLVM это неопределённое поведение
+static void emitDivisionOverflowCheck(CodeGenContext& context, llvm::Value* dividend, llvm::Value* divisor, int line) {
+    auto* type = llvm::cast<llvm::IntegerType>(dividend->getType());
+
+    llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
+    llvm::BasicBlock* errorBlock = llvm::BasicBlock::Create(context.TheContext, "div.overflow", function);
+    llvm::BasicBlock* okBlock = llvm::BasicBlock::Create(context.TheContext, "div.safe", function);
+
+    llvm::Value* isMin = context.Builder.CreateICmpEQ(dividend, llvm::ConstantInt::get(type, llvm::APInt::getSignedMinValue(type->getBitWidth())));
+    llvm::Value* isMinusOne = context.Builder.CreateICmpEQ(divisor, llvm::ConstantInt::getSigned(type, -1));
+    context.Builder.CreateCondBr(context.Builder.CreateAnd(isMin, isMinusOne), errorBlock, okBlock);
+
+    context.Builder.SetInsertPoint(errorBlock);
+    context.emitPanic("integer overflow", line);
+
+    context.Builder.SetInsertPoint(okBlock);
+}
+
 llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryOpNode& node, llvm::Value* left, llvm::Value* right) {
     left = TypeConversions::loadValueIfPointer(context, left, "left");
     right = TypeConversions::loadValueIfPointer(context, right, "right");
@@ -31,24 +66,22 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
         right = TypeConversions::applyImplicitCast(context, right, node.right->implicitCastTo, "right");
     }
     
+    // Семантика приводит не всё: элемент массива или вызов могут прийти с другим типом.
+    // Через convertValueToType, чтобы i1 расширялся как 0 или 1
     if (left->getType() != right->getType()) {
         if (left->getType()->isIntegerTy() && right->getType()->isIntegerTy()) {
-            unsigned leftWidth = left->getType()->getIntegerBitWidth();
-            unsigned rightWidth = right->getType()->getIntegerBitWidth();
-            
-            if (leftWidth > rightWidth) {
-                right = context.Builder.CreateIntCast(
-                    right, left->getType(), true, "implicit_cast_right"
-                );
-            } else {
-                left = context.Builder.CreateIntCast(
-                    left, right->getType(), true, "implicit_cast_left"
-                );
-            }
-            
-#if DEBUG
-            std::cerr << "Это нихуя не правильный подход и надо исправлять TypeSymbolVisitor, это временное решение" << std::endl;
-#endif
+            if (left->getType()->getIntegerBitWidth() > right->getType()->getIntegerBitWidth())
+                right = TypeConversions::convertValueToType(context, right, left->getType(), "implicit_cast_right");
+            else
+                left = TypeConversions::convertValueToType(context, left, right->getType(), "implicit_cast_left");
+        } else if (left->getType()->isFloatTy() && right->getType()->isDoubleTy()) {
+            left = TypeConversions::convertValueToType(context, left, right->getType(), "implicit_cast_left");
+        } else if (left->getType()->isDoubleTy() && right->getType()->isFloatTy()) {
+            right = TypeConversions::convertValueToType(context, right, left->getType(), "implicit_cast_right");
+        } else if (left->getType()->isIntegerTy() && right->getType()->isFloatingPointTy()) {
+            left = TypeConversions::convertValueToType(context, left, right->getType(), "implicit_cast_left");
+        } else if (left->getType()->isFloatingPointTy() && right->getType()->isIntegerTy()) {
+            right = TypeConversions::convertValueToType(context, right, left->getType(), "implicit_cast_right");
         }
     }
 
@@ -103,47 +136,12 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
             }
             return context.Builder.CreateFDiv(left, right, "divtmp_float");
         } else {
-            // Упрощенный вариант для целочисленного деления:
-            llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
-
-            llvm::BasicBlock* currentBlock = context.Builder.GetInsertBlock();
-
-            llvm::BasicBlock* trapBlock = llvm::BasicBlock::Create(context.TheContext, "trap", function);
-            llvm::BasicBlock* divBlock = llvm::BasicBlock::Create(context.TheContext, "div", function);
-
-            // Проверка на делитель == 0
-            llvm::Value* isZero = context.Builder.CreateICmpEQ(
-                right, llvm::ConstantInt::get(right->getType(), 0), "is_zero_check"
-            );
-            context.Builder.CreateCondBr(isZero, trapBlock, divBlock);
-
-            // Код в trap-блоке
-            context.Builder.SetInsertPoint(trapBlock);
-            llvm::Function* trapFunc = llvm::Intrinsic::getOrInsertDeclaration(
-                context.TheModule.get(), llvm::Intrinsic::trap
-            );
-            context.Builder.CreateCall(trapFunc);
-            context.Builder.CreateUnreachable();
-
-            // Код в блоке деления
-            context.Builder.SetInsertPoint(divBlock);
-            auto div = context.Builder.CreateSDiv(left, right, "divtmp_int");
-            // Создаем переход к продолжению
-            llvm::BasicBlock* continueBlock = llvm::BasicBlock::Create(
-                context.TheContext, "div_continue", function
-            );
-            context.Builder.CreateBr(continueBlock);
-
-            // Устанавливаем точку вставки на блок продолжения
-            context.Builder.SetInsertPoint(continueBlock);
-
-            // Создаем PHI-узел для результата деления
-            llvm::PHINode* phi = context.Builder.CreatePHI(
-                div->getType(), 1, "div_result"
-            );
-            phi->addIncoming(div, divBlock);
-
-            return phi;
+            emitDivisionByZeroCheck(context, right, node.line);
+            // i1 это 0 или 1: со знаком истина была бы -1, и 1 / 1 считалось бы переполнением
+            if (left->getType()->isIntegerTy(1))
+                return context.Builder.CreateUDiv(left, right, "divtmp_bool");
+            emitDivisionOverflowCheck(context, left, right, node.line);
+            return context.Builder.CreateSDiv(left, right, "divtmp_int");
         }
     }
     else if (node.op == "srem" || node.op == "frem") {
@@ -156,13 +154,22 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
             }
             return context.Builder.CreateFRem(left, right, "remtmp_float");
         } else {
-            return context.Builder.CreateSRem(left, right, "remtmp_int");
+            emitDivisionByZeroCheck(context, right, node.line);
+            if (left->getType()->isIntegerTy(1))
+                return context.Builder.CreateURem(left, right, "remtmp_bool");
+            // Остаток от деления на -1 всегда 0, а srem на нём для самого маленького числа это неопределённое поведение.
+            // На 1 остаток тоже 0, поэтому просто подменяем делитель
+            llvm::Value* isMinusOne = context.Builder.CreateICmpEQ(right, llvm::ConstantInt::getSigned(right->getType(), -1));
+            llvm::Value* safeDivisor = context.Builder.CreateSelect(isMinusOne, llvm::ConstantInt::get(right->getType(), 1), right, "safe_divisor");
+            return context.Builder.CreateSRem(left, safeDivisor, "remtmp_int");
         }
     } 
     else if (node.op == "scat") {
         std::string TOML_path = loader::findTomlPath();
         if (TOML_path.empty()) {
+#if DEBUG
             std::cerr << "Warning: Не удалось найти путь к TOML-файлу" << std::endl;
+#endif
             return nullptr;
         }
 
@@ -170,11 +177,38 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
         llvm::Function* concatFunc = declareFunctionFromTOML("scat", context.TheModule.get(), 
                                                          context.TheContext, TOML_path);
         if (!concatFunc) {
+#if DEBUG
             std::cerr << "Warning: Функция scat не найдена в стандартной библиотеке" << std::endl;
+#endif
             return nullptr;
         }
         std::vector<llvm::Value*> args = {left, right};
-        return context.Builder.CreateCall(concatFunc, args, "concat_result");
+        return context.emitCall(concatFunc, args, "concat_result");
+    }
+    else if (node.op == "and") {
+        return context.Builder.CreateAnd(left, right, "andtmp");
+    }
+    else if (node.op == "or") {
+        return context.Builder.CreateOr(left, right, "ortmp");
+    }
+    else if (node.op.starts_with("strcmp_")) {
+        // Сравнение строк: strcmp из libc, результат сравниваем с нулём
+        llvm::Type* i32Type = llvm::Type::getInt32Ty(context.TheContext);
+        llvm::FunctionCallee strcmpFunc = context.TheModule->getOrInsertFunction(
+            "strcmp", i32Type, left->getType(), right->getType()
+        );
+        llvm::Value* compared = context.Builder.CreateCall(strcmpFunc, {left, right}, "strcmp_result");
+
+        llvm::CmpInst::Predicate predicate;
+        if (node.op == "strcmp_eq") predicate = llvm::CmpInst::ICMP_EQ;
+        else if (node.op == "strcmp_ne") predicate = llvm::CmpInst::ICMP_NE;
+        else if (node.op == "strcmp_slt") predicate = llvm::CmpInst::ICMP_SLT;
+        else if (node.op == "strcmp_sgt") predicate = llvm::CmpInst::ICMP_SGT;
+        else if (node.op == "strcmp_sle") predicate = llvm::CmpInst::ICMP_SLE;
+        else if (node.op == "strcmp_sge") predicate = llvm::CmpInst::ICMP_SGE;
+        else return nullptr;
+
+        return context.Builder.CreateICmp(predicate, compared, llvm::ConstantInt::get(i32Type, 0), "cmptmp");
     }
     else if (node.op.starts_with("icmp")) {
         // Сравнение
@@ -213,44 +247,19 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
         
         return context.Builder.CreateICmp(predicate, left, right, "cmptmp");
     }
-    /*
-    TODO: Сделать поддержку float
-    else if (node.op.starts_with("fcmp")) {
-        // Сравнение с плавающей точкой
+    else if (node.op.starts_with("fcmp_")) {
+        // Сравнение с плавающей точкой, семантика выдаёт те же суффиксы, что и для целых
         llvm::CmpInst::Predicate predicate;
-        if (node.op == "fcmp_oeq") 
-        { // ==
-            predicate = llvm::CmpInst::FCMP_OEQ;
-        } 
-        else if (node.op == "fcmp_one") 
-        { // !=
-            predicate = llvm::CmpInst::FCMP_ONE;
-        } 
-        else if (node.op == "fcmp_olt") 
-        { // <
-            predicate = llvm::CmpInst::FCMP_OLT;
-        } 
-        else if (node.op == "fcmp_ogt") 
-        { // >
-            predicate = llvm::CmpInst::FCMP_OGT;
-        } 
-        else if (node.op == "fcmp_oge") 
-        { // >=
-            predicate = llvm::CmpInst::FCMP_OGE;
-        } 
-        else if (node.op == "fcmp_ole") 
-        { // <=
-            predicate = llvm::CmpInst::FCMP_OLE;
-        } 
-        else 
-        {
-            std::cerr << "Warning: Неизвестная операция сравнения с плавающей точкой: " << node.op << std::endl;
-            return nullptr;
-        }
-        
+        if (node.op == "fcmp_eq") predicate = llvm::CmpInst::FCMP_OEQ;
+        else if (node.op == "fcmp_ne") predicate = llvm::CmpInst::FCMP_UNE;
+        else if (node.op == "fcmp_slt") predicate = llvm::CmpInst::FCMP_OLT;
+        else if (node.op == "fcmp_sgt") predicate = llvm::CmpInst::FCMP_OGT;
+        else if (node.op == "fcmp_sle") predicate = llvm::CmpInst::FCMP_OLE;
+        else if (node.op == "fcmp_sge") predicate = llvm::CmpInst::FCMP_OGE;
+        else return nullptr;
+
         return context.Builder.CreateFCmp(predicate, left, right, "cmptmp");
     }
-    */
 #if DEBUG    
     std::cerr << "Warning: Неизвестная бинарная операция: " << node.op << std::endl;
 #endif
@@ -264,13 +273,78 @@ llvm::Value* Expressions::handleUnaryOperation(CodeGenContext& context, UnaryOpN
         operand = TypeConversions::applyImplicitCast(context, operand, node.operand->implicitCastTo, "operand");
     }
     
+    // r?: propagate an error using the caller's result layout; unwrap on success.
+    if (node.op == "try") {
+        auto sourceLayout = context.getResultStruct(node.operand->inferredType);
+        auto destinationLayout = context.getResultStruct(context.CurrentReturnType);
+        auto function = context.Builder.GetInsertBlock()->getParent();
+        auto okBlock = llvm::BasicBlock::Create(context.TheContext, "try.ok", function);
+        auto errorBlock = llvm::BasicBlock::Create(context.TheContext, "try.error", function);
+        auto ok = context.Builder.CreateLoad(context.Builder.getInt8Ty(),
+            context.Builder.CreateStructGEP(sourceLayout, operand, 0));
+        context.Builder.CreateCondBr(context.Builder.CreateICmpNE(ok, context.Builder.getInt8(0)), okBlock, errorBlock);
+        context.Builder.SetInsertPoint(errorBlock);
+        auto code = context.Builder.CreateLoad(context.Builder.getInt32Ty(), context.Builder.CreateStructGEP(sourceLayout, operand, 1));
+        auto error = context.Builder.CreateLoad(context.Builder.getPtrTy(), context.Builder.CreateStructGEP(sourceLayout, operand, 2));
+        llvm::Value* fallback = nullptr;
+        llvm::BasicBlock* fallbackEnd = nullptr;
+        llvm::BasicBlock* merge = nullptr;
+        if (node.fallback) {
+            fallback = Arrays::emitValue(context, node.fallback, node.inferredType);
+            fallbackEnd = context.Builder.GetInsertBlock();
+            merge = llvm::BasicBlock::Create(context.TheContext, "try.merge", function);
+            context.Builder.CreateBr(merge);
+        } else if (node.errorBody) {
+            auto names = context.NamedValues;
+            auto slot = context.createEntryAlloca(context.Builder.getPtrTy(), "error");
+            context.Builder.CreateStore(operand, slot);
+            context.NamedValues["error"] = slot;
+            ASTGen gen(context);
+            node.errorBody->accept(gen);
+            context.NamedValues = names;
+            if (!context.Builder.GetInsertBlock()->getTerminator()) context.Builder.CreateUnreachable();
+        } else if (!context.ResultHandlers.empty()) {
+            const auto handler = context.ResultHandlers.back();
+            context.Builder.CreateStore(operand, handler.slot);
+            context.Builder.CreateBr(handler.block);
+        } else {
+        auto size = context.TheModule->getDataLayout().getTypeAllocSize(destinationLayout);
+        auto propagated = context.allocateObject(context.Builder.getInt64(size), true, "propagated_error");
+        context.Builder.CreateStore(context.Builder.getInt8(0), context.Builder.CreateStructGEP(destinationLayout, propagated, 0));
+        context.Builder.CreateStore(code, context.Builder.CreateStructGEP(destinationLayout, propagated, 1));
+        context.Builder.CreateStore(error, context.Builder.CreateStructGEP(destinationLayout, propagated, 2));
+        context.Builder.CreateRet(propagated);
+        }
+        context.Builder.SetInsertPoint(okBlock);
+        if (node.inferredType->toString() == "void") return nullptr;
+        auto value = context.Builder.CreateLoad(context.getLLVMType(node.inferredType, context.TheContext),
+            context.Builder.CreateStructGEP(sourceLayout, operand, 3), "unwrapped");
+        if (!merge) return value;
+        auto successEnd = context.Builder.GetInsertBlock();
+        context.Builder.CreateBr(merge);
+        context.Builder.SetInsertPoint(merge);
+        auto phi = context.Builder.CreatePHI(value->getType(), 2, "try.value");
+        phi->addIncoming(value, successEnd);
+        phi->addIncoming(fallback, fallbackEnd);
+        return phi;
+    }
+
+    // ?r: байт ok объекта result
+    if (node.op == "nullcheck") {
+        llvm::StructType* layout = context.getResultStruct(node.operand->inferredType);
+        llvm::Value* ok = context.Builder.CreateLoad(context.Builder.getInt8Ty(), context.Builder.CreateStructGEP(layout, operand, 0), "ok");
+        return context.Builder.CreateICmpNE(ok, context.Builder.getInt8(0), "is_ok");
+    }
+
     if (node.op == "neg") {  // Унарный минус
         if (operand->getType()->isFloatingPointTy()) {
             return context.Builder.CreateFNeg(operand, "negtmp");
         } else if (operand->getType()->isIntegerTy()) {
             return context.Builder.CreateNeg(operand, "negtmp");
         } else {
+#if DEBUG
             std::cerr << "Warning: Неподдерживаемый тип для унарного минуса" << std::endl;
+#endif
             return nullptr;
         }
     } 
@@ -286,7 +360,9 @@ llvm::Value* Expressions::handleUnaryOperation(CodeGenContext& context, UnaryOpN
             );
             return context.Builder.CreateNot(boolValue, "nottmp");
         } else {
+#if DEBUG
             std::cerr << "Warning: Неподдерживаемый тип для логического отрицания" << std::endl;
+#endif
             return nullptr;
         }
     }

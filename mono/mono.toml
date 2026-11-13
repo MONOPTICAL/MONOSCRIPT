@@ -1,32 +1,143 @@
 [[function]]
-name = "sum"
-ret = "i32"
-args = ["i32","i32"]
-
-[[function]]
 name = "scat"
+panic_context = true
+pure = true
 ret = "string"
 args = ["string", "string"]
 
 [[function]]
+name = "substr"
+panic_context = true
+pure = true
+ret = "string"
+args = ["string", "i32", "i32"]
+
+[[function]]
+name = "strfind"
+pure = true
+ret = "i32"
+args = ["string", "string"]
+
+[[function]]
+name = "startsWith"
+pure = true
+ret = "i1"
+args = ["string", "string"]
+
+[[function]]
+name = "count"
+pure = true
+ret = "i32"
+args = ["string", "string"]
+
+[[function]]
+name = "isNumeric"
+panic_context = true
+pure = true
+ret = "i1"
+args = ["string"]
+
+[[function]]
+name = "isSpace"
+panic_context = true
+pure = true
+ret = "i1"
+args = ["string"]
+
+[[function]]
+name = "panic"
+panic_context = true
+ret = "void"
+args = ["string"]
+
+[[function]]
+name = "strim"
+panic_context = true
+pure = true
+ret = "string"
+args = ["string"]
+
+[[function]]
+name = "split"
+panic_context = true
+pure = true
+ret = "array<string>"
+args = ["string", "string"]
+
+[[function]]
+name = "reverse"
+panic_context = true
+pure = true
+ret = "string"
+args = ["string"]
+
+[[function]]
+name = "lower"
+panic_context = true
+pure = true
+ret = "string"
+args = ["string"]
+
+[[function]]
+name = "upper"
+panic_context = true
+pure = true
+ret = "string"
+args = ["string"]
+
+[[function]]
+name = "toInt"
+pure = true
+ret = "result<i32>"
+args = ["string"]
+
+[[function]]
 name = "toString_int"
+panic_context = true
+pure = true
 ret = "string"
 args = ["i32"]
 
 [[function]]
+name = "toString_char"
+panic_context = true
+pure = true
+ret = "string"
+args = ["char"]
+
+[[function]]
 name = "toString_bool"
+panic_context = true
+pure = true
 ret = "string"
 args = ["i1"]
 
 [[function]]
 name = "toString_float"
+panic_context = true
+pure = true
 ret = "string"
 args = ["float"]
 
 [[function]]
+name = "toString_f64"
+panic_context = true
+pure = true
+ret = "string"
+args = ["f64"]
+
+[[function]]
 name = "toString_long"
+panic_context = true
+pure = true
 ret = "string"
 args = ["i64"]
+
+[[function]]
+name = "toArray"
+pure = true
+ret = "array<char>"
+args = ["string"]
 
 [[function]]
 name = "echo"
@@ -34,6 +145,29 @@ ret = "void"
 args = ["string"]
 
 [[function]]
-name = "test"
+name = "eecho"
+ret = "void"
+args = ["string"]
+
+[[function]]
+name = "print"
+ret = "void"
+args = ["string"]
+
+[[function]]
+name = "input"
+panic_context = true
+ret = "result<string>"
+args = []
+
+[[function]]
+name = "toString_char_array"
+panic_context = true
+pure = true
+ret = "string"
+args = ["array<char>"]
+
+[[function]]
+name = "gc_collect"
 ret = "void"
 args = []

@@ -17,8 +17,10 @@ public:
     }
     
     // Initialize with source code
-    void initialize(const std::vector<std::string>& sourceLinesParam) {
+    // lineNumbersParam - настоящий номер в файле для каждой строки из sourceLinesParam
+    void initialize(const std::vector<std::string>& sourceLinesParam, const std::vector<int>& lineNumbersParam) {
         sourceLines = &sourceLinesParam;
+        lineNumbers = &lineNumbersParam;
         errorCount = 0;
         warningCount = 0;
     }
@@ -31,9 +33,12 @@ public:
     }
 
     // Error reporting methods
-    void report(int line, int column, const std::string& module, const std::string& message, const std::string& errorType = "Unknown Error");
-    void reportWithHint(int line, int column, const std::string& module, const std::string& message, const std::string& hint, const std::string& errorType = "Unknown Error");
+    void report(int line, int column, const std::string& module, const std::string& message, const std::string& errorType = "Error");
+    void reportWithHint(int line, int column, const std::string& module, const std::string& message, const std::string& hint, const std::string& errorType = "Error");
     void warn(int line, int column, const std::string& message);
+
+    // Настоящий номер строки в файле по номеру строки из узла AST
+    int displayLine(int line) const;
 
     // Statistics
     int getErrorCount() const;
@@ -44,6 +49,7 @@ private:
     ErrorEngine() : sourceLines(nullptr), errorCount(0), warningCount(0) {}
     
     const std::vector<std::string>* sourceLines = nullptr;
+    const std::vector<int>* lineNumbers = nullptr;
     int errorCount;
     int warningCount;
 

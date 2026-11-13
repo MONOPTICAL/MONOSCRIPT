@@ -1,5 +1,5 @@
 #include "../../lexer/headers/Token.h"
-#include "../../includes/icecream.hpp"
+#include "../../includes/ic.hpp"
 #include "AST.h"
 #include <memory>
 #include <stdexcept>
@@ -25,6 +25,8 @@ private:
     int tokenIndex; // индекс текущего токена в строке
     int currentIndent; // текущий уровень отступа
     bool isPipe;
+    std::map<std::string, std::string> typeSubstitution; // При разборе копии шаблона: T -> конкретный тип
+    std::shared_ptr<std::vector<std::vector<Token>>> sharedLines; // Токены для копий шаблонов, одни на весь файл
     std::shared_ptr<ASTNode> currentNode; // указатель на текущий узел AST
 
     // указатель на текущий токен
@@ -43,6 +45,8 @@ private:
     std::shared_ptr<BlockNode> parseBlock(int);
     std::shared_ptr<ASTNode> parseAssignment(bool);
     std::shared_ptr<ASTNode> parseIf();
+    std::shared_ptr<ASTNode> parseAttempt();
+    std::shared_ptr<BlockNode> parseInlineHandler();
     std::shared_ptr<ASTNode> parseFor();
     std::shared_ptr<ASTNode> parseWhile();
     std::shared_ptr<ASTNode> parseReturn();
@@ -90,8 +94,10 @@ return [expression]
     // выражения
     std::shared_ptr<ASTNode> parseBinary(int precedence = 0);
     std::shared_ptr<ASTNode> parseUnary();
+    std::shared_ptr<ASTNode> parsePostfix(std::shared_ptr<ASTNode> expression);
     std::shared_ptr<ASTNode> parsePrimary();
     std::shared_ptr<ASTNode> parseMemberExpression();
+    std::shared_ptr<ASTNode> parseAccessChain(std::shared_ptr<AccessExpression> root);
     
     void parseDotNotation(std::shared_ptr<AccessExpression>);
     void parseArrayNotation(std::shared_ptr<AccessExpression>);

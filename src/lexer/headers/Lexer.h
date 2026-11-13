@@ -9,7 +9,7 @@
 #include <optional>
 #include "Token.h"
 #include "ParsingFunctions.h"
-#include "../../includes/icecream.hpp"
+#include "../../includes/ic.hpp"
 
 class Lexer
 {
@@ -54,6 +54,7 @@ private:
     int currentIndex;
     TokenType currentTokenType;
     std::string currentTokenValue;
+    bool isCharNotFinished = false;
     bool isStringnotFinished = false;
     bool isInMultilineComment = false;
     bool isInMultilineExpression = false;

@@ -5,4 +5,12 @@
 /.vscode
 ms
 *.ms
+!/tests/**/*.ms
+!/mono/std/**/*.ms
 /msTests
+# Локальные бенчмарки (не коммитятся)
+/bench/
+/codegen-tour/
+/graphify-out/
+/logo-concepts/
+/.claude/

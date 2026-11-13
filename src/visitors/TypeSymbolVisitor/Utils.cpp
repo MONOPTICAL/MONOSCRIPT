@@ -1,3 +1,5 @@
+#include "../headers/TomlType.h"
+#include <algorithm>
 #include "../headers/TypeSymbolVisitor.h"
 #include "../../includes/ASTDebugger.hpp"
 void TypeSymbolVisitor::LogError(const std::string &message, std::shared_ptr<ASTNode> node)
@@ -43,23 +45,13 @@ std::shared_ptr<TypeNode> TypeSymbolVisitor::checkForIdentifier(std::shared_ptr<
         if (!varAssign->expression->inferredType)
             LogError("Expression type is null for variable: " + idNode->name, node);
 
-        if (varAssign->expression && varAssign->expression->implicitCastTo) 
-            std::cout << varAssign->implicitCastTo->toString() << std::endl;
         return varAssign->expression->inferredType;
     }
     else if (auto varAssignNode = std::dynamic_pointer_cast<VariableAssignNode>(node)) {
-        if (varAssignNode->expression == nullptr) {
-            if (!varAssignNode->inferredType)
-                LogError("Variable '" + varAssignNode->name + "' has no inferred type", node);
-            if (varAssignNode->expression && varAssignNode->expression->implicitCastTo)
-                std::cout << varAssignNode->implicitCastTo->toString() << std::endl;
-            return varAssignNode->inferredType;
-        }
-
-        if (!varAssignNode->expression->inferredType)
-            LogError("Expression type is null for variable: " + varAssignNode->name, node);
-
-        return varAssignNode->expression->inferredType;
+        // Тип переменной это то что объявлено, а не тип выражения справа
+        if (!varAssignNode->inferredType)
+            LogError("Variable '" + varAssignNode->name + "' has no inferred type", node);
+        return varAssignNode->inferredType;
     }
 
     if (!node->inferredType)
@@ -138,6 +130,7 @@ int TypeSymbolVisitor::getTypeRank(const std::string& type) {
     if (type == "i32") return 4;
     if (type == "i64") return 5;
     if (type == "float") return 6;
+    if (type == "f64") return 7;
     return 0;
 }
 
@@ -149,12 +142,13 @@ std::string TypeSymbolVisitor::getTypeByRank(int rank) {
         case 4: return "i32";
         case 5: return "i64";
         case 6: return "float";
+        case 7: return "f64";
         default: return "";
     }
 }
 
 static std::string getOperation(const std::string& op, const std::string& type) {
-    if (type == "float") {
+    if (isFloatType(type)) {
         if (op == "add") return "fadd";
         if (op == "sub") return "fsub";
         if (op == "mul") return "fmul";
@@ -169,12 +163,24 @@ static std::string getOperation(const std::string& op, const std::string& type) 
 // Рекурсивно выставляет implicitCastTo для всех чисел, если их тип меньше чем targetType
 void TypeSymbolVisitor::castAllNumbersToType(const std::shared_ptr<ASTNode>& node, const std::string& targetType) {
     if (!node) return;
+    if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node); unary && unary->op == "try") {
+        if (!unary->implicitCastTo && unary->inferredType->toString() != targetType &&
+            getTypeRank(unary->inferredType->toString()) > 0)
+            unary->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
+        return;
+    }
     if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
+        if (num->isCharLiteral) return;
         std::string fromType = num->inferredType ? num->inferredType->toString() : (num->type ? num->type->toString() : "");
         if (fromType != targetType) {
             num->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
             //IC(fromType, targetType, num->implicitCastTo->toString());
         }
+        return;
+    }
+    // Литерал 0.1 должен стать точным значением нужного типа, а не float, расширенным потом
+    if (auto number = std::dynamic_pointer_cast<FloatNumberNode>(node)) {
+        if (isFloatType(targetType)) number->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
         return;
     }
     if (auto ident = std::dynamic_pointer_cast<IdentifierNode>(node)) {
@@ -183,6 +189,7 @@ void TypeSymbolVisitor::castAllNumbersToType(const std::shared_ptr<ASTNode>& nod
                 ident->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
     }
     if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+        if (bin->op.starts_with("strcmp_")) return; // Строки к числам не приводим
         castAllNumbersToType(bin->left, targetType);
         castAllNumbersToType(bin->right, targetType);
         std::string implicitCast;
@@ -195,10 +202,10 @@ void TypeSymbolVisitor::castAllNumbersToType(const std::shared_ptr<ASTNode>& nod
             auto leftType = std::dynamic_pointer_cast<BinaryOpNode>(bin->left);
             implicitCast = leftType ? leftType->inferredType->toString() : bin->left->inferredType->toString();
         }
-        if (implicitCast == "float")
+        if (isFloatType(implicitCast))
         {
-            bin->op = getOperation(bin->op, "float");
-            bin->inferredType = std::make_shared<SimpleTypeNode>("float");
+            bin->op = getOperation(bin->op, implicitCast);
+            bin->inferredType = std::make_shared<SimpleTypeNode>(implicitCast);
         }
         else
         {
@@ -207,6 +214,8 @@ void TypeSymbolVisitor::castAllNumbersToType(const std::shared_ptr<ASTNode>& nod
     }   
     if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
         castAllNumbersToType(unary->operand, targetType);
+        // A cast on the whole expression must survive operand type inference.
+        if (unary->implicitCastTo) return;
         if (unary->operand->implicitCastTo) {
             unary->implicitCastTo = unary->operand->implicitCastTo;
         } else {
@@ -216,7 +225,7 @@ void TypeSymbolVisitor::castAllNumbersToType(const std::shared_ptr<ASTNode>& nod
     }
 }
 
-static bool checkIntLimits(const std::string& type, int value) {
+static bool checkIntLimits(const std::string& type, int64_t value) {
     if (type == "i1") return value == 0 || value == 1;
     if (type == "i8") return value >= -128 && value <= 127;
     if (type == "i16") return value >= -32768 && value <= 32767;
@@ -228,10 +237,21 @@ static bool checkIntLimits(const std::string& type, int value) {
 // Второй проход: кастим и валидируем (для не-auto)
 void TypeSymbolVisitor::castAndValidate(const std::shared_ptr<ASTNode>& node, const std::string& targetType, TypeSymbolVisitor* visitor) {
     if (!node) return;
+    if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node); unary && unary->op == "try") {
+        if (!unary->implicitCastTo && unary->inferredType->toString() != targetType &&
+            getTypeRank(unary->inferredType->toString()) > 0)
+            unary->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
+        return;
+    }
+    if (auto number = std::dynamic_pointer_cast<FloatNumberNode>(node)) {
+        if (isFloatType(targetType)) number->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
+        return;
+    }
     if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
-        int value = num->value;
+        if (num->isCharLiteral) return;
+        int64_t value = num->value;
         std::string fromType = num->inferredType ? num->inferredType->toString() : (num->type ? num->type->toString() : "");
-        if (targetType != "float" && !checkIntLimits(targetType, value)) {
+        if (!isFloatType(targetType) && !checkIntLimits(targetType, value)) {
             visitor->LogError("Value " + std::to_string(value) + " does not fit in type " + targetType, node);
         }
         if (fromType != targetType) {
@@ -253,14 +273,167 @@ void TypeSymbolVisitor::castAndValidate(const std::shared_ptr<ASTNode>& node, co
         bin->inferredType = std::make_shared<SimpleTypeNode>(targetType);
     }
     if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
-        castAndValidate(unary->operand, targetType, visitor);
+        // У отрицательного литерала диапазон проверяем вместе с минусом: i8 x = -128
+        auto number = std::dynamic_pointer_cast<NumberNode>(unary->operand);
+        if (number && unary->op == "neg" && !isFloatType(targetType)) {
+            if (!checkIntLimits(targetType, -number->value))
+                visitor->LogError("Value " + std::to_string(-number->value) + " does not fit in type " + targetType, node);
+            number->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
+        }
+        else
+            castAndValidate(unary->operand, targetType, visitor);
         unary->inferredType = std::make_shared<SimpleTypeNode>(targetType);
     }
+}
+
+static bool isBooleanOperator(const std::string& op) {
+    return op.starts_with("icmp_") || op.starts_with("fcmp_") || op.starts_with("strcmp_") ||
+           op == "and" || op == "or";
+}
+
+std::string TypeSymbolVisitor::resolveExprType(const std::shared_ptr<ASTNode>& node) {
+    if (node->implicitCastTo) return node->implicitCastTo->toString();
+    if (auto number = std::dynamic_pointer_cast<NumberNode>(node); number && number->isCharLiteral) return "char";
+    if (std::dynamic_pointer_cast<NumberNode>(node)) return "";
+    // Литерал подстраивается под то, куда его присваивают: float x = 0.1 это не сужение
+    if (std::dynamic_pointer_cast<FloatNumberNode>(node)) return "float";
+
+    if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+        if (isBooleanOperator(bin->op)) return "i1";
+        if (bin->op == "scat") return "string";
+
+        std::string left = resolveExprType(bin->left);
+        std::string right = resolveExprType(bin->right);
+        return getTypeRank(left) >= getTypeRank(right) ? left : right;
+    }
+
+    if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node)) {
+        if (unary->op == "try") return unary->inferredType->toString();
+        if (unary->op == "not" || unary->op == "nullcheck") return "i1";
+        return resolveExprType(unary->operand);
+    }
+
+    if (!node->inferredType) {
+        LogError("Cannot infer expression type", node);
+        return "";
+    }
+    return node->inferredType->toString();
+}
+
+// ok(x) и err(...) как литерал []: тип им задаёт место, куда их кладут. false, если это не они
+bool TypeSymbolVisitor::checkResultLiteral(const std::shared_ptr<ASTNode>& node, const std::string& targetType) {
+    auto call = std::dynamic_pointer_cast<CallNode>(node);
+    if (!call || !call->inferredType || call->inferredType->toString() != "result literal") return false;
+
+    auto target = std::dynamic_pointer_cast<GenericTypeNode>(parseTomlType(targetType));
+    if (!target || target->baseName != "result" || target->typeParameters.size() != 1) {
+        LogError(call->callee + "() can only be used where a result<T> is expected, here it is " + targetType, node);
+    }
+    const auto& valueType = target->typeParameters[0];
+    const std::string value = valueType->toString();
+
+    if (call->callee == "ok") {
+        if (value == "void") {
+            if (!call->arguments.empty()) LogError("ok() for result<void> takes no value", node);
+        } else {
+            if (call->arguments.size() != 1) LogError("ok() for " + targetType + " takes one value", node);
+            if (std::dynamic_pointer_cast<BlockNode>(call->arguments[0]))
+                validateCollectionElements(valueType, call->arguments[0], false);
+            else
+                checkConversion(call->arguments[0], value, "ok(): ");
+        }
+    } else {
+        // err("текст") или err(код, "текст")
+        if (call->arguments.empty() || call->arguments.size() > 2) LogError("err() takes a message, or a code and a message", node);
+        if (call->arguments.size() == 2) checkConversion(call->arguments[0], "i32", "err(): code: ");
+        checkConversion(call->arguments.back(), "string", "err(): message: ");
+    }
+
+    call->inferredType = target;
+    return true;
+}
+
+void TypeSymbolVisitor::checkConversion(const std::shared_ptr<ASTNode>& node, const std::string& targetType, const std::string& errorPrefix) {
+    if (checkResultLiteral(node, targetType)) return;
+    // Пустой литерал [] или {} подходит к любой коллекции
+    if (std::dynamic_pointer_cast<NoneNode>(node) && (targetType.starts_with("array") || targetType.starts_with("map")))
+        return;
+
+    const std::string sourceType = resolveExprType(node);
+    const int targetRank = getTypeRank(targetType);
+    auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node);
+
+    // Только литералы: они просто должны влезать в нужный тип
+    if (sourceType.empty()) {
+        if (targetRank == 0)
+            LogError(errorPrefix + "Type mismatch: expected " + targetType + ", got " + node->inferredType->toString(), node);
+        castAndValidate(node, targetType, this);
+        return;
+    }
+
+    if (sourceType != targetType) {
+        const int sourceRank = getTypeRank(sourceType);
+        if (sourceRank == 0 || targetRank == 0)
+            LogError(errorPrefix + "Type mismatch: expected " + targetType + ", got " + sourceType, node);
+
+        // Явный каст компилятор не трогает, он должен давать ровно нужный тип
+        if (node->implicitCastTo && !(bin && (bin->op == "and" || bin->op == "or")))
+            LogError(errorPrefix + "Type mismatch: expected " + targetType + ", got " + sourceType, node);
+
+        if (sourceRank > targetRank)
+            LogError(errorPrefix + "Type mismatch: expected " + targetType + ", got " + sourceType + ", use explicit cast ->" + targetType, node);
+
+        if (checkLabels("@strict"))
+            LogError(errorPrefix + "Implicit cast from " + sourceType + " to " + targetType + " is not allowed in @strict mode, use ->" + targetType, node);
+    }
+
+    if (targetRank == 0) return; // Строки и коллекции приводить не к чему
+
+    // Явный каст: операнды приводим друг к другу, сам каст оставляем
+    if (node->implicitCastTo && bin && !(bin->op == "and" || bin->op == "or")) {
+        auto cast = node->implicitCastTo;
+        auto inferred = node->inferredType;
+
+        std::string operandType = resolveExprType(bin->left);
+        const std::string rightOperandType = resolveExprType(bin->right);
+        if (getTypeRank(rightOperandType) > getTypeRank(operandType)) operandType = rightOperandType; // Выбираем более широкий тип из операндов
+        if (operandType.empty()) operandType = cast->toString(); // одни литералы (1 + 1)->i8 считаем всё сразу в i8
+
+        castAllNumbersToType(bin->left, operandType);
+        castAllNumbersToType(bin->right, operandType);
+        node->inferredType = inferred;
+        return;
+    }
+    if (node->implicitCastTo && !bin) return;
+
+    // Логические выражения: операнды приводим друг к другу, а не к нужному типу
+    if ((bin && isBooleanOperator(bin->op)) ||
+        (std::dynamic_pointer_cast<UnaryOpNode>(node) && sourceType == "i1" && std::dynamic_pointer_cast<UnaryOpNode>(node)->op != "neg" && std::dynamic_pointer_cast<UnaryOpNode>(node)->op != "try")) {
+        std::shared_ptr<ASTNode> expression = node;
+        castNumbersInBinaryTree(expression, "auto");
+        node->inferredType = registry.findType("i1");
+        if (targetType != "i1") node->implicitCastTo = registry.findType(targetType);
+        else if (!bin || !(bin->op == "and" || bin->op == "or")) node->implicitCastTo = nullptr;
+        return;
+    }
+
+    if (bin || std::dynamic_pointer_cast<UnaryOpNode>(node) || std::dynamic_pointer_cast<IdentifierNode>(node)) {
+        castAndValidate(node, targetType, this);
+        return;
+    }
+
+    if (sourceType != targetType)
+        node->implicitCastTo = registry.findType(targetType);
 }
 
 // Первый проход: ищем максимальный rank
 void TypeSymbolVisitor::findMaxRank(const std::shared_ptr<ASTNode>& node, int& maxRank) {
     if (!node) return;
+    if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node); unary && unary->op == "try") {
+        auto type = unary->implicitCastTo ? unary->implicitCastTo : unary->inferredType;
+        maxRank = std::max(maxRank, getTypeRank(type->toString()));
+        return;
+    }
     if (auto num = std::dynamic_pointer_cast<NumberNode>(node)) {
         if (num->implicitCastTo)
             maxRank = std::max(maxRank, getTypeRank(num->implicitCastTo->toString()));
@@ -285,6 +458,7 @@ void TypeSymbolVisitor::findMaxRank(const std::shared_ptr<ASTNode>& node, int& m
         return;
     }
     if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+        if (bin->op.starts_with("strcmp_")) return; // Строки на ранг не влияют
         findMaxRank(bin->left, maxRank);
         findMaxRank(bin->right, maxRank);
     }
@@ -292,28 +466,28 @@ void TypeSymbolVisitor::findMaxRank(const std::shared_ptr<ASTNode>& node, int& m
         findMaxRank(unary->operand, maxRank);
     }
     if (auto call = std::dynamic_pointer_cast<CallNode>(node)) {
-        if (!checkLabels("@strict"))
-        {
-            for (const auto& arg : call->arguments) 
-                findMaxRank(arg, maxRank);
+        // Важен тип, который вызов возвращает, а не типы его аргументов.
+        // У встроенных len, has и P() записи в таблице функций нет, зато тип уже выведен
+        if (call->inferredType) {
+            maxRank = std::max(maxRank, getTypeRank(call->inferredType->toString()));
         }
-        else
-        {            
-            if (contexts.back().functions.find(call->callee) == contexts.back().functions.end()) {
-                if (registry.findFunction(call->callee) == nullptr) 
-                    LogError("Function not found: " + call->callee, node);
-                else
-                {
-                    auto func = std::dynamic_pointer_cast<FunctionNode>(registry.findFunction(call->callee));
-                    maxRank = std::max(maxRank, getTypeRank(func->returnType->toString()));
-                }
-            }
+        else if (contexts.back().functions.find(call->callee) == contexts.back().functions.end()) {
+            if (registry.findFunction(call->callee) == nullptr)
+                LogError("Function not found: " + call->callee, node);
             else
             {
-                auto func = std::dynamic_pointer_cast<FunctionNode>(contexts.back().functions[call->callee]);
+                auto func = std::dynamic_pointer_cast<FunctionNode>(registry.findFunction(call->callee));
                 maxRank = std::max(maxRank, getTypeRank(func->returnType->toString()));
             }
         }
+        else
+        {
+            auto func = std::dynamic_pointer_cast<FunctionNode>(contexts.back().functions[call->callee]);
+            maxRank = std::max(maxRank, getTypeRank(func->returnType->toString()));
+        }
+    }
+    if (auto accessExpression = std::dynamic_pointer_cast<AccessExpression>(node)) {
+        maxRank = std::max(maxRank, getTypeRank(accessExpression->inferredType->toString()));
     }
 }
 
@@ -328,6 +502,8 @@ void TypeSymbolVisitor::castNumbersInBinaryTree(std::shared_ptr<ASTNode>& node, 
         findMaxRank(node, maxRank);
         targetType = getTypeByRank(maxRank);
         if (targetType.empty()) {
+            // В условии только сравнения строк: числа приводить не к чему
+            if (node->inferredType && (node->inferredType->toString() == "i1" || node->inferredType->toString() == "char")) return;
             LogError("Cannot deduce type for auto", node);
             return;
         }
@@ -375,6 +551,11 @@ void TypeSymbolVisitor::validateCollectionElements(
         if (std::dynamic_pointer_cast<NoneNode>(expr))
             return;
 
+        // Переменная или элемент другой коллекции: тип должен совпасть полностью
+        expr->accept(*this);
+        if (genericType && expr->inferredType && expr->inferredType->toString() == genericType->toString())
+            return;
+
         LogError("Invalid collection initialization", expr);
         return;
     }
@@ -390,6 +571,7 @@ void TypeSymbolVisitor::validateCollectionElements(
         if (type == "i32") { if (maxRank < 4) maxRank = 4; return 4; }
         if (type == "i64") { if (maxRank < 5) maxRank = 5; return 5; }
         if (type == "float") { if (maxRank < 6) maxRank = 6; return 6; }
+        if (type == "f64") { if (maxRank < 7) maxRank = 7; return 7; }
         return 0; // unknown type
     };
 
@@ -399,30 +581,15 @@ void TypeSymbolVisitor::validateCollectionElements(
             // Для вложенных коллекций рекурсивно
             if (auto subBlock = std::dynamic_pointer_cast<BlockNode>(statement)) {
                 validateCollectionElements(genericType->typeParameters[0], subBlock, isAuto);
-            } else if (auto binary = std::dynamic_pointer_cast<BinaryOpNode>(statement)) {
-                // TODO : Проверить на корректность в пиздец тяжёлых случаях
-                binary->left->accept(*this);
-                binary->right->accept(*this);
-                auto leftType = binary->left->inferredType;
-                auto rightType = binary->right->inferredType;
+            } else {
+                statement->accept(*this);
                 auto expectedElemType = genericType->typeParameters[0];
-                if (auto expectedGeneric = std::dynamic_pointer_cast<GenericTypeNode>(expectedElemType)) {
+                if (std::dynamic_pointer_cast<GenericTypeNode>(expectedElemType)) {
                     // Вложенная коллекция
                     validateCollectionElements(expectedElemType, statement, isAuto);
                 } else {
-                    castNumbersInBinaryTree(statement, "auto");
-                }
-            } else {
-                statement->accept(*this);
-                auto elemType = statement->inferredType;
-                auto expectedElemType = genericType->typeParameters[0];
-                if (auto expectedGeneric = std::dynamic_pointer_cast<GenericTypeNode>(expectedElemType)) {
-                    // Вложенная коллекция
-                    validateCollectionElements(expectedElemType, statement, isAuto);
-                } else if (elemType->toString() != expectedElemType->toString()) {
-                    if ((numericRank(elemType->toString(), maxRank) > 0 && numericRank(expectedElemType->toString(), maxRank) > 0))
-                        continue;
-                    LogError("Element type mismatch: expected " + expectedElemType->toString() + ", got " + elemType->toString(), statement);
+                    // Элемент подчиняется тем же правилам, что и обычное присваивание
+                    checkConversion(statement, expectedElemType->toString());
                 }
             }
         }
@@ -438,20 +605,17 @@ void TypeSymbolVisitor::validateCollectionElements(
                 auto expectedKeyType = genericType->typeParameters[0];
                 auto expectedValueType = genericType->typeParameters[1];
 
-                // Проверка ключа
-                if (auto expectedGenericKey = std::dynamic_pointer_cast<GenericTypeNode>(expectedKeyType)) {
+                // Ключ и значение подчиняются тем же правилам, что и обычное присваивание
+                if (std::dynamic_pointer_cast<GenericTypeNode>(expectedKeyType)) {
                     validateCollectionElements(expectedKeyType, keyValue->key, isAuto);
-                } else if (keyType->toString() != expectedKeyType->toString()) {
-                    if (!(numericRank(keyType->toString(), maxRank) > 0 && numericRank(expectedKeyType->toString(), maxRank) > 0))
-                        LogError("Key type mismatch: expected " + expectedKeyType->toString() + ", got " + keyType->toString(), keyValue->key);
+                } else {
+                    checkConversion(keyValue->key, expectedKeyType->toString());
                 }
 
-                // Проверка значения
-                if (auto expectedGenericValue = std::dynamic_pointer_cast<GenericTypeNode>(expectedValueType)) {
+                if (std::dynamic_pointer_cast<GenericTypeNode>(expectedValueType)) {
                     validateCollectionElements(expectedValueType, keyValue->value, isAuto);
-                } else if (valueType->toString() != expectedValueType->toString()) {
-                    if (!(numericRank(valueType->toString(), maxRank) > 0 && numericRank(expectedValueType->toString(), maxRank) > 0))   
-                        LogError("Value type mismatch: expected " + expectedValueType->toString() + ", got " + valueType->toString(), keyValue->value);
+                } else {
+                    checkConversion(keyValue->value, expectedValueType->toString());
                 }
 
                 // Проверка ключей на дубликацию
@@ -562,11 +726,11 @@ void TypeSymbolVisitor::applyImplicitCastToNumeric(
             } else if (auto floatNode = std::dynamic_pointer_cast<FloatNumberNode>(expr)){
                  // Аналогично для float
                  std::string actualType = floatNode->inferredType ? floatNode->inferredType->toString() : "";
-                 if (currentTargetType != "float" && actualType == "float"){
+                 if (!isFloatType(currentTargetType) && actualType == "float"){
                      LogError("Type mismatch: expected integer type " + currentTargetType + " but got float", expr);
-                 } else if (currentTargetType == "float" && actualType != "float" && getTypeRank(actualType) > 0){
-                     // Приведение целого к float
-                     floatNode->implicitCastTo = std::make_shared<SimpleTypeNode>("float");
+                 } else if (isFloatType(currentTargetType) && actualType != currentTargetType && getTypeRank(actualType) > 0){
+                     // Приведение к нужному вещественному типу
+                     floatNode->implicitCastTo = std::make_shared<SimpleTypeNode>(currentTargetType);
                  } // else если оба float или оба не float - ничего не делаем или ошибка
             }
             // Добавить обработку других узлов, если они могут быть числовыми (например, IdentifierNode, CallNode)
@@ -581,10 +745,11 @@ std::shared_ptr<TypeNode> TypeSymbolVisitor::get_common_type_from_list(
     std::shared_ptr<ASTNode> error_context_node, // Для LogError в правильном контексте
     bool allow_numeric_promotion_for_simple_types) {
 
-    // DEBUGGING:
+#if DEBUG
      std::cout << "get_common_type_from_list called with types: ";
      for (const auto& t : types) { std::cout << (t ? t->toString() : "null") << ", "; }
      std::cout << "allow_promo: " << allow_numeric_promotion_for_simple_types << std::endl;
+#endif
 
     if (types.empty()) {
         // Если список типов пуст, возвращаем "auto", что может быть уточнено позже.
@@ -700,9 +865,10 @@ std::shared_ptr<TypeNode> TypeSymbolVisitor::get_common_type_from_list(
                 std::shared_ptr<TypeNode> common_k = get_common_type_from_list(all_key_types, error_context_node, true); // Передаем true
                 std::shared_ptr<TypeNode> common_v = get_common_type_from_list(all_value_types, error_context_node, true); // Передаем true
                 
-                // DEBUGGING:
-                 std::cout << "get_common_type_from_list (map) common_k: " << (common_k ? common_k->toString() : "null") 
+#if DEBUG
+                 std::cout << "get_common_type_from_list (map) common_k: " << (common_k ? common_k->toString() : "null")
                            << ", common_v: " << (common_v ? common_v->toString() : "null") << std::endl;
+#endif
 
                 if (common_k && common_v && common_k->toString().rfind("error_", 0) != 0 && common_v->toString().rfind("error_", 0) != 0 &&
                     common_k->toString() != "auto_empty_list" && common_v->toString() != "auto_empty_list") {

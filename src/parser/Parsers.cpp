@@ -1,4 +1,5 @@
 #include "headers/Parser.h"
+#include "../visitors/headers/TomlType.h"
 /*
 Ну а тут уже парсеры для всех действий в языке
 */
@@ -20,15 +21,27 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
     std::string functionName = current().value; // Сохраняем имя функции
     consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора
 
-    if (check(TokenType::Colon))
+    // Шаблон: [T]first<T>(array<T>: a)
+    std::vector<std::string> typeParameters;
+    if (check(TokenType::Operator) && current().value == "<")
     {
-        consume(TokenType::Colon, "Expected '::' when associating function to class");
-        consume(TokenType::Colon, "Expected '::' when associating function to class");
-        association = current().value;
-        std::swap(functionName, association);
-        consume(TokenType::Identifier, "Class identifier expected after association");
+        advance();
+        do
+        {
+            typeParameters.push_back(current().value);
+            consume(TokenType::Identifier, "Expected type parameter name");
+        } while (match(TokenType::Comma));
+
+        if (!check(TokenType::Operator) || current().value != ">")
+            throwError("Expected > to close type parameters");
+        advance();
     }
-    
+
+    // Пока разбираем сам шаблон, T это имя типа: x->T и T y = x должны разбираться
+    const bool isTemplate = !typeParameters.empty() && typeSubstitution.empty();
+    if (isTemplate)
+        for (const auto& name : typeParameters) typeSubstitution[name] = name;
+
     if (check(TokenType::LeftParen)) // Если следующий токен - это левая скобка, то это функция с параметрами
     {
         advance(); // Переходим к следующему токену
@@ -59,7 +72,7 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
 
                     consume(TokenType::LeftParen, "Expected '(' after function type"); // Проверяем наличие левой скобки после типа параметра функции
                     std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> params;
-                    do
+                    if (!check(TokenType::RightParen)) do // func: f() -> i32 без параметров
                     {
                         std::shared_ptr<TypeNode> paramType = getFullType(); // Получаем полный тип параметра функции
                         consume(TokenType::Colon, "Expected ':' after parameter type"); // Проверяем наличие двоеточия после типа параметра функции
@@ -105,12 +118,9 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
         
         int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока if
         
-        const bool noDecl = // Проверяем наличие метки @decl
-            std::find(labels.begin(), labels.end(), "@decl") != labels.end();
 
         std::shared_ptr<BlockNode> body = nullptr; 
-        // Если не помечено как @decl, тело не парсим
-        if (!noDecl)
+        
         {
             const int declIndent = getIndentLevel(lines[lineIndex]);
             const int expectedIndent = declIndent + 1;
@@ -130,15 +140,27 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
                 throwError("Expected indentation after function declaration");
             }
         }
-        else
-        {
-            body = std::make_shared<BlockNode>(); // Создаём тело функции
-            body->line = lineIndex; body->column = tokenIndex; // Устанавливаем строку и колонку для узла
-        }
-
 
         auto func = std::make_shared<FunctionNode>(functionName, association, returnType, parameters, labels, body); // Создаём узел функции
         func->line = line; func->column = token; // Устанавливаем строку и колонку для узла
+
+        // При разборе копии подстановка уже сделана, это обычная функция
+        if (isTemplate)
+        {
+            typeSubstitution.clear();
+            if (!sharedLines) sharedLines = std::make_shared<std::vector<std::vector<Token>>>(lines);
+            func->typeParameters = typeParameters;
+
+            auto source = sharedLines;
+            const std::string module = moduleName;
+            func->instantiate = [source, module, line, token](const std::map<std::string, std::string>& types) {
+                Parser copy(*source, module);
+                copy.typeSubstitution = types;
+                copy.lineIndex = line;
+                copy.tokenIndex = token;
+                return copy.parseFunction();
+            };
+        }
         return func; // Возвращаем узел функции
     }
     else
@@ -152,6 +174,14 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
 std::shared_ptr<ASTNode> Parser::parseCast(std::shared_ptr<ASTNode> expression)
 {
     consume(TokenType::Arrow, "Expected '->' after expression"); // Проверяем наличие стрелки после выражения
+
+    // x->T в копии шаблона
+    if (check(TokenType::Identifier) && typeSubstitution.count(current().value))
+    {
+        expression->implicitCastTo = parseTomlType(typeSubstitution.at(current().value));
+        advance();
+        return expression;
+    }
     if(check(TokenType::Type))
     {
         std::string typeName = current().value; // Сохраняем имя типа
@@ -178,39 +208,47 @@ std::shared_ptr<ASTNode> Parser::parseIf()
 {
     int line = lineIndex; int token = tokenIndex; // Запоминаем строку и токен
 
-    // Проверяем, что текущий токен - это ключевое слово if
-    consume(TokenType::Keyword, "Expected 'if' keyword"); 
-    // Мы не делаем проверку здесь на наличие круглой скобки, так как это может быть выражение без скобок
-    // И даже если это выражение без скобок, то оно всё равно может казаться как if (expression)
-    // Вот воможные варианты:
-    // if(2+2==4), if((2+2)==4), if 2+2==4, if (2+2)==4
-    // Поэтому мы просто сразу посылаем его в parseExpression который разберёт его
-
+    const int indent = getIndentLevel(lines[lineIndex]);
+    consume(TokenType::Keyword, "Expected 'if' keyword");
     auto condition = parseExpression();
-    int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока if
-    nextLine(); // Переходим к следующей строке токенов 
-
-    auto thenBlock = parseBlock(expectedIndent);
-    std::shared_ptr<ASTNode> elseBlock = nullptr;
-    tokenIndex = expectedIndent-1;
-    //if (tokenIndex!=(expectedIndent-1)) 
-
-    if (current().value == "else")
-    {
-        if(peek().value == "if")
-        {
-            advance();
-            elseBlock = parseIf();
-            lineIndex++;
+    auto branchBody = [&]() -> std::shared_ptr<BlockNode> {
+        if (match(TokenType::Colon)) {
+            if (isEndOfLine()) throwError("Expected a statement after ':'");
+            if (check(TokenType::LeftBracket) || (check(TokenType::Keyword) &&
+                current().value != "return" && current().value != "break" &&
+                current().value != "continue" && current().value != "const" && current().value != "final"))
+                throwError("Inline if/else requires a single simple statement");
+            auto body = std::make_shared<BlockNode>();
+            body->line = lineIndex; body->column = tokenIndex;
+            const int bodyLine = lineIndex;
+            body->statements.push_back(parseStatement());
+            if (lineIndex != bodyLine || !isEndOfLine())
+                throwError("Inline if/else requires a single simple statement");
+            nextLine();
+            return body;
         }
-        else
-        {
-            nextLine(); // consume 'else'
-            elseBlock = parseBlock(expectedIndent);
+        if (!isEndOfLine()) throwError("Expected ':' or end of line after condition");
+        nextLine();
+        if (isEndOfFile() || getIndentLevel(lines[lineIndex]) != indent + 1)
+            throwError("Expected indentation after if/else");
+        return parseBlock(indent + 1);
+    };
+    auto thenBlock = branchBody();
+    std::shared_ptr<ASTNode> elseBlock;
+    if (!isEndOfFile() && getIndentLevel(lines[lineIndex]) == indent) {
+        tokenIndex = indent;
+        if (current().value == "else") {
+            advance();
+            if (current().value == "if") {
+                elseBlock = parseIf();
+                lineIndex++;
+            } else {
+                elseBlock = branchBody();
+            }
         }
     }
-
-    lineIndex--; // Без этого он скипает 2 линии а не одну
+    lineIndex--; // The surrounding block advances to the next unconsumed line.
+    tokenIndex = lines[lineIndex].size();
 
     auto ifNode = std::make_shared<IfNode>(condition, thenBlock, elseBlock);
     ifNode->line = line; ifNode->column = token; // Устанавливаем строку и колонку для узла
@@ -240,6 +278,7 @@ std::shared_ptr<ASTNode> Parser::parseFor()
     
     int currentLine = lineIndex; // Сохраняем текущую линию
     auto iterable = parseExpression(); // Парсим переменную для итерации
+    if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
     if (currentLine < lineIndex) // Если мы не перешли на следующую линию, то это не for
         lineIndex--;
 
@@ -267,6 +306,7 @@ std::shared_ptr<ASTNode> Parser::parseWhile()
 
     consume(TokenType::Keyword, "Expected 'while' keyword"); // Проверяем наличие ключевого слова while
     auto condition = parseExpression();
+    if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
 
     int expectedIndent = getIndentLevel(lines[lineIndex]) + 1;
     nextLine();
@@ -302,8 +342,10 @@ std::shared_ptr<BlockNode> Parser::parseBlock(int expectedIndent)
         // пропустить Pipe токены
         tokenIndex = actualIndent;
 
+        int currentLine = lineIndex;
         auto stmt = parseStatement();  // не должен заниматься отступами
         if (stmt) block->statements.push_back(stmt);
+        if ((currentLine == lineIndex) && !isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
         nextLine();
     }
 
@@ -330,7 +372,7 @@ std::shared_ptr<ASTNode> Parser::parseReturn()
 
     consume(TokenType::Keyword, "Expected 'return' keyword"); // Проверяем наличие ключевого слова return
     std::shared_ptr<ASTNode> expression;
-    if(current().column != -1)
+    if(current().column != -1 && !check(TokenType::Semicolon))
         expression = parseExpression(); 
     else
         expression = std::make_shared<NullNode>();
@@ -381,7 +423,12 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
         if(!check(TokenType::Operator) || current().value != "=") // Проверяем наличие оператора присваивания
         {   
             std::shared_ptr<NoneNode> none = std::make_shared<NoneNode>();
-            return std::make_shared<VariableAssignNode>(variableName, isConst, type, none);
+            none->line = lineIndex; none->column = tokenIndex; // Устанавливаем строку и колонку для узла
+
+            auto varAssign = std::make_shared<VariableAssignNode>(variableName, isConst, type, none);
+            varAssign->line = lineIndex; varAssign->column = tokenIndex; // Устанавливаем строку и колонку для узла
+            varAssign->isDeferred = finalFlag;
+            return varAssign;
         }
     }
     else if(current().type == TokenType::Identifier && peek().value == "^=") // Проверяем наличие идентификатора
@@ -432,6 +479,7 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
 
             auto varAssign = std::make_shared<VariableAssignNode>(variableName, isConst, type, none);
             varAssign->line = lineIndex; varAssign->column = tokenIndex; // Устанавливаем строку и колонку для узла
+            varAssign->isDeferred = finalFlag;
             return varAssign; // Возвращаем узел присваивания переменной
         }
     }
@@ -495,13 +543,26 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
 
     std::string name = current().value; // Сохраняем имя структуры
     consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора структуры
-    
+    if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
+
     int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока структуры
     nextLine(); // Переходим к следующему токену
     auto body = parseBlock(expectedIndent); // Парсим тело структуры
     
     lineIndex--; // Без этого он скипает 2 линии а не одну    
     
+    // Метод это обычная функция, у которой первым параметром идёт сам объект
+    if (auto block = std::dynamic_pointer_cast<BlockNode>(body)) {
+        for (const auto& statement : block->statements) {
+            if (auto method = std::dynamic_pointer_cast<FunctionNode>(statement)) {
+                if (!method->typeParameters.empty())
+                    throwError("Generic methods are not supported yet: " + method->name);
+                method->associated = name;
+                method->parameters.insert(method->parameters.begin(), {std::make_shared<SimpleTypeNode>(name), "self"});
+            }
+        }
+    }
+
     auto structNode = std::make_shared<StructNode>(name, body); // Создаём узел структуры
     structNode->line = line; structNode->column = token; // Устанавливаем строку и колонку для узла
     return structNode; // Возвращаем узел структуры
@@ -524,6 +585,11 @@ std::shared_ptr<ASTNode> Parser::parseUse()
         do {
             path.push_back(current().value);
             consume(TokenType::Identifier, "Expected identifier in import path");
+            // std.strings.utf8
+            while (match(TokenType::Dot)) {
+                path.back() += "." + current().value;
+                consume(TokenType::Identifier, "Expected identifier after '.' in module name");
+            }
             if (!current().value.empty() && !(check(TokenType::Arrow) || check(TokenType::Colon)))
                 throwError("Import path must be a single word without spaces");
         } while (match(TokenType::Arrow));
@@ -548,4 +614,54 @@ std::shared_ptr<ASTNode> Parser::parseUse()
     auto importNode = std::make_shared<ImportNode>(paths);
     importNode->line = line; importNode->column = token; // Устанавливаем строку и колонку для узла
     return importNode; // Возвращаем узел импорта
+}
+
+std::shared_ptr<BlockNode> Parser::parseInlineHandler() {
+    auto body = std::make_shared<BlockNode>();
+    body->line = lineIndex; body->column = tokenIndex;
+    do {
+        if (isEndOfLine()) throwError("Expected statement in local error handler");
+        if (check(TokenType::LeftBracket) || (check(TokenType::Keyword) &&
+            current().value != "return" && current().value != "break" &&
+            current().value != "continue" && current().value != "const" && current().value != "final"))
+            throwError("Local error handler requires simple statements");
+        const int line = lineIndex;
+        body->statements.push_back(parseStatement());
+        if (line != lineIndex) throwError("Local error handler must stay on one line");
+    } while (match(TokenType::Semicolon));
+    return body;
+}
+
+std::shared_ptr<ASTNode> Parser::parseAttempt() {
+    auto node = std::make_shared<AttemptNode>();
+    node->line = lineIndex; node->column = tokenIndex;
+    const int indent = getIndentLevel(lines[lineIndex]);
+    advance();
+    auto body = [&]() {
+        if (!isEndOfLine()) throwError("Expected end of line before attempt/handler body");
+        nextLine();
+        if (isEndOfFile() || getIndentLevel(lines[lineIndex]) != indent + 1)
+            throwError("Expected indented attempt/handler body");
+        return parseBlock(indent + 1);
+    };
+    node->body = body();
+    while (!isEndOfFile() && getIndentLevel(lines[lineIndex]) == indent) {
+        tokenIndex = indent;
+        const std::string kind = current().value;
+        if (kind != "else" && kind != "panic") break;
+        advance();
+        std::string name = current().value;
+        consume(TokenType::Identifier, "Expected error binding after '" + kind + "'");
+        if (kind == "else") {
+            if (node->errorBody) throwError("Duplicate else handler");
+            node->errorName = name; node->errorBody = body();
+        } else {
+            if (node->panicBody) throwError("Duplicate panic handler");
+            node->panicName = name; node->panicBody = body();
+        }
+    }
+    if (!node->errorBody && !node->panicBody) throwError("attempt requires an else or panic handler");
+    --lineIndex;
+    tokenIndex = lines[lineIndex].size();
+    return node;
 }

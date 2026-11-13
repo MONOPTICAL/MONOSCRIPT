@@ -1,19 +1,33 @@
 #include "headers/cli.h"
+#include "headers/ui.h"
+#include <filesystem>
 #include <iostream>
 #include <fstream>
 
 void printHelp(const char* programName) {
-    std::cout << "🤔 Usage: " << programName << " [OPTIONS] [FILE]\n\n"
-              << "⚙️ Options:\n"
-              << "  --help           ❓ Show this help message and exit\n"
-              << "  --tokens         🏷️  Show tokens\n"
-              << "  --ast            🌳 Show AST\n"
-              << "  --symantic       🔍 Show symantic analysis\n"
-              << "  --run, run       ▶️  Execute the program via LLVM\n"
-              << "  --compile        🏗️  Compile to executable\n"
-              << "  --offOptimization 🛠️  Disable LLVM optimization\n"
-              << "\n⌨️ If FILE is not specified, input is read from standard input.\n"
-              << std::endl;
+    const std::string name = std::filesystem::path(programName).filename().string();
+    const std::string bold = ui::style(stdout, ui::WHITE) + ui::style(stdout, ui::BOLD), accent = ui::style(stdout, ui::ACCENT), dim = ui::style(stdout, ui::DIM), reset = ui::style(stdout, ui::RESET);
+
+    auto option = [&](const std::string& flag, const std::string& text) {
+        std::cout << "  " << accent << flag << reset << std::string(flag.size() < 24 ? 24 - flag.size() : 1, ' ') << text << "\n";
+    };
+
+    ui::printBanner(stdout);
+    std::cout << "\n" << bold << "USAGE" << reset << "\n"
+              << "  " << name << " [OPTIONS] [FILE]\n\n"
+              << bold << "RUN" << reset << "\n";
+    option("run FILE", "Run a program through the JIT");
+    option("--compile OUT FILE", "Build a native executable");
+    option("--offOptimization", "Run or build without LLVM optimization");
+    option("--timings", "Show how long each compiler stage took");
+    std::cout << "\n" << bold << "INSPECT" << reset << "\n";
+    option("--tokens", "Show tokens");
+    option("--ast", "Show AST");
+    option("--semantic", "Show semantic analysis");
+    std::cout << "\n" << bold << "TEST" << reset << "\n";
+    option("--run_tests [FILTER]", "Run the test suite, FILTER selects tests by path");
+    option("--verbose", "Show every test");
+    std::cout << "\n" << dim << "  Without FILE the source is read from standard input." << reset << "\n" << std::endl;
 }
 
 CLIOptions parseArgs(int argc, char* argv[]) {
@@ -28,7 +42,7 @@ CLIOptions parseArgs(int argc, char* argv[]) {
             options.showTokens = true;
         } else if (arg == "--ast") {
             options.showAST = true;
-        } else if (arg == "--symantic") {
+        } else if (arg == "--semantic" || arg == "--symantic") {
             options.showSymantic = true;
         } else if (arg == "--run" || arg == "run") {
             options.runJIT = true;
@@ -42,6 +56,12 @@ CLIOptions parseArgs(int argc, char* argv[]) {
             }
         } else if (arg == "--offOptimization") {
             options.offOptimization = true;
+        } else if (arg == "--timings") {
+            options.showTimings = true;
+        } else if (arg == "--run_tests") {
+            options.runTests = true;
+        } else if (arg == "--verbose") {
+            options.verbose = true;
         } else if (arg[0] != '-') {
             options.inputFile = arg;
         } else {
@@ -59,6 +79,7 @@ CLIOptions parseArgs(int argc, char* argv[]) {
 
 std::string readSourceCode(const std::string& inputFile) {
     std::string sourceCode;
+    ui::stage("Reading the source file");
     
     if (!inputFile.empty()) {
         std::ifstream file(inputFile);
@@ -71,7 +92,10 @@ std::string readSourceCode(const std::string& inputFile) {
             sourceCode += line + "\n";
         }
     } else {
-        std::cout << "Enter source code (Ctrl+D to finish):\n";
+        if (ui::isTerminal(stdin)) {
+            ui::printBanner(stderr);
+            std::cerr << "\n" << ui::style(stderr, ui::DIM) << "  Enter source code, Ctrl+D to finish" << ui::style(stderr, ui::RESET) << "\n\n";
+        }
         std::string line;
         while (std::getline(std::cin, line)) {
             sourceCode += line + "\n";

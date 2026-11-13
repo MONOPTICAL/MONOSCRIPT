@@ -8,6 +8,7 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/Target/TargetMachine.h>
 #include <map>
 #include <string>
 #include <vector>
@@ -16,18 +17,37 @@
 #include "../../parser/headers/AST.h"
 
 
+// Как структура лежит в памяти. Поля-объекты и строки это ссылки
+struct StructLayout {
+    StructNode*                                      node = nullptr;
+    llvm::StructType*                                type = nullptr;
+    llvm::Function*                                  constructor = nullptr;
+    std::map<std::string, unsigned>                  fieldIndex;
+    std::vector<std::shared_ptr<VariableAssignNode>> fields;
+    std::map<std::string, std::shared_ptr<FunctionNode>> methods;
+    bool                                             hasReferences = false; // Иначе память без ссылок: сборщику просматривать незачем
+};
+
 class CodeGenContext {
 public:
-    llvm::LLVMContext                   TheContext; // Контекст LLVM(он отвечает за управление памятью)
+    std::unique_ptr<llvm::LLVMContext>   OwnedContext;
+    llvm::LLVMContext&                  TheContext; // Контекст LLVM(он отвечает за управление памятью)
     llvm::IRBuilder<>                   Builder; // IRBuilder - это класс, который помогает создавать IR-код
     std::unique_ptr<llvm::Module>       TheModule; // Модуль - это контейнер для IR-кода
     std::map<std::string, llvm::Value*> NamedValues; // Простая таблица символов для переменных/параметров
-    std::map<llvm::Value*, llvm::Type*> arrayElementTypes;
+    std::unordered_map<std::string, llvm::Constant*> stringCache;
+
+    llvm::Function*                     StartFunction = nullptr; // Точка входа программы: инициализирует рантайм и глобальные переменные
+    std::shared_ptr<TypeNode>           CurrentReturnType; // Что возвращает функция, которая генерируется сейчас
+    std::map<std::string, StructLayout> Structs;
+    int                                 CurrentLine = -1; // Строка инструкции, которая генерируется сейчас, для сообщений об ошибках
 
     std::vector<llvm::BasicBlock*> loopEndBlocks;    // Стек для блоков выхода из цикла (для break)
     std::vector<llvm::BasicBlock*> loopCondBlocks;   // Стек для блоков условия цикла (для continue)
 
     llvm::Function*                     getOrDeclareFunction(const std::string& name, llvm::FunctionType* type);
+
+    llvm::Constant* createString(const std::string& text, const std::string& name = "str");
 
     static llvm::Type*                  getLLVMType(std::shared_ptr<TypeNode> typeNode, llvm::LLVMContext& ctx);
 
@@ -45,10 +65,18 @@ public:
 
     static std::string                  getTypeString(std::shared_ptr<TypeNode> typeNode)
     {
-        return typeNode->inferredType->toString();
+        return typeNode->toString();
     }
 
-    void                                pushLoopContext(llvm::BasicBlock* condBlock, llvm::BasicBlock* endBlock) 
+    // Память под переменную выделяется в начале функции, а не на каждой итерации цикла
+    llvm::AllocaInst*                   createEntryAlloca(llvm::Type* type, const std::string& name)
+    {
+        llvm::Function* function = Builder.GetInsertBlock()->getParent();
+        llvm::IRBuilder<> entryBuilder(&function->getEntryBlock(), function->getEntryBlock().begin());
+        return entryBuilder.CreateAlloca(type, nullptr, name);
+    }
+
+    void                                pushLoopContext(llvm::BasicBlock* condBlock,llvm::BasicBlock* endBlock) 
     {
         if (condBlock) loopCondBlocks.push_back(condBlock);
         if (endBlock) loopEndBlocks.push_back(endBlock);
@@ -72,19 +100,53 @@ public:
         return loopCondBlocks.back();
     }
 
+    // Останавливает программу с ошибкой выполнения. После этого текущий блок завершён
+    void                                emitPanic(const std::string& message, int line);
+
+    // Имя функции, с которой начинается программа: помеченная @entry или main
+    static std::string                  findEntryName(const ProgramNode& program);
+
+    struct ResultHandler { llvm::BasicBlock* block; llvm::Value* slot; };
+    std::vector<ResultHandler> ResultHandlers;
+    std::vector<llvm::BasicBlock*> PanicHandlers;
+    llvm::Value* PanicContext = nullptr;
+    llvm::StructType* getPanicStruct();
+    llvm::Value* emitCall(llvm::Function* function, std::vector<llvm::Value*> arguments = {}, const std::string& name = "");
+    void checkPanic();
+    void propagatePanic();
+    llvm::Function* functionAdapter(llvm::Function* function);
+
     void LogError(const std::string& message);
     void LogWarning(const std::string& message);
 
-    // В класс CodeGenContext добавьте:
-    llvm::Value* createArray(llvm::Type* elementType, llvm::Value* size);
-    llvm::Value* getArrayElement(llvm::Value* array, llvm::Value* index);
-    void setArrayElement(llvm::Value* array, llvm::Value* index, llvm::Value* value);
-    void freeArray(llvm::Value* array);
+    // Массив это объект в куче: заголовок { ptr data, i32 length, i32 capacity } и отдельный блок данных.
+    // Переменная хранит ссылку на заголовок, тип элементов известен только из типов в AST
+    llvm::StructType*                   getArrayStruct();
+    // result<T> в памяти: { i8 ok, i32 code, ptr error, T value }, у result<void> без value
+    llvm::StructType*                   getResultStruct(const std::shared_ptr<TypeNode>& resultType);
+    // Память без ссылок сборщик не просматривает и не обнуляет: вызывающий заполняет её сам
+    llvm::Value*                        allocateObject(llvm::Value* bytes, bool hasReferences, const std::string& name);
+    llvm::Value*                        createArray(llvm::Type* elementType, llvm::Value* size);
+    llvm::Value*                        getArrayData(llvm::Value* array);
+    llvm::Value*                        getArrayLength(llvm::Value* array);
+    // Адрес элемента с проверкой границ, line для сообщения об ошибке
+    llvm::Value*                        getArrayElementPtr(llvm::Value* array, llvm::Type* elementType, llvm::Value* index, int line);
 
 
-    CodeGenContext(const std::string& moduleName = "ms_module") : Builder(TheContext) {
+    CodeGenContext(const std::string& moduleName = "ms_module", llvm::LLVMContext* externalContext = nullptr)
+        : OwnedContext(externalContext ? nullptr : std::make_unique<llvm::LLVMContext>()),
+          TheContext(externalContext ? *externalContext : *OwnedContext), Builder(TheContext) {
         TheModule = std::make_unique<llvm::Module>(moduleName, TheContext); // Создаем новый модуль
+        // Раскладку нужно поставить до первого getTypeAllocSize: пустая строка в модуле —
+        // это не "раскладка текущей машины", а встроенная по умолчанию (i64 выровнен по 4)
+        TheModule->setTargetTriple(targetMachine().getTargetTriple());
+        TheModule->setDataLayout(targetMachine().createDataLayout());
     }
+
+    // Одна машина цели на весь процесс: по ней считаются размеры типов в кодгене,
+    // её же получает оптимизатор (стоимость инструкций, векторизация) и llc через triple в модуле.
+    // CPU обобщённый, как у gcc/clang по умолчанию, чтобы собранный файл запускался не только здесь
+    static llvm::TargetMachine&         targetMachine();
 };
 
 #endif // CODEGENCONTEXT_H

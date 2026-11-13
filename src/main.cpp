@@ -3,16 +3,39 @@
 #include "CLI/headers/runner.h"
 #include "CLI/headers/symantic.h"
 #include "CLI/headers/compile.h"
+#include "CLI/headers/test_runner.h"
+#include "CLI/headers/ui.h"
 #include "errors/headers/ErrorEngine.h"
+#include "loader/headers/loader.h"
+#include <gc/gc.h>
 #include <iostream>
 #include <chrono>
 #include <filesystem>
 
 int main(int argc, char* argv[]) {
+    // Сборщик мусора запускается первым, до любого выделения памяти программой
+    GC_INIT();
+
+    // Служебный режим: так -run_tests запускает сам себя на каждый тест
+    if (argc > 1 && std::string(argv[1]) == "--check-file") {
+        return checkMain(argc - 1, argv + 1);
+    }
+
     try {
         // Парсинг аргументов
         CLIOptions options = parseArgs(argc, argv);
-        
+
+        // Тесты фронтенда
+        if (options.runTests) {
+            std::string self = loader::getExecutableDir() + "/" + std::filesystem::path(argv[0]).filename().string();
+            return runFrontendTests({self, "--check-file"}, {self, "run"}, loader::findTestsPath(), options.verbose, options.inputFile);
+        }
+
+        // Сколько всего стадий, зависит от режима: см. вызовы ui::stage
+        const int stageCount = options.runJIT ? 8 : options.compileExecutable ? 10 : 5;
+        ui::pipelineBegin(stageCount, options.compileExecutable);
+        if (options.showTimings) ui::printTimingsAtExit();
+
         // Чтение кода
         std::string sourceCode = readSourceCode(options.inputFile);
         
@@ -28,23 +51,33 @@ int main(int argc, char* argv[]) {
         // Выполнение только если указан флаг --run или run
         if (options.runJIT) {
             std::string currentFilePath = std::filesystem::current_path().string();
-            runProgram(combinedAST, currentFilePath, options.showAST, options.offOptimization);
-            return 0;
+            int exitCode = runProgram(combinedAST, currentFilePath, options.showAST, options.offOptimization);
+            return exitCode == RUN_FAILED ? 1 : exitCode;
         }
 
         if (options.compileExecutable) {
             // Компиляция в исполняемый файл
             std::string outputFile = options.ExecutableFile.empty() ? "output" : options.ExecutableFile;
-            compileToExecutable(combinedAST, outputFile);
-            std::cout << "Компиляция завершена. Исполняемый файл: " << outputFile << std::endl;
+            if (!compileToExecutable(combinedAST, outputFile, options.offOptimization)) {
+                return 1;
+            }
+            ui::pipelineStop();
+            std::cout << ui::style(stdout, ui::ACCENT) << "Build finished." << ui::style(stdout, ui::RESET)
+                      << " Executable: " << ui::style(stdout, ui::BOLD) << outputFile << ui::style(stdout, ui::RESET) << std::endl;
             return 0;
         }
         
+        ui::pipelineStop();
+
         // Если --run не указан, просто завершаем работу после анализа
-        std::cout << "Анализ кода завершен. Для выполнения используйте флаг --run." << std::endl;
+        std::cout << ui::style(stdout, ui::ACCENT) << "Analysis finished." << ui::style(stdout, ui::RESET)
+                  << " Use run to execute the program." << std::endl;
         
     } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
+        ui::pipelineStop();
+
+        // Ошибки компиляции уже напечатаны, у них пустой текст
+        if (e.what()[0] != '\0') std::cerr << ui::style(stderr, ui::RED) << e.what() << ui::style(stderr, ui::RESET) << std::endl;
         return 1;
     }
     

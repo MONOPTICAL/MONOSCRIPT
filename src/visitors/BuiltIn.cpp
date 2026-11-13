@@ -1,4 +1,5 @@
 #include "headers/BuiltIn.h"
+#include "headers/TomlType.h"
 #include "../includes/toml.hpp" // путь к toml11
 #include <iostream>
 void registerBuiltInFunctions(Registry& registry, const std::string& tomlPath) 
@@ -16,19 +17,24 @@ void registerBuiltInFunctions(Registry& registry, const std::string& tomlPath)
         std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> args;
         for (size_t i = 0; i < argsArr.size(); ++i) {
             args.emplace_back(
-                std::make_shared<SimpleTypeNode>(argsArr[i]),
+                parseTomlType(argsArr[i]),
                 "arg" + std::to_string(i + 1)
             );
         }
+
+        // Функции с pure = true можно вызывать из @pure
+        std::vector<std::string> labels;
+        if (toml::find_or<bool>(func, "pure", false))
+            labels.push_back("@pure");
 
         registry.addBuiltinFunction(
             name,
             std::make_shared<FunctionNode>(
                 name,
                 "",
-                std::make_shared<SimpleTypeNode>(retStr),
+                parseTomlType(retStr),
                 args,
-                std::vector<std::string>(),
+                labels,
                 nullptr
             )
         );
@@ -63,6 +69,11 @@ void registerBuiltInTypes(Registry& registry)
     registry.addBuiltinType("i32", std::make_shared<SimpleTypeNode>("i32"));
     registry.addBuiltinType("i64", std::make_shared<SimpleTypeNode>("i64"));
     registry.addBuiltinType("float", std::make_shared<SimpleTypeNode>("float"));
+    registry.addBuiltinType("f64", std::make_shared<SimpleTypeNode>("f64"));
+    registry.addBuiltinType("char", std::make_shared<SimpleTypeNode>("char"));
+    registry.addBuiltinType("func", std::make_shared<SimpleTypeNode>("func")); // func<параметры..., результат>
+    registry.addBuiltinType("panic_info", std::make_shared<SimpleTypeNode>("panic_info"));
+    registry.addBuiltinType("result", std::make_shared<SimpleTypeNode>("result")); // result<T>: значение или ошибка
     registry.addBuiltinType("string", std::make_shared<SimpleTypeNode>("string"));
     registry.addBuiltinType("null", std::make_shared<SimpleTypeNode>("null"));
     registry.addBuiltinType("none", std::make_shared<SimpleTypeNode>("none"));

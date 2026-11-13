@@ -8,6 +8,7 @@ enum class TokenType {
     Type,                   // type - тип переменной 
     Number,                 // number - число
     String,                 // string - строка
+    Char,                   // char - один байт в одинарных кавычках
     Operator,               // operator - оператор (например, +, -, *, /, %, ^, =, !=, <, >)
     Keyword,                // keyword - ключевое слово (например, if, else, while, for, return)
     LeftParen,              // left parenthesis - левая скобка ( для выражений и функций 
@@ -40,6 +41,7 @@ inline std::string TokenTypeToString(TokenType type)
     case TokenType::Identifier: return "Identifier";
     case TokenType::Number: return "Number";
     case TokenType::String: return "String";
+    case TokenType::Char: return "Char";
     case TokenType::Operator: return "Operator";
     case TokenType::LeftParen: return "LeftParen";
     case TokenType::RightParen: return "RightParen";

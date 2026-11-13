@@ -2,6 +2,7 @@
 #include "../runtime/headers/CodeGenContext.h"
 #include "../runtime/headers/ASTVisitors.h"
 #include "../loader/headers/loader.h"
+#include "headers/ui.h"
 #include <llvm/Support/FileSystem.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/Support/TargetSelect.h>
@@ -11,19 +12,21 @@
 #include <cstdio>
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Target/TargetMachine.h>
+#include <llvm/Support/Program.h>
 
-bool emitExecutable(llvm::Module* module, const std::string& outputPath, const std::string& entryFunction) {
+bool emitExecutable(llvm::Module* module, const std::string& outputPath) {
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
     llvm::InitializeNativeTargetAsmParser();
 
     // LLVM IR -> .ll
+    ui::stage("Writing LLVM IR to a file");
     std::error_code EC;
     std::string irPath = outputPath + ".ll";
     llvm::raw_fd_ostream irFile(irPath, EC, llvm::sys::fs::OF_None);
     
     if (EC) {
-        std::cerr << "Не удалось открыть файл для IR кода: " << EC.message() << std::endl;
+        std::cerr << "Could not open the IR file: " << EC.message() << std::endl;
         return false;
     }
     
@@ -31,22 +34,36 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath, const s
     irFile.close();
 
     std::string objPath = outputPath + ".o";
-    std::string llcCmd = "llc -filetype=obj -o " + objPath + " " + irPath;
-    
-    std::cout << "Запуск команды: " << llcCmd << std::endl;
-    int llcRet = std::system(llcCmd.c_str());
+    // llc может лежать не в PATH, а рядом с LLVM, с которым собран компилятор
+    std::string llcTool = "llc";
+#ifdef LLVM_TOOLS_PATH
+    if (std::ifstream(std::string(LLVM_TOOLS_PATH) + "/llc").good())
+        llcTool = std::string(LLVM_TOOLS_PATH) + "/llc";
+#endif
+    // pic нужен, потому что gcc по умолчанию собирает PIE, а без него не линкуются строки
+    ui::stage("llc: generating machine code");
+    auto llc = llvm::sys::findProgramByName(llcTool);
+    if (!llc) {
+        std::cerr << "Could not find llc: " << llc.getError().message() << std::endl;
+        return false;
+    }
+    int llcRet = llvm::sys::ExecuteAndWait(*llc,
+        {*llc, "-filetype=obj", "-relocation-model=pic", "-o", objPath, irPath});
     if (llcRet != 0) {
-        std::cerr << "Ошибка при выполнении llc: команда вернула код " << llcRet << std::endl;
+        ui::pipelineStop();
+        std::cerr << "llc failed with code " << llcRet << std::endl;
         return false;
     }
 
     std::string stdlibPath = loader::findLibraryPath();
     if (stdlibPath.empty()) {
-        std::cerr << "Не удалось найти стандартную библиотеку" << std::endl;
+        std::cerr << "Could not find the standard library" << std::endl;
         return false;
     }
 
+#if DEBUG
     std::cout << "Стандартная библиотека: " << stdlibPath << std::endl;
+#endif
 
     std::string stdlibDir = "";
     size_t lastSlash = stdlibPath.find_last_of('/');
@@ -54,81 +71,46 @@ bool emitExecutable(llvm::Module* module, const std::string& outputPath, const s
         stdlibDir = stdlibPath.substr(0, lastSlash);
     }
     
-    bool needsWrapper = (entryFunction != "main");
-    std::string wrapperPath;
-    
-    if (needsWrapper) {
-        wrapperPath = outputPath + "_wrapper.c";
-        std::ofstream wrapperFile(wrapperPath);
-        
-        if (!wrapperFile.is_open()) {
-            std::cerr << "Не удалось создать файл-обертку для main" << std::endl;
-            return false;
-        }
-
-        wrapperFile << "#include <stdint.h>\n\n";
-        wrapperFile << "extern int " << entryFunction << "();\n\n";
-        wrapperFile << "int main(int argc, char** argv) {\n";
-        wrapperFile << "    " << entryFunction << "();\n";
-        wrapperFile << "    return 0;\n";
-        wrapperFile << "}\n";
-        
-        wrapperFile.close();
-    }
-    
     // Компилируем и линкуем
-    std::string gccCmd = "gcc -g -o " + outputPath + " " + objPath;
-    
-    if (needsWrapper) {
-        gccCmd += " " + wrapperPath;
+    auto gcc = llvm::sys::findProgramByName("gcc");
+    if (!gcc) {
+        std::cerr << "Could not find gcc: " << gcc.getError().message() << std::endl;
+        return false;
     }
-    
-    // mono
-    gccCmd += " " + stdlibPath + " -lm -ldl -Wl,-rpath," + stdlibDir;
-    
-    std::cout << "Запуск команды: " << gccCmd << std::endl;
-    int gccRet = std::system(gccCmd.c_str());
+    const std::string rpath = "-Wl,-rpath," + stdlibDir;
+    ui::stage("gcc: linking the executable");
+    int gccRet = llvm::sys::ExecuteAndWait(*gcc,
+        {*gcc, "-g", "-o", outputPath, objPath, stdlibPath, "-lgc", "-lm", "-ldl", rpath});
     if (gccRet != 0) {
-        std::cerr << "Ошибка при линковке с помощью gcc: команда вернула код " << gccRet << std::endl;
+        ui::pipelineStop();
+        std::cerr << "gcc failed with code " << gccRet << std::endl;
         return false;
     }
     
     // Удаляем промежуточные файлы
     std::remove(irPath.c_str());
     std::remove(objPath.c_str());
-    if (needsWrapper) {
-        std::remove(wrapperPath.c_str());
-    }
     
     return true;
 }
 
-void compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::string& outputFile) {
+bool compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::string& outputFile, bool offOptimization) {
     CodeGenContext context(outputFile);
     ASTGen codeGen(context);
+    ui::stage("Code generation: building LLVM IR");
     combinedAST->accept(codeGen);
 
     if (context.TheModule != nullptr) {
-        std::string entryFunctionName = "main";
-        
-        // Поиск функции с меткой @entry
-        for (const auto& node : combinedAST->body) {
-            if (auto func = std::dynamic_pointer_cast<FunctionNode>(node)) {
-                for (const auto& label : func->labels) {
-                    if (label == "@entry") {
-                        entryFunctionName = func->name;
-                        break;
-                    }
-                }
-            }
-        }
 #if DEBUG
         std::cerr << "\n--- LLVM IR ---" << std::endl;
         context.TheModule->print(llvm::outs(), nullptr);
         std::cerr << "--- END LLVM IR ---\n" << std::endl;
 #endif
-        {
-            llvm::PassBuilder passBuilder;
+        // Без оптимизаций тесты ловят то, что O2 случайно маскирует: так прятался баг с раскладкой структур
+        if (offOptimization) ui::stage("Optimizer: skipped");
+        else {
+            ui::stage("Optimizer: running LLVM O2 passes");
+            llvm::PassBuilder passBuilder(&CodeGenContext::targetMachine()); // без машины цели O2 не знает стоимость инструкций и почти не векторизует
             llvm::LoopAnalysisManager LAM;
             llvm::FunctionAnalysisManager FAM;
             llvm::CGSCCAnalysisManager CGAM;
@@ -151,10 +133,18 @@ void compileToExecutable(std::shared_ptr<ProgramNode> combinedAST, const std::st
         context.TheModule->print(llvm::outs(), nullptr);
         std::cerr << "--- END LLVM IR(O2) ---\n" << std::endl;
 #endif
-        if (!emitExecutable(context.TheModule.get(), outputFile, entryFunctionName)) {
-            std::cerr << "Ошибка при компиляции в исполняемый файл." << std::endl;
+        if (!context.TheModule->getFunction("main")) {
+            ui::pipelineStop();
+            std::cerr << "Error: entry function not found: " << CodeGenContext::findEntryName(*combinedAST) << ", add main or mark a function with @entry" << std::endl;
+            return false;
         }
+        if (!emitExecutable(context.TheModule.get(), outputFile)) {
+            std::cerr << "Could not build the executable." << std::endl;
+            return false;
+        }
+        return true;
     } else {
-        std::cerr << "Ошибка: Не удалось получить модуль LLVM для компиляции." << std::endl;
+        std::cerr << "Error: could not get the LLVM module to compile." << std::endl;
+        return false;
     }
 }

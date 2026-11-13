@@ -1,5 +1,7 @@
 #ifndef AST_H
 #define AST_H
+#include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -19,6 +21,7 @@ class ASTNodeVisitor {
         virtual void visit(class ReassignMemberNode& node) = 0;
         virtual void visit(class VariableReassignNode& node) = 0;
         virtual void visit(class IfNode& node) = 0;
+        virtual void visit(class AttemptNode& node) = 0;
         virtual void visit(class ForNode& node) = 0;
         virtual void visit(class WhileNode& node) = 0;
         virtual void visit(class ReturnNode& node) = 0;
@@ -41,11 +44,12 @@ class ASTNodeVisitor {
 };
 
 class TypeNode;
+class FunctionNode;
 
 class ASTNode : public std::enable_shared_from_this<ASTNode> {
     public:
-        int line; // номер строки в исходном коде
-        int column; // номер столбца в исходном коде
+        int line = 0; // номер строки в исходном коде
+        int column = 0; // номер столбца в исходном коде
 
         std::shared_ptr<TypeNode> inferredType; // Выводимый тип узла (для IR)
 
@@ -145,6 +149,12 @@ class FunctionNode : public ASTNode {
 
         std::vector<std::string> labels; // @strict, @pure, @entry, @public, @private, @test
         std::shared_ptr<ASTNode> body; // BlockNode
+
+        // Шаблон: [T]first<T>(array<T>: a). Сам он не проверяется и не генерируется.
+        // instantiate заново разбирает функцию из токенов, подставляя вместо T конкретный тип:
+        // копия получается как только что разобранный код, и семантика может свободно её менять
+        std::vector<std::string> typeParameters;
+        std::function<std::shared_ptr<FunctionNode>(const std::map<std::string, std::string>&)> instantiate;
         
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);
@@ -196,6 +206,7 @@ class VariableAssignNode : public ASTNode {
         std::string name;
         std::shared_ptr<TypeNode> type;
         bool isConst;
+        bool isDeferred = false; // final без значения: присвоить можно ровно один раз, позже
         std::shared_ptr<ASTNode> expression;
 
         void accept(ASTNodeVisitor& visitor) override {
@@ -243,6 +254,16 @@ class IfNode : public ASTNode {
         }
 };
     
+class AttemptNode : public ASTNode {
+public:
+    std::shared_ptr<BlockNode> body;
+    std::shared_ptr<BlockNode> errorBody;
+    std::shared_ptr<BlockNode> panicBody;
+    std::string errorName;
+    std::string panicName;
+    void accept(ASTNodeVisitor& visitor) override { visitor.visit(*this); }
+};
+
 class ForNode : public ASTNode {
     public:
         ForNode() = default;
@@ -289,6 +310,7 @@ class CallNode : public ASTNode {
             : callee(callee), arguments(arguments) {}
         std::string callee;
         std::vector<std::shared_ptr<ASTNode>> arguments;
+        std::shared_ptr<TypeNode> functionValueType; // Вызов параметра типа func: keep(x)
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);
@@ -316,6 +338,9 @@ class UnaryOpNode : public ASTNode {
             : op(op), operand(operand) {}
         std::string op;
         std::shared_ptr<ASTNode> operand;
+        // Only postfix try: lazy replacement value or a terminating local handler.
+        std::shared_ptr<ASTNode> fallback;
+        std::shared_ptr<BlockNode> errorBody;
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);
@@ -327,6 +352,7 @@ class IdentifierNode : public ASTNode {
         IdentifierNode() = default;
         IdentifierNode(const std::string& name) : name(name) {}
         std::string name;
+        std::shared_ptr<FunctionNode> referencedFunction; // Имя функции, переданной как значение: filter(a, isPositive)
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);
@@ -339,7 +365,8 @@ class NumberNode : public ASTNode {
         NumberNode(int64_t value, std::shared_ptr<TypeNode> type) : value(value), type(type) {}
         int64_t value;
         std::shared_ptr<TypeNode> type; // тип числа (i32, i64, i8, i1)
-
+        bool isBoolLiteral = false; // написано true или false, а не 0 или 1
+        bool isCharLiteral = false; // написано 'a': это char, а не число, под другой тип не подстраивается
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);
@@ -349,8 +376,8 @@ class NumberNode : public ASTNode {
 class FloatNumberNode : public ASTNode {
     public:
         FloatNumberNode() = default;
-        FloatNumberNode(float value) : value(value) {}
-        float value;
+        FloatNumberNode(double value) : value(value) {}
+        double value;
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);
@@ -380,6 +407,7 @@ class NullNode : public ASTNode {
 class NoneNode : public ASTNode {
     public:
         NoneNode() = default;
+        bool isEmptyLiteral = false; // написано [] или {}, а не просто нет значения
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);

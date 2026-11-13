@@ -2,7 +2,7 @@
 #define LINKER_H
 
 #include "../../lexer/headers/Lexer.h"
-#include "../../includes/icecream.hpp"
+#include "../../includes/ic.hpp"
 #include "../../visitors/headers/TypeSymbolVisitor.h"
 
 #include <string>
@@ -112,7 +112,8 @@ private:
     bool                                                                                                processImports(ModuleContext& module);
     
     // Загрузка модуля по пути
-    bool                                                                                                loadModule(const std::string& modulePath);
+    bool                                                                                                loadModule(const std::string& moduleName, const std::string& filePath);
+    std::string                                                                                         resolveModule(const std::string& name, const ModuleContext& importer);
     
     // Вспомогательная хуйня
     bool                                                                                                symbolExists(const std::string& moduleName, 

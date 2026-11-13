@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="236" viewBox="0 0 860 236">
+<style>text{font-variant-ligatures:none;font-feature-settings:"liga" 0,"calt" 0}.flow{animation:flow 1s linear infinite}@keyframes flow{to{stroke-dashoffset:-9}}</style>
+<rect x="0.5" y="0.5" width="859" height="235" rx="14" fill="#000000" stroke="#262626"/>
+<text x="28" y="38" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="15" fill="#ffffff" text-anchor="start" letter-spacing="0.5"><tspan font-weight="800">COMPILE</tspan><tspan font-weight="300" dx="2" font-size="12.9">PIPELINE</tspan></text>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#737373"/></marker></defs>
+<rect x="28" y="66" width="136" height="62" rx="8" fill="#000000" stroke="#333333"/>
+<text x="96.0" y="93.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="15" font-weight="800" fill="#ffffff" text-anchor="middle" opacity="1">hello.ms</text>
+<text x="96.0" y="112.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="middle" opacity="1">source</text>
+<line x1="167" y1="97.0" x2="183" y2="97.0" stroke="#737373" stroke-width="1.5" stroke-dasharray="5 4" class="flow" marker-end="url(#a)"/>
+<rect x="186" y="66" width="136" height="62" rx="8" fill="#000000" stroke="#333333"/>
+<text x="254.0" y="93.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="15" font-weight="800" fill="#ffffff" text-anchor="middle" opacity="1">lexer</text>
+<text x="254.0" y="112.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="middle" opacity="1">tokens</text>
+<line x1="325" y1="97.0" x2="341" y2="97.0" stroke="#737373" stroke-width="1.5" stroke-dasharray="5 4" class="flow" marker-end="url(#a)"/>
+<rect x="344" y="66" width="136" height="62" rx="8" fill="#000000" stroke="#333333"/>
+<text x="412.0" y="93.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="15" font-weight="800" fill="#ffffff" text-anchor="middle" opacity="1">parser</text>
+<text x="412.0" y="112.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="middle" opacity="1">AST</text>
+<line x1="483" y1="97.0" x2="499" y2="97.0" stroke="#737373" stroke-width="1.5" stroke-dasharray="5 4" class="flow" marker-end="url(#a)"/>
+<rect x="502" y="66" width="136" height="62" rx="8" fill="#ffffff" stroke="#ffffff"/>
+<text x="570.0" y="93.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="15" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">checks</text>
+<text x="570.0" y="112.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#4d4d4d" text-anchor="middle" opacity="1">types @pure @strict</text>
+<line x1="641" y1="97.0" x2="657" y2="97.0" stroke="#737373" stroke-width="1.5" stroke-dasharray="5 4" class="flow" marker-end="url(#a)"/>
+<rect x="660" y="66" width="136" height="62" rx="8" fill="#000000" stroke="#333333"/>
+<text x="728.0" y="93.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="15" font-weight="800" fill="#ffffff" text-anchor="middle" opacity="1">LLVM</text>
+<text x="728.0" y="112.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="middle" opacity="1">IR, optimizer</text>
+<text x="570.0" y="146.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="11" font-weight="400" fill="#a3a3a3" text-anchor="middle" opacity="1">↑ mistakes stop here</text>
+<path d="M728.0 130 V154 H493.0 V172" fill="none" stroke="#737373" stroke-width="1.5" stroke-dasharray="5 4" class="flow" marker-end="url(#a)"/>
+<rect x="398.0" y="176" width="190" height="42" rx="21" fill="#ffffff" stroke="#ffffff"/>
+<text x="493.0" y="195.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="14" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">ms run</text>
+<text x="493.0" y="209.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#4d4d4d" text-anchor="middle" opacity="1">JIT, runs right away</text>
+<path d="M728.0 130 V154 H713.0 V172" fill="none" stroke="#737373" stroke-width="1.5" stroke-dasharray="5 4" class="flow" marker-end="url(#a)"/>
+<rect x="618.0" y="176" width="190" height="42" rx="21" fill="#000000" stroke="#ffffff"/>
+<text x="713.0" y="195.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="14" font-weight="800" fill="#ffffff" text-anchor="middle" opacity="1">ms --compile</text>
+<text x="713.0" y="209.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="middle" opacity="1">native executable</text>
+</svg>

@@ -4,17 +4,19 @@
 #include "../linker/headers/Linker.h"
 #include "../includes/ASTDebugger.hpp"
 #include "../errors/headers/ErrorEngine.h"
+#include "headers/ui.h"
 #include <iostream>
 #include <filesystem>
 
 std::vector<std::vector<Token>> tokenizeSource(const std::string& sourceCode, bool showTokens) {
+    ui::stage("Lexer: splitting the source into tokens");
     Lexer lexer(sourceCode);
     lexer.tokenize();
     
     if (showTokens) {
-        std::cout << "\n--- Токены ---\n";
+        std::cout << "\n--- Tokens ---\n";
         lexer.printTokens();
-        std::cout << "--- Конец токенов ---\n\n";
+        std::cout << "--- End of tokens ---\n\n";
     }
     
     return lexer.getTokens();
@@ -25,20 +27,21 @@ std::shared_ptr<ProgramNode> parseAndLinkModules(
     const std::string& inputFile, 
     bool showAST
 ) {
+    ui::stage("Parser: building the syntax tree");
     Parser parser(tokens, inputFile);
     auto program = parser.parse();
+
+    ui::stage("Linker: resolving modules and imports");
     
-    // Получаем путь текущего файла
-    std::string currentFilePath = std::filesystem::current_path().string();
-    Linker linker(currentFilePath);
+    Linker linker(STDLIB_MS_PATH);
     
     // Добавляем основной модуль
     if (!linker.addModule(std::filesystem::path(inputFile).stem().string(), inputFile, program)) {
-        throw std::runtime_error("Ошибка при добавлении модуля");
+        throw std::runtime_error("Could not add the module");
     }
     
     if (!linker.linkModules()) {
-        throw std::runtime_error("Ошибка при линковке модулей");
+        throw std::runtime_error("Could not link the modules");
     }
     
     // Создаем объединенный AST из всех модулей
@@ -60,14 +63,12 @@ std::shared_ptr<ProgramNode> parseAndLinkModules(
         // Копируем все узлы из текущего модуля в объединенный AST
         if (module.ast) {
             for (const auto& node : module.ast->body) {
-                // Пропускаем директивы импорта в объединенном AST, они уже обработаны
-                if (!std::dynamic_pointer_cast<ImportNode>(node)) {
-                    // Добавляем метку модуля в объединенный AST
-                    auto newModuleMark = std::make_shared<ModuleMark>(module.path);
-                    combinedAST->body.push_back(newModuleMark);
-                    
-                    combinedAST->body.push_back(node);
-                }
+                // Добавляем метку модуля в объединенный AST
+                auto newModuleMark = std::make_shared<ModuleMark>(module.path);
+                combinedAST->body.push_back(newModuleMark);
+
+                // Импорты тоже оставляем: по ним семантика решает, что видно этому модулю
+                combinedAST->body.push_back(node);
             }
         }
     }
@@ -77,20 +78,22 @@ std::shared_ptr<ProgramNode> parseAndLinkModules(
 #endif    
 
     if (showAST && combinedAST) {
-        std::cout << "\n--- Объединенный AST ---\n";
+        std::cout << "\n--- Combined AST ---\n";
         ASTDebugger::debug(combinedAST);
-        std::cout << "--- Конец объединенного AST ---\n";
+        std::cout << "--- End of combined AST ---\n";
     }
 
     
     // Инициализация ErrorEngine
     std::vector<std::string>* sourceFromTokens = new std::vector<std::string>();
+    std::vector<int>* lineNumbers = new std::vector<int>();
     for (const auto& tokenList : tokens) {
         std::string sourceLine;
         for (const auto& token : tokenList) {
             sourceLine += token.value + " ";
         }
         sourceFromTokens->push_back(sourceLine);
+        lineNumbers->push_back(tokenList.front().line);
     }
 
 #if DEBUG
@@ -104,7 +107,7 @@ std::shared_ptr<ProgramNode> parseAndLinkModules(
     std::cout << "--- Конец исходного кода из токенов ---\n";
 #endif
 
-    ErrorEngine::getInstance().initialize(*sourceFromTokens);
+    ErrorEngine::getInstance().initialize(*sourceFromTokens, *lineNumbers);
 
     return combinedAST;
 }

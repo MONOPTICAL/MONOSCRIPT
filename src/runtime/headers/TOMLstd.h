@@ -9,6 +9,7 @@
 #include <llvm/IR/Function.h>
 #include "../../includes/toml.hpp"
 #include "CodeGenContext.h"
+#include "../../visitors/headers/TomlType.h"
 
 inline llvm::Function* declareFunctionFromTOML(
     const std::string& funcName,
@@ -27,18 +28,22 @@ inline llvm::Function* declareFunctionFromTOML(
         const auto& retStr = toml::find<std::string>(func, "ret");
         const auto& argsArr = toml::find<std::vector<std::string>>(func, "args");
 
-        llvm::Type* retType = CodeGenContext::getLLVMType(std::make_shared<SimpleTypeNode>(retStr), ctx);
+        llvm::Type* retType = CodeGenContext::getLLVMType(parseTomlType(retStr), ctx);
         if (!retType) return nullptr;
 
         std::vector<llvm::Type*> argTypes;
         for (const auto& argStr : argsArr) {
-            llvm::Type* argType = CodeGenContext::getLLVMType(std::make_shared<SimpleTypeNode>(argStr), ctx);
+            llvm::Type* argType = CodeGenContext::getLLVMType(parseTomlType(argStr), ctx);
             if (!argType) return nullptr;
             argTypes.push_back(argType);
         }
 
+        const bool checked = toml::find_or<bool>(func, "panic_context", false);
+        if (checked) argTypes.push_back(llvm::PointerType::getUnqual(ctx));
         llvm::FunctionType* ftype = llvm::FunctionType::get(retType, argTypes, false);
-        return llvm::cast<llvm::Function>(module->getOrInsertFunction(name, ftype).getCallee());
+        auto function = llvm::cast<llvm::Function>(module->getOrInsertFunction(name, ftype).getCallee());
+        if (checked) function->addFnAttr("ms.panic_context");
+        return function;
     }
     return nullptr;
 }

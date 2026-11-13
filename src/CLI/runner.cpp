@@ -3,14 +3,11 @@
 #include "../runtime/headers/ASTVisitors.h"
 #include "../includes/ASTDebugger.hpp"
 #include "../loader/headers/loader.h"
+#include "headers/ui.h"
 #include <llvm/IR/Module.h>
 #include <llvm/Support/raw_ostream.h>
-#include <llvm/IRReader/IRReader.h>
-#include <llvm/Support/MemoryBuffer.h>
-#include <llvm/Support/SourceMgr.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
-#include <llvm/ExecutionEngine/GenericValue.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/Error.h>
 #include <iostream>
@@ -20,7 +17,7 @@
 #include <llvm/IR/PassManager.h>
 #include <llvm/Passes/PassBuilder.h>
 
-int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimization) {
+int executeModule(std::unique_ptr<llvm::Module> module, std::unique_ptr<llvm::LLVMContext> Ctx, std::string mainFunction, bool offOptimization) {
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
     llvm::InitializeNativeTargetAsmParser();
@@ -38,8 +35,9 @@ int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimi
     
     
     if (!handle) {
+        ui::pipelineStop();
         std::cerr << "Error loading standard library (libm_std.so): " << dlerror() << std::endl;
-        return 1;
+        return RUN_FAILED;
     }
 
     // JIT
@@ -51,38 +49,16 @@ int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimi
             JIT->getDataLayout().getGlobalPrefix()))
     );
 
-    // --- Клонирование модуля ---
-    auto Ctx = std::make_unique<llvm::LLVMContext>();
-    std::unique_ptr<llvm::Module> ClonedModule;
-
-    { // Ограничиваем область видимости буфера и потока
-        llvm::SmallString<0> IRBuffer;
-        llvm::raw_svector_ostream OS(IRBuffer);
-        module->print(OS, nullptr);
-
-        llvm::SMDiagnostic Err;
-        ClonedModule = llvm::parseIR(
-            *llvm::MemoryBuffer::getMemBuffer(IRBuffer.str()),
-            Err,
-            *Ctx
-        );
-
-        if (!ClonedModule) {
-            std::cerr << "Error cloning module for JIT: ";
-            Err.print("executeModule", llvm::errs());
-            return 1;
-        }
-    }
-
 #if DEBUG
     std::cout << "\n--- LLVM IR ---" << std::endl;
-    ClonedModule->print(llvm::outs(), nullptr);
+    module->print(llvm::outs(), nullptr);
     std::cout << "--- END LLVM IR ---\n" << std::endl;
 #endif
 
+    ui::stage(offOptimization ? "Optimizer: skipped" : "Optimizer: running LLVM O2 passes");
     if(!offOptimization)
     {
-        llvm::PassBuilder passBuilder;
+        llvm::PassBuilder passBuilder(&CodeGenContext::targetMachine()); // без машины цели O2 не знает стоимость инструкций и почти не векторизует
         llvm::LoopAnalysisManager LAM;
         llvm::FunctionAnalysisManager FAM;
         llvm::CGSCCAnalysisManager CGAM;
@@ -98,21 +74,26 @@ int executeModule(llvm::Module* module, std::string mainFunction, bool offOptimi
         llvm::ModulePassManager MPM = passBuilder.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
     
         // Прогоняем *оптимизейшен*
-        MPM.run(*ClonedModule, MAM);
+        MPM.run(*module, MAM);
     }
 
 #if DEBUG
     std::cout << "\n--- LLVM IR(O2) ---" << std::endl;
-    ClonedModule->print(llvm::outs(), nullptr);
+    module->print(llvm::outs(), nullptr);
     std::cout << "--- END LLVM IR(O2) ---\n" << std::endl;
 #endif
 
+    ui::stage("JIT: compiling to machine code");
+
     // ThreadSafeModule
-    llvm::orc::ThreadSafeModule TSM(std::move(ClonedModule), std::move(Ctx));
+    llvm::orc::ThreadSafeModule TSM(std::move(module), std::move(Ctx));
     ExitOnErr(JIT->addIRModule(std::move(TSM)));
 
     auto MainSymbol = ExitOnErr(JIT->lookup(mainFunction));
     auto MainFn = MainSymbol.toPtr<int(*)()>();
+
+    // Анимация заканчивается до старта: дальше экран принадлежит программе
+    ui::pipelineStop();
 
     // Вызываем функцию
     #if DEBUG
@@ -131,9 +112,15 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
     auto t_start = std::chrono::high_resolution_clock::now();
 #endif
     // Code generation
-    CodeGenContext context(currentFilePath);
-    ASTGen codeGen(context);
-    combinedAST->accept(codeGen);
+    ui::stage("Code generation: building LLVM IR");
+    auto llvmContext = std::make_unique<llvm::LLVMContext>();
+    std::unique_ptr<llvm::Module> module;
+    {
+        CodeGenContext context(currentFilePath, llvmContext.get());
+        ASTGen codeGen(context);
+        combinedAST->accept(codeGen);
+        module = std::move(context.TheModule);
+    }
 
 #if DEBUG
     auto t_codegen = std::chrono::high_resolution_clock::now();
@@ -143,29 +130,26 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
 
     try {
         
-        if (context.TheModule != nullptr) { 
-            std::string entryFunctionName = "main";
-            
-            // Поиск функции с меткой @entry
-            for (const auto& node : combinedAST->body) {
-                if (auto func = std::dynamic_pointer_cast<FunctionNode>(node)) {
-                    for (const auto& label : func->labels) {
-                        if (label == "@entry") {
-                            entryFunctionName = func->name;
-                            break;
-                        }
-                    }
-                }
-            }
+        if (module != nullptr) {
+            const std::string entryFunctionName = CodeGenContext::findEntryName(*combinedAST);
             
 #if DEBUG
             auto t_jit_start = std::chrono::high_resolution_clock::now();
 #endif
-            int result = executeModule(context.TheModule.get(), entryFunctionName, offOptimization);
+            if (!module->getFunction("main")) {
+                ui::pipelineStop();
+                std::cerr << "Error: entry function not found: " << entryFunctionName << ", add main or mark a function with @entry" << std::endl;
+                return RUN_FAILED;
+            }
+
+            int result = executeModule(std::move(module), std::move(llvmContext), "main", offOptimization);
 #if DEBUG
             auto t_jit_end = std::chrono::high_resolution_clock::now();
 #endif
-            std::cout << "[" << entryFunctionName << " exited with code " << result << "]" << std::endl;
+            if (result == RUN_FAILED) return RUN_FAILED;
+
+            std::cout << ui::style(stdout, result == 0 ? ui::DIM : ui::ACCENT) << "[" << entryFunctionName << " exited with code " << result << "]"
+                      << ui::style(stdout, ui::RESET) << std::endl;
 
 #if DEBUG
             // Статистика по времени
@@ -182,11 +166,11 @@ int runProgram(std::shared_ptr<ProgramNode> combinedAST, const std::string& curr
             
             return result;
         } else {
-            std::cerr << "Ошибка: Не удалось получить модуль LLVM для выполнения." << std::endl;
-            return 1;
+            std::cerr << "Error: could not get the LLVM module to run." << std::endl;
+            return RUN_FAILED;
         }
     } catch (const std::exception& e) {
-        std::cerr << "Ошибка при выполнении: " << e.what() << std::endl;
-        return 1;
+        std::cerr << "Error while running: " << e.what() << std::endl;
+        return RUN_FAILED;
     }
 }

@@ -68,6 +68,10 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         // if [expression] or if [expression]
         // if 2 > 0
         // ↑ if we have keyword if, we have if statement
+    else if (currentToken.type == TokenType::Keyword && currentToken.value == "attempt")
+    {
+        return parseAttempt();
+    }
     else if (currentToken.type == TokenType::Keyword && currentToken.value == "if")
     {
         return parseIf();
@@ -99,6 +103,7 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     {
         auto breakNode = std::make_shared<BreakNode>(); // А тут и в continue нехуй заморачиваться, правильно? правильно
         breakNode->line = lineIndex; breakNode->column = tokenIndex;
+        advance();
         return breakNode;
     }
     // Continue statement
@@ -108,11 +113,12 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     {
         auto continueNode = std::make_shared<ContinueNode>();
         continueNode->line = lineIndex; continueNode->column = tokenIndex;
+        advance();
         return continueNode;
     }
     else if (currentToken.type == TokenType::Identifier && (peek().type == TokenType::Dot || peek().type == TokenType::LeftBracket))
     {
-        auto memberExpression = parseMemberExpression();
+        auto memberExpression = parsePostfix(parseMemberExpression());
 
         if(!isEndOfLine() && check(TokenType::Operator))
         {
@@ -140,6 +146,7 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         // ↑ if we have identifier, and next token is operator and is not dot(Dot annotation), we have dynamic variable declaration or assignment
     else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::Operator)
     {
+        if (peek().value == "?") return parseExpression();
         return parseAssignment(false);
     }
     // Static variable declaration
@@ -150,11 +157,19 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     {
         return parseAssignment(false);
     }
+    // Struct variable declaration
+        // [StructName] [variableName] = [expression]
+        // User u = User()
+        // ↑ if we have two identifiers in a row, the first one is a struct type
+    else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::Identifier)
+    {
+        return parseAssignment(false);
+    }
     // Const variable declaration
         // const [Type] [variableName] = [expression] or [variableName] ^= [expression]
         // const i32 i = 0 or i ^= 0
         // ↑ if we have keyword const, and next token is type, we have const variable declaration
-    else if (currentToken.type == TokenType::Keyword && currentToken.value == "const" && peek().type == TokenType::Type)
+    else if (currentToken.type == TokenType::Keyword && currentToken.value == "const" && (peek().type == TokenType::Type || peek().type == TokenType::Identifier))
     {
         return parseAssignment(true);
     }
@@ -162,7 +177,7 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         // final [Type] [variableName] = [expression] or [variableName] ^= [expression]
         // final i32 i = 0 or i ^= 0
         // ↑ if we have keyword final, and next token is type, we have final variable declaration
-    else if(currentToken.type == TokenType::Keyword && currentToken.value == "final" && peek().type == TokenType::Identifier)
+    else if(currentToken.type == TokenType::Keyword && currentToken.value == "final" && (peek().type == TokenType::Type || peek().type == TokenType::Identifier))
     {
         return parseAssignment(true);
     }
@@ -173,12 +188,19 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         // ↑ if we have identifier, and next token is left parenthesis, we have function call
     else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::LeftParen)
     {
-        return parseCall();
+        return parseExpression();
     }
     // убрать это нахуй, какой бля нормальный человек начнёт писать строку с (
     else if (currentToken.type == TokenType::LeftParen)
     {
         return parseExpression();
+    }
+    // panic function call
+    else if(currentToken.type == TokenType::Keyword && currentToken.value == "panic" && peek().type == TokenType::LeftParen)
+    {
+        lines[lineIndex][tokenIndex].type = TokenType::Identifier;
+        auto funcCall = parseCall();
+        return funcCall;
     }
     else
     {

@@ -1,4 +1,5 @@
 #include "headers/Parser.h"
+#include "../visitors/headers/TomlType.h"
 /*
 Тут все логические и вспомогательные функции
 По типу getIndentLevel, getLastTokenInCurrentLine и т.д.
@@ -91,9 +92,11 @@ void Parser::throwError(const std::string &errMsg)
         sourceFragment = std::string(sourceFragment.size()-2, '-') + sourceFragment + std::string(sourceFragment.size()-2, '-');
     }
     
+    // Пустые строки выкинуты лексером, поэтому настоящий номер берём из токена
+    const bool hasLine = lineIndex < lines.size();
     throw std::runtime_error(
-        "Parser Error [line " + std::to_string(lineIndex+1) + 
-        (tokenIndex < lines[lineIndex].size() ? ", column " + std::to_string(lines[lineIndex][tokenIndex].column) : "") +
+        "Parser Error [line " + std::to_string(hasLine ? lines[lineIndex].front().line : lineIndex+1) +
+        (hasLine && tokenIndex < lines[lineIndex].size() ? ", column " + std::to_string(lines[lineIndex][tokenIndex].column) : "") +
         "]: " + errMsg + "\n\nSOURCE(FILENAME) - placeholders\n" + sourceFragment
     );
 }
@@ -173,6 +176,13 @@ std::shared_ptr<TypeNode> Parser::getFullType()
     
     std::string baseName = current().value;
     advance();
+
+    // В копии шаблона T это уже конкретный тип
+    if (auto substituted = typeSubstitution.find(baseName); substituted != typeSubstitution.end()) {
+        auto type = parseTomlType(substituted->second);
+        type->line = lineIndex; type->column = tokenIndex;
+        return type;
+    }
     
     // Проверяем, является ли это параметризованным типом (generic)
     if (check(TokenType::Operator) && current().value == "<") {
@@ -268,7 +278,7 @@ std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
         if (currentPrecedence < precedence) break; // Если текущий приоритет меньше, чем заданный, выходим из цикла
 
         advance(); // Переходим к следующему токену
-        auto right = parseBinary(currentPrecedence);
+        auto right = parseBinary(currentPrecedence + 1); // +1 чтобы 10 - 3 - 2 было (10 - 3) - 2
 
         left = std::make_shared<BinaryOpNode>(left, currentToken.value, right); // Создаём новый узел бинарной операции
         left->line = lineIndex; left->column = tokenIndex; // Устанавливаем строку и колонку для узла
@@ -288,7 +298,26 @@ std::shared_ptr<ASTNode> Parser::parseUnary()
         node->line = lineIndex; node->column = tokenIndex; // Устанавливаем строку и колонку для узла
         return node; // Возвращаем узел унарной операции
     }
-    return parsePrimary(); // Если нет унарной операции, разбираем первичное выражение
+    return parsePostfix(parsePrimary());
+}
+
+std::shared_ptr<ASTNode> Parser::parsePostfix(std::shared_ptr<ASTNode> expression)
+{
+    while (check(TokenType::Operator) && current().value == "?") {
+        const int line = lineIndex, column = tokenIndex;
+        advance();
+        auto unwrap = std::make_shared<UnaryOpNode>("try", expression);
+        expression = unwrap;
+        expression->line = line; expression->column = column;
+        if (current().value == "else") {
+            advance();
+            if (match(TokenType::Colon)) unwrap->errorBody = parseInlineHandler();
+            else unwrap->fallback = parseExpression();
+            break;
+        }
+        if (check(TokenType::Arrow)) expression = parseCast(expression);
+    }
+    return expression;
 }
 
 std::shared_ptr<ASTNode> Parser::parsePrimary()
@@ -298,12 +327,12 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
     {
         advance(); // Переходим к следующему токену
         std::optional<int64_t> intValue; // Переменная для хранения значения числа
-        std::optional<float> floatValue; // Переменная для хранения значения числа с плавающей точкой
+        std::optional<double> floatValue; // Переменная для хранения значения числа с плавающей точкой
         try
         {
             if(std::find(currentToken.value.begin(), currentToken.value.end(), '.') != currentToken.value.end()) // Если число с плавающей точкой
             {
-                floatValue = std::stof(currentToken.value); // Преобразуем строку в число с плавающей точкой
+                floatValue = std::stod(currentToken.value); // Преобразуем строку в число с плавающей точкой
             }
             else
             {
@@ -313,6 +342,12 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         catch (const std::invalid_argument& e) // Если преобразование не удалось, выбрасываем исключение
         {
             throw std::runtime_error("Parser Error: Invalid number format at line " + std::to_string(currentToken.line) +
+                ", column " + std::to_string(currentToken.column) +
+                ": " + currentToken.value);
+        }
+        catch (const std::out_of_range& e) // Если число не влезает в тип
+        {
+            throw std::runtime_error("Parser Error: Number out of range at line " + std::to_string(currentToken.line) +
                 ", column " + std::to_string(currentToken.column) +
                 ": " + currentToken.value);
         }
@@ -352,6 +387,38 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
             if(check(TokenType::Arrow)) return parseCast(ASTnode); // Если есть каст, то кастим
             return ASTnode; // Возвращаем узел числа с плавающей точкой
         }
+    }
+    else if (currentToken.type == TokenType::Char) // Литерал 'a': один байт
+    {
+        advance();
+        std::string text = currentToken.value.substr(1, currentToken.value.size() - 2);
+        int code = -1;
+        if (text.size() == 1 && text[0] != '\\') {
+            code = static_cast<unsigned char>(text[0]);
+        } else if (text.size() == 2 && text[0] == '\\') {
+            switch (text[1]) {
+                case 'n': code = '\n'; break;
+                case 't': code = '\t'; break;
+                case 'r': code = '\r'; break;
+                case 'f': code = '\f'; break;
+                case 'b': code = '\b'; break;
+                case '0': code = 0; break;
+                case '\'': code = '\''; break;
+                case '"': code = '"'; break;
+                case '\\': code = '\\'; break;
+                default: throwError("Unknown escape in char literal: " + text);
+            }
+        } else if (text.empty()) {
+            throwError("Empty char literal");
+        } else {
+            throwError("A char is one byte, this does not fit: '" + text + "'. Use a string");
+        }
+
+        auto ASTnode = std::make_shared<NumberNode>(code, std::make_shared<SimpleTypeNode>("char"));
+        ASTnode->isCharLiteral = true;
+        ASTnode->line = lineIndex; ASTnode->column = tokenIndex;
+        if(check(TokenType::Arrow)) return parseCast(ASTnode);
+        return ASTnode;
     }
     else if (currentToken.type == TokenType::String) // Если токен - строка
     {
@@ -409,12 +476,24 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
                 } while (match(TokenType::Comma));
             }
 
+                
             consume(TokenType::RightParen, "Expected ')' after function arguments"); // Проверяем наличие правой скобки
             
-            auto ASTnode = std::make_shared<CallNode>(currentToken.value, arguments); // Создаём узел вызова функции
-            ASTnode->line = lineIndex; ASTnode->column = tokenIndex; // Устанавливаем строку и колонку для узла
+            auto ASTnode = std::make_shared<CallNode>(currentToken.value, arguments); 
+            ASTnode->line = lineIndex; ASTnode->column = tokenIndex;
+
+            // divide(4, 2).value, mk()[1]
+            if (check(TokenType::Dot) || check(TokenType::LeftBracket)) {
+                auto root = std::make_shared<AccessExpression>();
+                root->line = ASTnode->line; root->column = ASTnode->column;
+                root->baseName = ASTnode->callee;
+                root->expression = ASTnode;
+                return parseAccessChain(root);
+            }
             
             if(check(TokenType::Arrow)) return parseCast(ASTnode); // Если есть каст, то кастим
+
+           
             
             return ASTnode; // Возвращаем узел вызова функции
         }
@@ -493,6 +572,8 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
         if(peek().type == TokenType::RightBracket) {
             auto none = std::make_shared<NoneNode>(); 
             none->line = lineIndex; none->column = tokenIndex; // Устанавливаем строку и колонку для узла
+            advance(); advance(); // съедаем [ и ]
+            none->isEmptyLiteral = true;
             return none; // Возвращаем узел none
         }// если нихуя нету в скобках скипай
 
@@ -510,7 +591,13 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
     }
     else if (currentToken.type == TokenType::LeftBrace)
     {
-        if(peek().type == TokenType::RightBrace)  return std::make_shared<NoneNode>(); 
+        if(peek().type == TokenType::RightBrace)
+        {
+            advance(); advance(); // съедаем { и }
+            auto none = std::make_shared<NoneNode>();
+            none->isEmptyLiteral = true;
+            return none;
+        }
 
         std::shared_ptr<BlockNode> body = std::make_shared<BlockNode>();
         body->line = lineIndex; body->column = tokenIndex; // Устанавливаем строку и колонку для узла
@@ -545,16 +632,8 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
 
         consume(TokenType::RightParen, "Expected ')' after expression"); // Проверяем наличие правой скобки
 
-        /*
-        TODO: Каст выражений с помощью CastNode.
-        Пример: (1+2)->i32
-        if (check(TokenType::Arrow)) // Если есть каст, то кастим
-        {
-            auto cast = std::make_shared<CastNode>(expression);
-            cast->line = lineIndex; cast->column = tokenIndex; // Устанавливаем строку и колонку для узла
-            return parseCast(cast);
-        }
-        */
+        if(check(TokenType::Arrow)) return parseCast(expression); // Если есть каст, то кастим
+
         return expression; // Возвращаем разобранное выражение
     }
     else if (currentToken.type == TokenType::Keyword)
@@ -567,7 +646,8 @@ std::shared_ptr<ASTNode> Parser::parsePrimary()
             type->line = lineIndex; type->column = tokenIndex; // Устанавливаем строку и колонку для узла
             
             auto numberNode = std::make_shared<NumberNode>(currentToken.value == "true", type); // Создаём узел булевого значения
-            
+            numberNode->isBoolLiteral = true;
+
             numberNode->line = lineIndex; numberNode->column = tokenIndex; // Устанавливаем строку и колонку для узла
             return numberNode; // Создаём узел булевого значения
         }
@@ -623,9 +703,11 @@ void Parser::parseDotNotation(std::shared_ptr<AccessExpression> next)
     {
         next->expression = parseCall();
     }
-    else 
+    else
+    {
         next->expression = std::make_shared<IdentifierNode>(current().value); // Изначально выражение - это идентификатор
         if(!check(TokenType::LeftBracket)) advance();
+    }
 
     if(check(TokenType::Dot))
     {
@@ -650,14 +732,22 @@ void Parser::parseArrayNotation(std::shared_ptr<AccessExpression> next)
     next->expression = parseExpression();
     
     consume(TokenType::RightBracket, "Expected ']' after array notation");
+
+    if(check(TokenType::Dot))
+    {
+        next->notation = "."; // Устанавливаем нотацию для текущего узла
+    }
+    else if(check(TokenType::LeftBracket))
+    {
+        next->notation = "[]"; // Устанавливаем нотацию для текущего узла
+    }
 }
 
 std::shared_ptr<ASTNode> Parser::parseMemberExpression()
 {
     std::shared_ptr<AccessExpression> root = std::make_shared<AccessExpression>();
     root->line = lineIndex; root->column = tokenIndex; // Устанавливаем строку и колонку для узла
-    auto currentNode = root;
-    
+
     if (!(check(TokenType::Identifier) || check(TokenType::Type)))
     {
         throwError("Expected type or identifier in member expression");
@@ -666,7 +756,13 @@ std::shared_ptr<ASTNode> Parser::parseMemberExpression()
     root->baseName= current().value;
     root->expression = std::make_shared<IdentifierNode>(root->baseName); // Изначально выражение - это идентификатор
     advance();
-    
+
+    return parseAccessChain(root);
+}
+
+std::shared_ptr<ASTNode> Parser::parseAccessChain(std::shared_ptr<AccessExpression> root)
+{
+    auto currentNode = root;
     while (check(TokenType::Dot) || check(TokenType::LeftBracket) || 
            (check(TokenType::LeftParen) && currentNode->baseName.size() > 0))
     {
@@ -702,6 +798,8 @@ std::shared_ptr<ASTNode> Parser::parseMemberExpression()
         IdentifierASTNode->line = lineIndex; IdentifierASTNode->column = tokenIndex; // Устанавливаем строку и колонку для узла
         return IdentifierASTNode; // Возвращаем узел идентификатора
     }
+
+    if (check(TokenType::Arrow)) return parseCast(root); // a[0]->i32
     
     return root;
 }
