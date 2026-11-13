@@ -4,5 +4,5 @@ use
 
 [i32]main()
 |   array<i32> a = [1]
-|   n ^= indexOf(a, "x")? else -1
+|   n ^= indexOf(a, "x")
 |   return n

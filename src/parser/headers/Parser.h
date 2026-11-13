@@ -52,6 +52,7 @@ private:
     std::shared_ptr<ASTNode> parseReturn();
     std::shared_ptr<ASTNode> parseCall();
     std::shared_ptr<ASTNode> parseStruct();
+    std::shared_ptr<ASTNode> parseNamespace();
 
     std::shared_ptr<ASTNode> parseUse();
 

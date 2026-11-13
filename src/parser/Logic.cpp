@@ -177,6 +177,13 @@ std::shared_ptr<TypeNode> Parser::getFullType()
     std::string baseName = current().value;
     advance();
 
+    // Тип из namespace: Xyi.x
+    while (check(TokenType::Dot) && peek().type == TokenType::Identifier) {
+        advance();
+        baseName += "." + current().value;
+        advance();
+    }
+
     // В копии шаблона T это уже конкретный тип
     if (auto substituted = typeSubstitution.find(baseName); substituted != typeSubstitution.end()) {
         auto type = parseTomlType(substituted->second);

@@ -5,6 +5,10 @@ void Registry::addBuiltinType(const std::string& name, std::shared_ptr<TypeNode>
     builtinTypes[name] = type;
 }
 
+void Registry::addNamespace(const std::string& name, std::shared_ptr<NamespaceNode> ns) {
+    userNamespaces[name] = ns;
+}
+
 void Registry::addBuiltinFunction(const std::string& name, std::shared_ptr<FunctionNode> func) {
     builtinFunctions[name].push_back(func);
 }
@@ -54,6 +58,12 @@ std::shared_ptr<StructNode> Registry::findStruct(const std::string& name) const 
     return nullptr;
 }
 
+std::shared_ptr<NamespaceNode> Registry::findNamespace(const std::string& name) const {
+    auto it = userNamespaces.find(name);
+    if (it != userNamespaces.end()) return it->second;
+    
+    return nullptr;
+}
 std::shared_ptr<ClassNode> Registry::findClass(const std::string& name) const {
     auto it = userClasses.find(name);
     if (it != userClasses.end()) return it->second;

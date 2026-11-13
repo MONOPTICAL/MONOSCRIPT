@@ -104,5 +104,5 @@ void TypeSymbolVisitor::visit(StructNode& node) {
     // Возвращаемся к предыдущему контексту
     contexts.pop_back();
 
-    if (contexts.size() > 1) hoistedStructs.push_back(node.shared_from_this());
+    if (contexts.size() > 1 || !contexts.back().currentNamespace.empty()) hoistedStructs.push_back(node.shared_from_this());
 }

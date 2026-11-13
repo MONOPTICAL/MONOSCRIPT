@@ -3,6 +3,7 @@
 #include "../../CLI/headers/ui.h"
 #include "../../errors/headers/ErrorEngine.h"
 #include <iostream>
+#include <memory>
 
 std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSymbolVisitor& visitor);
 std::shared_ptr<TypeNode> functionTypeOf(const FunctionNode& function);
@@ -319,10 +320,35 @@ void TypeSymbolVisitor::visit(ProgramNode &node)
     node.body.insert(node.body.begin(), hoistedStructs.begin(), hoistedStructs.end());
 }
 
+void TypeSymbolVisitor::visit(NamespaceNode &node)
+{
+    // Добавляем пространство имён в текущий контекст
+    contexts.back().namespaces[node.name] = node.shared_from_this();
+
+    if(!contexts.back().scopePath.empty())
+        LogError("Namespace declaration inside another scope is not allowed");
+
+    if(registry.findNamespace(node.name))
+        LogError("Namespace already defined: " + node.name);
+
+    registry.addNamespace(node.name, std::make_shared<NamespaceNode>(node));
+    contexts.back().scopePath = node.name;
+    contexts.back().currentNamespace = node.name;
+    // Проходим по телу пространства имён
+    node.body->accept(*this);
+    contexts.back().scopePath = ""; // Убираем пространство имён из текущего контекста после обработки его тела
+    contexts.back().currentNamespace = "";  
+}
+
 void TypeSymbolVisitor::visit(FunctionNode &node)
 {
     if (!node.typeParameters.empty()) return; // Проверяются только копии шаблона
     ui::stageDetail(node.name);
+    const std::string visibleName = node.name;
+    const std::string parent = contexts.back().scopePath;
+    // Функция namespace получает полное имя ns.f, как структура в StructClass.cpp
+    if (contexts.size() == 1 && node.associated.empty() && !parent.empty())
+        node.name = parent + "." + node.name;
     // Проверяем, существует ли функция в реестре(в текущем контексте или глобальном)
     // Если вызов выше определения уже положил сюда эту же функцию, это не повтор
     auto existingFunction = contexts.back().functions.find(node.name);
@@ -335,7 +361,6 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
 
     // У каждой локальной функции свой символ LLVM, иначе одноимённые в разных функциях сольются в одну
     static int localFunctions = 0;
-    const std::string visibleName = node.name;
     if (contexts.size() > 1 && node.associated.empty())
         node.name += "::local" + std::to_string(++localFunctions);
 
@@ -411,10 +436,10 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
         .variables = variables, // Добавляем переменные текущего контекста
         .functions = functions, // Добавляем функции текущего контекста
         .currentFunctionName = node.name,       // Имя функции 
+        .currentNamespace = contexts.back().currentNamespace,
         .returnType = node.returnType,          // Тип возвращаемого значения
         .returnedValue = false                  // Возвращаемое значение
     };
-    const std::string& parent = contexts.back().scopePath;
     currentFunction.scopePath = parent.empty() ? visibleName : parent + "." + visibleName;
 
     std::cout << "Current scope path: " << currentFunction.scopePath << std::endl;
@@ -433,7 +458,7 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
     // Если функция не является методом класса, то добавляем ее в глобальный реестр
     // Метод вызывается только через объект, как функция он не виден
     if(node.associated.empty()) {
-        if(contexts.size() == 1)
+        if(contexts.size() == 1) // снаружи функция namespace видна только по полному имени
             contexts[0].functions[node.name] = node.shared_from_this();
         else {
             contexts.back().functions[node.name] = node.shared_from_this();
@@ -517,6 +542,9 @@ static std::string getType(std::shared_ptr<ASTNode> expression, std::string type
 
 void TypeSymbolVisitor::visit(VariableAssignNode &node)
 {
+    // Переменная namespace получает полное имя Xyi.x, как функции и структуры
+    if (contexts.size() == 1 && !contexts.back().currentNamespace.empty())
+        node.name = contexts.back().currentNamespace + "." + node.name;
     // Проверяем, существует ли переменная в реестре. _ можно объявлять сколько угодно: так игнорируют result
     if (node.name != "_" && contexts.back().variables.find(node.name) != contexts.back().variables.end()) {
         LogError("Variable already defined: " + node.name);
@@ -687,6 +715,7 @@ void TypeSymbolVisitor::visit(ReturnNode &node)
 
 // TODO: Переделать функцию полность потому что она хуйня ебанная
 void TypeSymbolVisitor::visit(VariableReassignNode& node) {
+    resolveNamespaceVariable(node.name);
     // Проверяем, существует ли переменная в реестре
     if (contexts.back().variables.find(node.name) == contexts.back().variables.end()) {
         LogError("Variable not found: " + node.name, node.shared_from_this());
@@ -1157,6 +1186,11 @@ void TypeSymbolVisitor::visit(CallNode& node) {
     }
 
     // Создание структуры: P(). Функция с таким же именем важнее
+    // x() внутри namespace Xyi создаёт Xyi.x
+    if (auto fullName = findStructFullName(node.callee); fullName
+        && contexts.back().functions.find(node.callee) == contexts.back().functions.end()
+        && declaredFunctions.find(node.callee) == declaredFunctions.end())
+        node.callee = *fullName;
     if (contexts.back().functions.find(node.callee) == contexts.back().functions.end()
         && declaredFunctions.find(node.callee) == declaredFunctions.end()
         && registry.findStruct(node.callee)) {
@@ -1191,6 +1225,13 @@ void TypeSymbolVisitor::visit(CallNode& node) {
         else if (registry.findFunction(node.callee) != nullptr) 
             contexts.back().functions[node.callee] = registry.findFunction(node.callee);
 
+        // Если функция в namespace зовёт другую функцию в том же namespace, нужно учитывать префикс namespace
+        else if (const std::string full = contexts.back().currentNamespace + "." + node.callee;
+         !contexts.back().currentNamespace.empty() && contexts.back().functions.count(full))
+        {   
+            contexts.back().functions[node.callee] = contexts.back().functions[full];
+            node.callee = full;
+        }
         // Функция нихуя не найдена
         else
             LogError("Function not found: " + node.callee, node.shared_from_this());

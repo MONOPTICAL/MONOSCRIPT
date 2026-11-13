@@ -7,5 +7,5 @@ use
 
 [i32]main()
 |   array<P> a = [P(), P()]
-|   b ^= sort(a)? else a
+|   b ^= sort(a)
 |   return 0

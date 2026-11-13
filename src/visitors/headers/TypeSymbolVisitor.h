@@ -10,14 +10,17 @@
 #include "Register.h"
 #include "BuiltIn.h"
 #include <fstream>
+#include <string>
 
 struct Context {
     std::vector<std::string> labels;
     std::unordered_map<std::string, std::shared_ptr<ASTNode>> variables;
     std::unordered_map<std::string, std::shared_ptr<ASTNode>> functions;
+    std::unordered_map<std::string, std::shared_ptr<ASTNode>> namespaces; // Пространства имён в текущем контексте
     std::unordered_map<std::string, std::string> structsFullName; // Полное имя структуры по её локальному имени
     std::string scopePath; // Путь области видимости, например "h" для h::local1
     std::string currentFunctionName;
+    std::string currentNamespace;
     std::shared_ptr<TypeNode> returnType;
     int resultHandlerDepth = 0;
     bool returnedValue = false;
@@ -42,6 +45,10 @@ private:
 
     std::vector<Context>                                            contexts;
     std::vector<std::shared_ptr<ASTNode>>                           hoistedStructs;
+    // Полное имя структуры (Xyi.x) по короткому: лежит в контексте, где её объявили, а не в текущем
+    const std::string*                                              findStructFullName(const std::string& name) const;
+    // Внутри namespace Xyi короткое x это переменная Xyi.x: переписывает имя на полное
+    void                                                            resolveNamespaceVariable(std::string& name) const;
 
     bool                                                            lastAccessResultField = false; // r.value и прочие поля result только для чтения
     bool                                                            checkResultLiteral(const std::shared_ptr<ASTNode>& node, const std::string& targetType);
@@ -212,6 +219,7 @@ public:
     void                                                            visit(SimpleTypeNode& node) override;
     void                                                            visit(GenericTypeNode& node) override;
     void                                                            visit(ProgramNode& node) override;
+    void                                                            visit(NamespaceNode& node) override;
     void                                                            visit(FunctionNode& node) override;
     void                                                            visit(StructNode& node) override;
     void                                                            visit(BlockNode& node) override;

@@ -121,10 +121,17 @@ void ASTGen::visit(ProgramNode& node) {
     }
 
     // И так же с функциями объявляем сигнатуры заранее, чтобы их можно было вызывать до определения
-    for (auto& n : node.body) {
+    auto declare = [&](const std::shared_ptr<ASTNode>& n) {
         if (auto function = std::dynamic_pointer_cast<FunctionNode>(n); function && function->associated.empty() && function->typeParameters.empty()) {
             declareUserFunction(context, *function);
         }
+    };
+    for (auto& n : node.body) {
+        declare(n);
+        // Функции namespace уже названы ns.f семантикой, объявляем их наравне с глобальными
+        if (auto ns = std::dynamic_pointer_cast<NamespaceNode>(n))
+            if (auto block = std::dynamic_pointer_cast<BlockNode>(ns->body))
+                for (auto& statement : block->statements) declare(statement);
     }
 
     context.StartFunction = llvm::Function::Create(
@@ -146,8 +153,15 @@ void ASTGen::visit(ProgramNode& node) {
     // После инициализации контекста паники и стека можно продолжать генерацию кода программы
     context.Builder.ClearInsertionPoint();
 
-    for (auto& n : node.body) {
-        if (!n) continue;
+    std::function<void(const std::shared_ptr<ASTNode>&)> emit = [&](const std::shared_ptr<ASTNode>& n) {
+        if (!n) return;
+
+        // Тело namespace это те же глобальные объявления: переменные тоже идут в стартовую функцию
+        if (auto ns = std::dynamic_pointer_cast<NamespaceNode>(n)) {
+            if (auto block = std::dynamic_pointer_cast<BlockNode>(ns->body))
+                for (auto& statement : block->statements) emit(statement);
+            return;
+        }
 
         // Глобальные переменные инициализируются в стартовой функции в порядке объявления
         if (std::dynamic_pointer_cast<VariableAssignNode>(n)) {
@@ -156,12 +170,13 @@ void ASTGen::visit(ProgramNode& node) {
             n->accept(*this);
             startBlock = context.Builder.GetInsertBlock(); // Выражение могло создать новые блоки
             context.Builder.ClearInsertionPoint(); // Очищаем точку вставки после обработки глобальной переменной
-            continue;
+            return;
         }
 
         n->accept(*this);
         // Результат последнего узла становится результатом программы
-    }
+    };
+    for (auto& n : node.body) emit(n);
 
     finishStartFunction(context, node, startBlock);
 #if DEBUG
@@ -1109,6 +1124,11 @@ void ASTGen::visit(ContinueNode& node) {
 }
 
 void ASTGen::visit(AccessExpression& node) {
+    // Семантика свернула math.f(1) или Xyi.x в голый вызов или переменную без звеньев
+    if (!node.nextAccess && node.expression) {
+        node.expression->accept(*this);
+        return;
+    }
     llvm::Type* elementType = nullptr;
     llvm::Value* elementPtr = Arrays::emitElementPtr(context, node, elementType);
     // Метод без результата: p.birthday()
@@ -1125,6 +1145,11 @@ void ASTGen::visit(ImportNode &node)
     Они уже убраны к хуям собачим из AST перед этапом семантики
             Смысла реализовывать здесь что то нет
     */
+}
+
+void ASTGen::visit(NamespaceNode &node)
+{
+    node.body->accept(*this);
 }
 
 void ASTGen::visit(LambdaNode &node)

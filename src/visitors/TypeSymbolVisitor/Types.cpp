@@ -1,16 +1,34 @@
 #include "../headers/TypeSymbolVisitor.h"
 
+const std::string* TypeSymbolVisitor::findStructFullName(const std::string& name) const
+{
+    for (auto it = contexts.rbegin(); it != contexts.rend(); ++it)
+        if (auto f = it->structsFullName.find(name); f != it->structsFullName.end()) return &f->second;
+    return nullptr;
+}
+
+void TypeSymbolVisitor::resolveNamespaceVariable(std::string& name) const
+{
+    const auto& context = contexts.back();
+    if (context.currentNamespace.empty() || context.variables.count(name)) return;
+    if (const std::string full = context.currentNamespace + "." + name; context.variables.count(full)) name = full;
+}
+
 void TypeSymbolVisitor::visit(SimpleTypeNode &node)
 {
     // Проверяем, существует ли тип в реестре
     auto type = registry.findType(node.name);
-    if (!type && !registry.findStruct(node.name) && !contexts.back().structsFullName.count(node.name)) {
+    auto fullName = findStructFullName(node.name);
+    
+    if (!type && !registry.findStruct(node.name) && !registry.findNamespace(node.name) && !fullName) {
         LogError("Unknown type: " + node.name);
     }
 
-    if (!type && contexts.back().structsFullName.count(node.name)) {
-        node.name = contexts.back().structsFullName[node.name];
+    if (!type && fullName) {
+        node.name = *fullName;
     }
+    if (!type && registry.findNamespace(node.name))
+        node.name = contexts.back().scopePath + "." + node.name;
     // Структуры в реестре типов нет, тип такого узла это он сам
     node.inferredType = type ? type : std::make_shared<SimpleTypeNode>(node.name);
 }
@@ -60,6 +78,7 @@ std::shared_ptr<TypeNode> functionTypeOf(const FunctionNode& function) {
 
 void TypeSymbolVisitor::visit(IdentifierNode& node)
 {
+    resolveNamespaceVariable(node.name);
     // Проверяем, существует ли переменная в реестре
     auto it = contexts.back().variables.find(node.name);
     if (it == contexts.back().variables.end()) {

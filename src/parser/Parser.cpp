@@ -116,6 +116,14 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         advance();
         return continueNode;
     }
+    // Переменная с типом из namespace: Xyi.x p = Xyi.x()
+    else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::Dot
+             && tokenIndex + 3 < lines[lineIndex].size()
+             && lines[lineIndex][tokenIndex + 2].type == TokenType::Identifier
+             && lines[lineIndex][tokenIndex + 3].type == TokenType::Identifier)
+    {
+        return parseAssignment(false);
+    }
     else if (currentToken.type == TokenType::Identifier && (peek().type == TokenType::Dot || peek().type == TokenType::LeftBracket))
     {
         auto memberExpression = parsePostfix(parseMemberExpression());
@@ -201,6 +209,11 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         lines[lineIndex][tokenIndex].type = TokenType::Identifier;
         auto funcCall = parseCall();
         return funcCall;
+    }
+    else if (currentToken.type == TokenType::LeftBracket && peek().value == "namespace")
+    {
+        // [namespace] namespaceName
+        return parseNamespace();
     }
     else
     {

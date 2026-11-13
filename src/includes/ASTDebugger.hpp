@@ -43,6 +43,11 @@ class ASTDebugger
                 }
                 debug(func->body, indent + 2);
             }
+            else if (auto namespaceNode = std::dynamic_pointer_cast<NamespaceNode>(node))
+            {
+                printIndent(indent); std::cout << "[Namespace] " << namespaceNode->name << "\n";
+                debug(namespaceNode->body, indent + 2);
+            }
             else if (auto moduleMark = std::dynamic_pointer_cast<ModuleMark>(node))
             {
                 printIndent(indent); std::cout << "[Module Mark] " << moduleMark->moduleName << "\n";

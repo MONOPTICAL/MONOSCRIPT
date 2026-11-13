@@ -498,6 +498,47 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
     return varAssign; // Возвращаем узел присваивания переменной
 }
 
+std::shared_ptr<ASTNode> Parser::parseNamespace()
+{
+    /*
+    Namespace definition:
+    [namespace] MyNamespace
+    | // body
+    */
+    int line = lineIndex; int token = tokenIndex; // Запоминаем строку и токен
+    consume(TokenType::LeftBracket, "Expected '[' before namespace declaration"); // Проверяем наличие левой скобки
+    consume(TokenType::Keyword, "Expected 'namespace' keyword"); // Проверяем наличие ключевого слова namespace
+    consume(TokenType::RightBracket, "Expected ']' before namespace declaration"); // Проверяем наличие правой скобки
+
+    std::string name = current().value; // Сохраняем имя пространства имён
+    consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора
+    if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
+
+    std::shared_ptr<NamespaceNode> namespaceNode = std::make_shared<NamespaceNode>();
+    namespaceNode->line = line; namespaceNode->column = token;
+    namespaceNode->name = name;
+
+    const int declIndent = getIndentLevel(lines[lineIndex]);
+    const int expectedIndent = declIndent + 1;
+
+    nextLine();
+
+    if (isEndOfFile())
+        throwError("Expected indentation after function declaration");
+
+    if (getIndentLevel(lines[lineIndex]) == expectedIndent)
+    {
+        namespaceNode->body = parseBlock(expectedIndent);
+        lineIndex--; 
+    }
+    else
+    {
+        throwError("Expected indentation after function declaration");
+    }
+    
+    return namespaceNode;
+}
+
 std::shared_ptr<ASTNode> Parser::parseCall()
 {
     /*

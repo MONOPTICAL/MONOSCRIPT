@@ -14,6 +14,7 @@ class ASTNodeVisitor {
         virtual void visit(class SimpleTypeNode& node) = 0;
         virtual void visit(class GenericTypeNode& node) = 0;
         virtual void visit(class ProgramNode& node) = 0;
+        virtual void visit(class NamespaceNode& node) = 0;
         virtual void visit(class FunctionNode& node) = 0;
         virtual void visit(class StructNode& node) = 0;
         virtual void visit(class BlockNode& node) = 0;
@@ -130,6 +131,19 @@ class ProgramNode : public ASTNode {
             : body(body), moduleName(moduleName) {}
         std::vector<std::shared_ptr<ASTNode>> body;
         std::string moduleName;
+
+        void accept(ASTNodeVisitor& visitor) override {
+            visitor.visit(*this);
+        }
+};
+
+class NamespaceNode: public ASTNode {
+    public:
+        std::string name;
+        std::shared_ptr<ASTNode> body;
+        NamespaceNode() = default;
+        NamespaceNode(const std::string& name, std::shared_ptr<ASTNode> body)
+            : name(name), body(body) {}
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);
