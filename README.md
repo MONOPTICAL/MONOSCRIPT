@@ -1,397 +1,169 @@
 <div align="center">
-  <a href="https://github.com/MONOPTICAL/MONOSCRIPT">
-    <img src="https://github.com/MONOPTICAL/MONOSCRIPT/blob/main/MONOSCRIPT.png?raw=true" alt="Logo">
-  </a>
 
-<h3 align="center">MONOSCRIPT</h3>
+<a href="https://github.com/MONOPTICAL/MONOSCRIPT">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/logo/logo-white.svg">
+    <img src=".github/logo/logo-black.svg" alt="MONOSCRIPT" width="460">
+  </picture>
+</a>
 
-  <p align="center">
-    Convenient language for creating plugins for MONOPTICAL
-    <br />
-  </p>
-  <hr>
+**A secure, readable, plugin-oriented language for writing system and application scripts in Kubernetes, security and automation**
+
+<img src=".github/readme/tagline.svg" alt="secure by default · reads like a script · runs like C" width="860">
+
+[Language guide](LANGUAGE.md) · [Quick start](#quick-start) · [Performance](#performance) · [Status](#status)
+
+![status](https://img.shields.io/badge/status-early%20development-ffb224?style=flat-square)
+![LLVM](https://img.shields.io/badge/compiled%20with-LLVM-3f3f46?style=flat-square&logo=llvm)
+![license](https://img.shields.io/badge/license-LGPL%202.1-3f3f46?style=flat-square)
+
 </div>
 
-**MONOSCRIPT** is an experimental, statically typed programming language with type inference, compiled through **LLVM**. It feels like a scripting language, runs instantly through a JIT, and can also be built into a native executable.
+<br>
 
-```go
-[i64]fibonacci(i64: n) @strict @pure
-|   if n < 2
-|   |   return n
-|   return fibonacci(n - 1) + fibonacci(n - 2)
+<p align="center">
+  <img src=".github/readme/hero.svg" alt="A MONOSCRIPT plugin that flags Kubernetes pods with too many restarts, and its output" width="860">
+</p>
 
-[i32]main()
-|   echo("fib(30) = " + fibonacci(30))
-|   return 0
-```
+<br>
 
-> 🚧 **Early development.** Numbers, strings, functions, loops, modules, arrays, maps and structs work today, through the JIT and in native executables. See [Current State](#-current-state).
+MONOSCRIPT is a small, statically typed language that **reads like a script and runs like C**. Write a plugin in a few minutes, run it instantly through the JIT, or ship it as a single native binary. The compiler checks types, purity and narrowing before anything runs, so the bug in the branch nobody tested never makes it to production.
 
-## 💡 Why MONOSCRIPT?
+- **Script-short.** Type inference, no boilerplate, `ms run file.ms` and you're done.
+- **Checked before it runs.** Static types, no silent narrowing, `@pure` enforced by the compiler.
+- **Strict where it matters.** Turn on `@strict` for one function, not for the whole project.
+- **Fails gracefully.** Errors are values, and even runtime panics can be caught.
+- **Native speed.** LLVM backend: a JIT for development, real executables for deployment.
+- **Easy to extend.** Add native functions in **D** with one entry in a TOML file.
 
-MONOPTICAL needs plugins: small programs for security checks, scanning, data analytics and automation. They have to be quick to write, and they must not fail in surprising ways.
+## Why another language?
 
-Scripting languages are quick to write, but type errors only show up when the code is already running. Systems languages catch those errors, but they are too heavy for a small plugin. MONOSCRIPT aims for the middle:
+Plugins for security and infrastructure tooling get written in a hurry, often in the middle of an incident, and then run unattended for months.
 
-|Goal|How|
-|---|---|
-|Quick to write|Short syntax, type inference, run a file with one command|
-|Hard to break|Static types, no silent narrowing, errors at compile time|
-|Strict where it matters|Turn on `@strict` and `@pure` per function, not for the whole project|
-|Fast|Native code through LLVM instead of an interpreter|
-|Easy to extend|Add native functions in **D** with one entry in a TOML file|
+Python is great for the hurry and bad for the months: a typo in an untested branch waits until 3 a.m. to fire. C++ or Rust would catch it, but nobody wants to fight a systems language for a 40-line port scanner.
 
-## ✨ What Makes It Different
+MONOSCRIPT sits in between. You write it like a script, the compiler checks it like a systems language, and LLVM turns it into native code.
 
-### 🏷️ Strictness Per Function
+## The compiler has your back
 
-You choose how strict each function is. Quick code stays quick, and critical code gets stronger guarantees:
+<p align="center">
+  <img src=".github/readme/errors.svg" alt="Two real compiler errors: a @pure function calling echo, and an implicit i32 to i8 narrowing" width="860">
+</p>
+
+These are real messages from `ms`. A few of the rules behind them:
+
+**`@pure` is checked, not a comment.** A pure function can't print, can't touch globals and can't modify its arguments.
+
+**Nothing narrows behind your back.** `i8 → i32` happens on its own. `i32 → i8` needs `->i8`, so you always see where data can be lost.
+
+**Strictness is per function.** Quick code stays quick. Code that matters gets `@strict`: no implicit casts and no inference, only in that function.
 
 ```go
 [i32]quick()
 |   i8 small = 5
-|   i32 wide = small          // widens automatically
+|   i32 wide = small          // widens on its own
 |   return wide
 
 [i32]careful() @strict
 |   i8 small = 5
-|   i32 wide = small->i32     // @strict requires an explicit cast
+|   i32 wide = small->i32     // here you have to say it
 |   return wide
-
-[i32]main()
-|   echo("" + quick() + careful())
-|   return 0
 ```
 
-### 🧼 Purity That Is Actually Checked
+**You can see the nesting.** Blocks are marked with `|`, so the shape of the code sits right there in the left margin. No invisible whitespace rules and no brace hunting.
 
-`@pure` is a promise the compiler enforces. A pure function cannot call impure functions, read globals or modify the objects passed to it:
+## Failing without falling over
 
-```go
-[string]label(i32: score) @pure
-|   return "score: " + score    // OK
-
-[void]report(i32: score) @pure
-|   echo(label(score))          // compile error: echo is impure
-
-[i32]main()
-|   return 0
-```
-
-### 🔢 No Silent Narrowing
-
-Widening is automatic. Anything that can lose data needs an explicit cast:
+A plugin that crashes on one bad line of input is a plugin nobody trusts. Something that can fail returns `result<T>`, and `?` lets you unwrap it, fall back or bail out. Runtime panics such as an out-of-bounds index can be caught too:
 
 ```go
 [i32]main()
-|   i32 big = 300
-|   i64 wide = big          // OK
-|   i8 small = big->i8      // OK: you asked for it
-|   i8 oops = big           // compile error: use explicit cast ->i8
-|   return 0
-```
-
-### 🧱 Visible Structure
-
-Blocks start with `|`, so nesting is visible at a glance and does not depend on invisible whitespace:
-
-```go
-[i32]main()
-|   for i in range(10)
-|   |   if i % 2 == 0
-|   |   |   echo("even: " + i)
-|   return 0
-```
-
-### 🔌 Explicit Modules
-
-Import a whole module, a single function or a function under an alias. Functions can stay `@private`, and replacing an imported function has to be intentional:
-
-```go
-use
-|> http_server
-|> math -> sqrt
-|> math -> pow : power
-
-[i32]helper() @overwrite    // without @overwrite, a name clash is a compile error
-|   return 100
-```
-
-## 🧭 Paradigms
-
-|Paradigm|Description|
-|---|---|
-|Imperative|`if`, `for`, `while`, mutable variables, step-by-step execution.|
-|Modular|`use`, `@private` and `@overwrite`.|
-|Structural|Custom `struct`s, no class inheritance.|
-|Functional|Pure functions with `@pure`. Lambdas and pipes are planned.|
-
-## 🔠 Data Types
-
-### 📃 Primitive Types
-
-- `i1` — boolean, `true` and `false`
-- `i8`, `i16`, `i32`, `i64` — signed integers
-- `float` — 32-bit floating-point numbers
-- `f64` — 64-bit floating-point numbers
-- `string` — immutable UTF-8 bytes with a stored length; embedded NUL bytes are rejected
-- `char` — one byte: `'a'`, `'\\n'`. `s[i]`, `for c in s` and `len(s)` work in bytes
-- `void` — absence of value (used for functions)
-
-### 📦 Containers and Structs
-
-- `array<T>` — arrays
-- `map<K, V>` — key-value mappings
-- `struct` — user-defined structures
-
-Like in Python, numbers are copied, while objects are passed by reference. Use `copy(x)` when you need a separate shallow copy. In `@pure` functions, copies that still share nested mutable objects with an argument are rejected. Returning or wrapping borrowed mutable objects is also rejected; this check is conservative. Objects live on a garbage-collected heap, and a reference is never null.
-
-```go
-[i32]main()
-|   array<i32> scores = [10, 20, 30]
-|   scores[0] = 5
-|   for score in scores
-|   |   echo("score: " + score)
-|
-|   map<string, i32> ports = {"ssh": 22}
-|   ports["http"] = 80
-|   if has(ports, "ssh")
-|   |   del(ports, "ssh")
-|   for name in ports                // keys come in insertion order
-|   |   echo(name + " = " + ports[name])
-|
-|   return len(scores) + len(ports)
-```
-
-Map keys are integers or strings. An index out of bounds, a missing map key, an integer division by zero, or a cast from `float` that does not fit stops the program with a message, the line number and exit code 101:
-
-```
-Runtime Error: index 3 out of bounds (len 3) at line 5
-```
-
-Integer addition, subtraction and multiplication wrap around on overflow, so `2147483647 + 1` in `i32` is `-2147483648`. The one integer operation that stops the program is dividing the smallest value of a type by `-1`.
-
-### ⚙️ Typing
-
-|Form|Example|
-|---|---|
-|Explicit type|`i32 count = 0`|
-|Inferred type|`name ^= "value"`|
-|Constant|`const i32 limit = 10`, `final limit ^= 10`|
-|Assigned once, later|`final i32 limit`, then `limit = 10` on every path before it is read|
-|Cast|`value->i8`|
-
-## 📋 Syntax
-
-### 🧪 Functions
-
-The return type goes in square brackets, and the parameter type goes before its name:
-
-```go
-[i32]sum(i32: a, i32: b)
-|   return a + b
-
-[i32]main()
-|   echo("1 + 2 = " + sum(1, 2))
-|   return 0
-```
-
-### 🧱 Operators
-
-|Operator|Meaning|
-|---|---|
-|`=`|Assignment|
-|`^=`|Declaration with inferred type|
-|`+ - * / %`|Arithmetic, `+` also joins strings|
-|`== != > < >= <=`|Comparison of numbers and strings|
-|`and or !`|Logical operations|
-|`->`|Cast|
-
-### ⚖️ Control Structures
-
-- `if`, `else if`, `else`
-- `for i in range(n)`, `for i in range(a, b)`, `for x in array`, `for key in map`
-- `while ...`
-- `break`, `continue`
-
-A single simple statement can follow `:` on the same line. `else` and `else if` stay on their own lines; inline and indented branches can be mixed:
-
-```go
-[i32]sign(i32: n)
-|   if n < 0: return -1
-|   else if n == 0: return 0
-|   else: return 1
-```
-
-An inline branch contains exactly one statement. Nested control blocks use the indented form.
-
-### 🏷️ Labels
-
-Labels go after the function declaration:
-
-|Label|Effect|
-|---|---|
-|`@entry`|Marks the entry point instead of `main`|
-|`@strict`|No implicit casts and no type inference|
-|`@pure`|No side effects, checked by the compiler|
-|`@private`|Hidden from imports|
-|`@overwrite`|Replaces an imported function on purpose|
-
-### 🧩 Generic Functions
-
-A function can work with any type. The types are worked out from the arguments, and the compiler checks and generates a separate copy for each set of types:
-
-```go
-[T]first<T>(array<T>: items)
-|   return items[0]
-
-[array<T>]pair<T>(T: a, T: b)
-|   return [a, b]
-
-[i32]main()
-|   echo(first(["a", "b"]))     // T is string
-|   echo("" + first([1, 2]))    // T is i32
-|   array<f64> p = pair(0.5, 1.5)
-|   return 0
-```
-
-### 🔁 Passing Functions
-
-A function can be passed by name to a parameter of type `func`. Together with generic functions this is enough to write `filter`, `map` or `sort` in the language itself:
-
-```go
-[array<T>]filter<T>(array<T>: items, func: keep(T: x) -> i1)
-|   array<T> out = []
-|   for x in items
-|   |   if keep(x)
-|   |   |   push(out, x)
-|   return out
-
-[i1]isEven(i32: x)
-|   return x % 2 == 0
-
-[i32]main()
-|   array<i32> even = filter([1, 2, 3, 4], isEven)
-|   return len(even)
-```
-
-A function can only be passed as an argument, not stored in a variable. `push(a, x)` and `pop(a)` grow and shrink an array.
-
-### ⚠️ Errors Without Crashes
-
-Something that can fail returns `result<T>`. The caller checks it, and the program keeps running:
-
-```go
-[result<i32>]parseDigit(string: s)
-|   if len(s) != 1
-|   |   return err(1, "expected one digit")
-|   char c = s[0]
-|   if c < '0' or c > '9'
-|   |   return err(2, "not a digit: " + s)
-|   return ok(c->i32 - '0'->i32)
-
-[i32]main()
-|   result<i32> r = parseDigit("x")
-|   if ?r                        // the same as r.ok
-|   |   echo("digit " + r.value)
-|   else
-|   |   echo("error " + r.code + ": " + r.error)
-|   return 0
-```
-
-Postfix `r?` unwraps a successful result. Without a local handler, an error immediately returns the original error code and message from the enclosing function, which must return `result<U>`; `U` may differ from the unwrapped type. Prefix `?r` remains a boolean success check. The operand is evaluated once; postfix `?` binds before arithmetic and works with `result<void>` as a standalone statement.
-
-```go
-[result<i32>]sumNumbers(string: a, string: b)
-|   i32 x = toInt(a)?
-|   i32 y = toInt(b)?
-|   return ok(x + y)
-```
-
-Use `r?->i64` for a cast after unwrapping. A nested result can be unwrapped with `r??`. Mutable values borrowed from arguments remain subject to `@pure` checks.
-
-`toInt(s)` returns `result<i32>`: it accepts decimal digits with an optional leading `+` or `-`. Empty input, whitespace, trailing characters and values outside the `i32` range return errors (code 1 for syntax, 2 for range). Check `.ok` before reading `.value`.
-
-Reading `r.value` from an error raises a runtime panic with the original message; it exits with code 101 if no panic handler catches it. A result that is never read is a compile error, write `_ ^= save()` to ignore one on purpose. Use `result<void>` and `return ok()` when there is no value. A native function in D returns the same layout with `resultOk`, `resultErr`, `resultVoidOk` and `resultVoidErr` from `mono/std/core/abi.d`.
-
-Local handling also works in ordinary functions such as `[i32]main()`:
-
-```ms
-[i32]main()
-|   port ^= toInt("invalid")? else 8080
-|   n ^= toInt("42")? else: echo(error.error); return error.code
+|   port ^= toInt("80x")? else 8080      // bad input, falls back to 8080
 |
 |   attempt
-|   |   value ^= toInt("7")?
-|   |   array<i32> rows = [value]
-|   |   echo("" + rows[9])
-|   else error
-|   |   echo(error.error)
+|   |   array<i32> rows = [port]
+|   |   echo("" + rows[9])               // out of bounds
 |   panic info
 |   |   echo(info.message + " at line " + info.line)
 |   return 0
 ```
 
-`? else expression` evaluates the result once and evaluates the replacement only on error. The replacement must fit the unwrapped type; use parentheses to delimit it inside a larger expression. `result<void>` has no replacement value. `? else: statements` binds the original error as `error` (`result<void>`, read-only `.ok`, `.code`, `.error`) and must end in `return`, `break` or `continue`; semicolons separate statements in this inline handler. Its binding is scoped to the handler. The action form consumes the remainder of the line and should be used as the final expression of a statement.
-
-Within an `attempt`, bare `?` sends an error to the nearest enclosing `else name` handler in the **same function**. Called functions still propagate their results through their own return values. An attempt may have an error handler, a panic handler, or both; duplicate handlers are rejected. Body variables are not visible in its handlers or after the attempt. After a handler finishes, execution continues after the entire attempt. A failure inside a handler targets an outer handler, never another handler of the same attempt.
-
-`panic info` catches controlled runtime failures, including those in deeper calls: integer division by zero/overflow, invalid numeric casts, array/string bounds, empty `pop`, missing map keys, map mutation during iteration, stack overflow, erroneous `.value` access, and checked standard-library string operations. It binds an immutable `panic_info` snapshot with `.message` and `.line` (0 if unknown). `? else` handles returned result errors only: a panic while evaluating the operand or replacement still goes to a surrounding panic handler. Side effects are not rolled back. OOM and arbitrary native crashes remain fatal. There is no `defer` or automatic resource cleanup yet; catching a panic does not close files, release locks, or undo a partial response.
-
-The compiler passes an explicit hidden `MsPanicContext*` through language calls, including methods, constructors and `func<>` calls; ordinary values keep their existing layouts. After a failed call, the compiler checks the channel before using its return value. Each program invocation owns its context; there is no global error flag. Language function symbols are internal to the compiled module, so their private calling convention cannot override C runtime functions with the same name.
-
-Native functions opt in with `panic_context = true` in `mono.toml` and accept a final `MsPanicContext*` argument, in addition to their declared language arguments. They report a controlled failure with `ms_raise(message, line, context)` and **return immediately**. They must also propagate failures from their own helpers before using any placeholder return value. `ms_raise` copies the message into a language string. A native function without this contract remains an ordinary C call; calling `ms_panic` still exits. Rebuild executables and native libraries after this calling-convention change; an old binary is not compatible with the updated checked standard-library entry points.
-
-Native string returns must use `newString(length)`, `stringFromBytes(data, length)` or `stringFromCString(text)` from the same ABI module. Strings still pass a C-compatible data pointer, but now carry a `u64` byte length immediately before it. Do not return raw C/D literals or `malloc` buffers as language strings. `resultErr` copies native error messages into this format. Rebuild native extensions and executables against the updated runtime.
-
-### 🧰 Structs
-
-```go
-[struct]User
-|   i32 age = 18
-|   string name = "anon"
-
-|   [void]birthday()
-|   |   self.age = self.age + 1
-|
-|   [string]describe() @pure
-|   |   return self.name + " is " + self.age
-
-[i32]main()
-|   User user = User()
-|   user.birthday()
-|   echo(user.describe())
-|   return 0
+```
+index 9 out of bounds (len 1) at line 6
 ```
 
-Inside a method, `self` is the object. A constant object can only call `@pure` methods, and a `@pure` method cannot change `self`.
 
-## 📍 Current State
 
-|Feature|Status|
-|---|---|
-|Numbers, strings, operators and casts|✅ Working|
-|`if`, `while`, `for i in range(n)`|✅ Working|
-|Functions, recursion, calling before declaration|✅ Working|
-|Modules, `@strict`, `@pure`, `@entry`|✅ Working|
-|JIT and native executables|✅ Working|
-|Arrays: literals, nesting, `a[i]`, `len`, `for x in array`, bounds checks|✅ Working|
-|Maps: `m[k]`, `has`, `del`, `len`, `for k in map`|✅ Working|
-|Structs: `P()`, fields, nesting, arrays of structs|✅ Working|
-|`copy` for arrays, maps and structs|✅ Working|
-|Garbage collection (Boehm)|✅ Working|
-|Runtime errors with line numbers|✅ Working|
-|Struct methods|✅ Working|
-|Lambdas and pipes (`\|>`)|📅 Planned|
-|Errors as values: `result<T>`, `ok()`, `err()`, `?r`, `r?`|✅ Working|
-|Local `? else`, `attempt`, result and panic handlers|✅ Working|
-|Generic functions and passing functions by name|✅ Working|
-|Null safety|📅 Planned|
-|Embedding and sandboxing|📅 Planned|
+## How it works
 
-## 🚀 Getting Started
+<p align="center">
+  <img src=".github/readme/pipeline.svg" alt="hello.ms goes through the lexer, parser, checks and LLVM, then either runs in the JIT or becomes a native executable" width="860">
+</p>
 
-You will need CMake 3.24+, a C++20 compiler, LLVM, `dmd`, `gcc` and `libgc-dev`.
+The same front end feeds both modes: `ms run` JIT-compiles and runs in about 60 ms, and `ms --compile` produces a standalone executable. Memory is managed by a garbage collector (Boehm), and references are never null.
+
+
+
+## Performance
+
+**In short:** a compiled MONOSCRIPT program runs about **1.8× slower than C** on average. That's in the same league as Go, **1.7× faster than Node** and **10× faster than Python**.
+
+<p align="center">
+  <img src=".github/readme/bench-summary.svg" alt="Average time relative to C: Go 1.3×, MONOSCRIPT 1.8×, Node 3.1×, Python 18.6×" width="860">
+</p>
+
+### What is compared
+
+Thirteen small programs, each written the same way in every language: same algorithm, same input, same output. Before timing anything, the runner checks that all versions print exactly the same thing.
+
+| | Version | How it runs |
+|---|---|---|
+| **MONOSCRIPT** | this repo, LLVM 22 | native binary from `ms --compile` |
+| C | gcc 16.2 (and clang 21.1) | `-O2`, the 1× baseline |
+| Go | 1.27 | `go build` |
+| Node | 24.19 | V8 JIT |
+| Python | 3.14 | CPython |
+
+<p align="center">
+  <img src=".github/readme/bench-detail.svg" alt="Table of all 13 benchmarks: each cell shows how many times slower than C each language is, and its time" width="860">
+</p>
+
+### What this tells you
+
+- **Plain number crunching is basically C.** Loops, `mandelbrot`, `spectral` and `sort` land within 1.3× of C, and sometimes level with it. LLVM is doing its job.
+- **Strings, maps and allocation are where it falls behind.** `strings`, `mapstr`, `parse` and `bintree` run at 2–3× C, because every string and object goes through the garbage collector. This is where the work goes next.
+- **Calls have a small price.** Every call carries the panic channel and a stack-depth check, which is what lets `panic` handlers catch errors from deep inside. Recursion-heavy `fib` pays for that with 3.8×.
+
+<details>
+<summary><b>All numbers</b>: mean wall time in milliseconds</summary>
+
+<br>
+
+| Benchmark | What it does | MONOSCRIPT | C gcc | C clang | Go | Node | Python |
+|---|---|---:|---:|---:|---:|---:|---:|
+| `fib` | `fib(32)`, recursive | **15** | 4.0 | 6.3 | 15 | 61 | 317 |
+| `loops` | 50M iterations of integer math | **137** | 142 | 114 | 237 | 2 209 | 11 211 |
+| `mandelbrot` | 1000×1000 grid, 200 iterations, `f64` | **203** | 203 | 197 | 205 | 242 | 6 591 |
+| `spectral` | spectral norm, n=1500 | **147** | 114 | 111 | 155 | 261 | 13 986 |
+| `matmul` | 400×400 `array<array<f64>>` | **81** | 36 | 25 | 61 | 140 | 2 791 |
+| `sort` | quicksort of 2M items | **216** | 186 | 178 | 219 | 474 | 4 397 |
+| `sieve` | primes up to 20M | **253** | 181 | 182 | 186 | 274 | 2 147 |
+| `structs` | 500k structs, methods, 40 passes | **148** | 81 | 84 | 119 | 848 | 2 646 |
+| `mapint` | `map<i64, i64>`: 1M inserts, 2M lookups | **380** | 191 | 182 | 369 | 632 | 1 158 |
+| `mapstr` | `map<string, i64>`: 1M increments | **267** | 105 | 104 | 126 | 272 | 496 |
+| `strings` | 2M string concatenations | **384** | 160 | 161 | 108 | 216 | 612 |
+| `parse` | 300k lines: `split` and `toInt` | **218** | 72 | 72 | 76 | 234 | 354 |
+| `bintree` | binary trees, depth 16 | **1 015** | 452 | 482 | 432 | 265 | 1 514 |
+
+Measured with [hyperfine](https://github.com/sharkdp/hyperfine): 2 warmup runs, at least 5 timed runs, process start included. Intel Core i5-1135G7, 16 GB RAM, Linux 7.2, November 2026, commit `174f6d4`. Averages are geometric means of the time relative to gcc.
+
+</details>
+
+
+
+## Quick start
+
+You'll need CMake 3.24+, a C++20 compiler, LLVM, `dmd`, `gcc` and `libgc-dev`.
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
@@ -401,50 +173,54 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-Run a program with the JIT:
+Write `hello.ms`:
+
+```go
+[i32]main()
+|   echo("hello from MONOSCRIPT")
+|   return 0
+```
+
+Run it through the JIT:
 
 ```bash
 ./ms run hello.ms
 ```
 
-Build a native executable:
+Or build a native executable:
 
 ```bash
 ./ms --compile hello hello.ms
 ```
 
-See which compiler stage takes the time:
+Add `--timings` to see where the compile time goes, or run the test suite with `./ms --run_tests`.
 
-```bash
-./ms run hello.ms --timings
-```
 
-Run the test suite:
 
-```bash
-./ms --run_tests
-```
+## Status
 
-## 📄 License
+MONOSCRIPT is young and the syntax can still change. Here's where it stands:
 
-MONOSCRIPT is an open-source project under the GNU LGPL v2.1:
+- [x] Numbers, strings, casts, `if` / `for` / `while`
+- [x] Functions, recursion, modules, `@strict`, `@pure`, `@entry`
+- [x] Arrays, maps, structs with methods
+- [x] Generics and passing functions by name
+- [x] `result<T>`, `?`, `? else`, `attempt` and panic handlers
+- [x] Garbage collection, runtime errors with line numbers
+- [x] JIT and native executables
+- [ ] Standart library(mono)
+- [ ] Lambdas and pipes (`|>`)
+- [ ] Null safety
+- [ ] Embedding and sandboxing
 
-- You can use it freely.
+Everything else, from types to the native ABI, is in the **[language guide](LANGUAGE.md)**.
 
-- Engine changes must remain open.
+## License
 
-- Embedding does not require disclosing your source.
+[GNU LGPL v2.1](LICENSE). Use it freely and embed it without opening your own code. Changes to the engine itself stay open.
 
-## ❤️ Conclusion
+<br>
 
-**MONOSCRIPT is not trying to compete with giants. It's about solving real problems in a simple, secure, and enjoyable way.**
-
-Made for:
-
-- scripting and logic in security systems,
-
-- scanning and data analytics,
-
-- DevOps and automation,
-
-- small, safe and readable programs.
+<div align="center">
+  <sub>MONOSCRIPT isn't trying to beat the big languages. It's trying to make small programs people can trust.</sub>
+</div>

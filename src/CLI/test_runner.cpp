@@ -174,6 +174,7 @@ struct RunResult
 {
     int exitCode;
     std::string output;
+    bool built = false; // Для runCompiled: файл собрался и запускался, вывод принадлежит программе
 };
 
 static std::string trim(const std::string& value)
@@ -296,13 +297,21 @@ static RunResult runCheck(const std::vector<std::string>& command_, const TestCa
 }
 
 // Собирает тест через --compile и запускает готовый файл. Если собрать не вышло, в результате ошибка компилятора
-static RunResult runCompiled(const std::string& compiler, const TestCase& test)
+static RunResult runCompiled(const std::string& compiler, const TestCase& test, bool offOptimization = false)
 {
-    const fs::path binary = fs::temp_directory_path() / ("ms_test_" + std::to_string(getpid()) + "_" + test.path.stem().string());
+    const fs::path binary = fs::temp_directory_path() / ("ms_test_" + std::to_string(getpid()) + "_" +
+                                                         test.path.stem().string() + (offOptimization ? "_O0" : ""));
 
-    RunResult result = runCheck({compiler, "--compile", binary.string()}, test);
+    std::vector<std::string> command = {compiler};
+    if (offOptimization) command.push_back("--offOptimization");
+    command.push_back("--compile");
+    command.push_back(binary.string());
+    RunResult result = runCheck(command, test);
     if (result.exitCode == 0)
+    {
         result = runShell(inTestDir(test) + " " + shellQuote(binary.string()) + " 2>&1");
+        result.built = true;
+    }
 
     // Если сборка упала, компилятор оставляет промежуточные файлы
     std::error_code ignored;
@@ -449,6 +458,7 @@ static std::string groupTitle(const std::string& group)
         {"examples", "Examples"},
         {"ok", "Control: already works"},
         {"run", "Running programs"},
+        {"stress", "Stress: load and optimization levels"},
     };
     auto it = titles.find(group);
     if (it != titles.end()) return it->second;
@@ -589,6 +599,7 @@ int runFrontendTests(const std::vector<std::string>& checkCommand, const std::ve
         if (entry.failure.empty() && needsRun)
         {
             RunResult compiled = runCompiled(runCommand[0], test);
+            const RunResult compiledRaw = compiled;
             entry.output = compiled.output;
 
             // Собранный файл не печатает строку о завершении, её печатает только ms run
@@ -599,6 +610,37 @@ int runFrontendTests(const std::vector<std::string>& checkCommand, const std::ve
                 entry.failure = "--compile: exit code " + std::to_string(compiled.exitCode) + ", through JIT " + std::to_string(run.exitCode);
             else if (const std::string failure = evaluate(test, compiled); !failure.empty())
                 entry.failure = "--compile: " + failure;
+
+            // Без оптимизаций программа обязана вести себя так же: иначе O2 что-то маскирует
+            // (так прятался баг, где размер структуры и смещения полей считались по разным раскладкам)
+            if (entry.failure.empty())
+            {
+                std::vector<std::string> unoptimized = {runCommand[0], "--offOptimization"};
+                unoptimized.insert(unoptimized.end(), runCommand.begin() + 1, runCommand.end());
+                const RunResult jitO0 = runCheck(unoptimized, test);
+                entry.output = jitO0.output;
+                if (jitO0.exitCode != run.exitCode)
+                    entry.failure = "JIT --offOptimization: exit code " + std::to_string(jitO0.exitCode) + ", with O2 " + std::to_string(run.exitCode);
+                else if (const std::string failure = evaluate(test, jitO0); !failure.empty())
+                    entry.failure = "JIT --offOptimization: " + failure;
+            }
+
+            // Два собранных файла сравниваются целиком: в них нет отладочного вывода компилятора,
+            // поэтому любая разница в выводе это разница в поведении программы
+            if (entry.failure.empty())
+            {
+                const RunResult compiledO0 = runCompiled(runCommand[0], test, true);
+                entry.output = compiledO0.output;
+                if (compiledO0.exitCode != compiledRaw.exitCode)
+                    entry.failure = "--compile --offOptimization: exit code " + std::to_string(compiledO0.exitCode) +
+                                    ", with O2 " + std::to_string(compiledRaw.exitCode);
+                // Если сборка не удалась, в выводе сообщения компилятора: они честно разные (стадии оптимизатора)
+                else if (compiledO0.built != compiledRaw.built)
+                    entry.failure = std::string("--compile --offOptimization: the build ") +
+                                    (compiledO0.built ? "succeeded" : "failed") + ", with O2 it " + (compiledRaw.built ? "succeeded" : "failed");
+                else if (compiledO0.built && compiledO0.output != compiledRaw.output)
+                    entry.failure = "--compile --offOptimization: output differs from the O2 build";
+            }
         }
 
         splitReason(test.xfail, entry.reason, entry.location);

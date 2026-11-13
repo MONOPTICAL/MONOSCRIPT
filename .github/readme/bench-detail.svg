@@ -1,0 +1,286 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="728" viewBox="0 0 860 728">
+<style>text{font-variant-ligatures:none;font-feature-settings:"liga" 0,"calt" 0}.flow{animation:flow 1s linear infinite}@keyframes flow{to{stroke-dashoffset:-9}}</style>
+<rect x="0.5" y="0.5" width="859" height="727" rx="14" fill="#000000" stroke="#262626"/>
+<text x="32" y="46" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="18" fill="#ffffff" text-anchor="start" letter-spacing="0.5"><tspan font-weight="800">EVERY</tspan><tspan font-weight="300" dx="2" font-size="15.5">BENCHMARK</tspan></text>
+<text x="32.0" y="70.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="12" font-weight="400" fill="#737373" text-anchor="start" opacity="1">each cell: times slower than C (gcc -O2), and the measured time</text>
+<rect x="227" y="78" width="102" height="586" rx="8" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+<text x="278.0" y="96.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="12.5" font-weight="800" fill="#ffffff" text-anchor="middle" opacity="1">MONOSCRIPT</text>
+<text x="278.0" y="109.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10" font-weight="400" fill="#737373" text-anchor="middle" opacity="1">ms --compile</text>
+<text x="380.0" y="96.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="12.5" font-weight="500" fill="#ffffff" text-anchor="middle" opacity="1">C</text>
+<text x="380.0" y="109.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10" font-weight="400" fill="#737373" text-anchor="middle" opacity="1">gcc -O2</text>
+<text x="482.0" y="96.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="12.5" font-weight="500" fill="#ffffff" text-anchor="middle" opacity="1">C</text>
+<text x="482.0" y="109.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10" font-weight="400" fill="#737373" text-anchor="middle" opacity="1">clang -O2</text>
+<text x="584.0" y="96.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="12.5" font-weight="500" fill="#ffffff" text-anchor="middle" opacity="1">Go</text>
+<text x="584.0" y="109.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10" font-weight="400" fill="#737373" text-anchor="middle" opacity="1">go build</text>
+<text x="686.0" y="96.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="12.5" font-weight="500" fill="#ffffff" text-anchor="middle" opacity="1">Node</text>
+<text x="686.0" y="109.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10" font-weight="400" fill="#737373" text-anchor="middle" opacity="1">V8</text>
+<text x="788.0" y="96.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="12.5" font-weight="500" fill="#ffffff" text-anchor="middle" opacity="1">Python</text>
+<text x="788.0" y="109.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10" font-weight="400" fill="#737373" text-anchor="middle" opacity="1">CPython</text>
+<text x="32.0" y="133.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="start" opacity="1">fib</text>
+<text x="32.0" y="148.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="start" opacity="1">recursive calls</text>
+<rect x="232" y="118" width="92" height="34" rx="3" fill="#979797"/>
+<text x="278.0" y="133.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">3.8×</text>
+<text x="278.0" y="146.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">15 ms</text>
+<rect x="334" y="118" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="380.0" y="133.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="380.0" y="146.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">4.0 ms</text>
+<rect x="436" y="118" width="92" height="34" rx="3" fill="#d3d3d3"/>
+<text x="482.0" y="133.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.6×</text>
+<text x="482.0" y="146.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">6.3 ms</text>
+<rect x="538" y="118" width="92" height="34" rx="3" fill="#999999"/>
+<text x="584.0" y="133.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">3.6×</text>
+<text x="584.0" y="146.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">15 ms</text>
+<rect x="640" y="118" width="92" height="34" rx="3" fill="#464646"/>
+<text x="686.0" y="133.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#ffffff" text-anchor="middle" opacity="1">15.3×</text>
+<text x="686.0" y="146.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#ffffff" text-anchor="middle" opacity="0.65">61 ms</text>
+<rect x="742" y="118" width="92" height="34" rx="3" fill="#222222"/>
+<text x="788.0" y="133.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#ffffff" text-anchor="middle" opacity="1">79.3×</text>
+<text x="788.0" y="146.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#ffffff" text-anchor="middle" opacity="0.65">317 ms</text>
+<text x="32.0" y="175.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="start" opacity="1">loops</text>
+<text x="32.0" y="190.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="start" opacity="1">integer math, 50M iterations</text>
+<rect x="232" y="160" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="278.0" y="175.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="278.0" y="188.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">137 ms</text>
+<rect x="334" y="160" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="380.0" y="175.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="380.0" y="188.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">142 ms</text>
+<rect x="436" y="160" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="482.0" y="175.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">0.8×</text>
+<text x="482.0" y="188.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">114 ms</text>
+<rect x="538" y="160" width="92" height="34" rx="3" fill="#cecece"/>
+<text x="584.0" y="175.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.7×</text>
+<text x="584.0" y="188.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">237 ms</text>
+<rect x="640" y="160" width="92" height="34" rx="3" fill="#454545"/>
+<text x="686.0" y="175.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#ffffff" text-anchor="middle" opacity="1">15.5×</text>
+<text x="686.0" y="188.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#ffffff" text-anchor="middle" opacity="0.65">2.2 s</text>
+<rect x="742" y="160" width="92" height="34" rx="3" fill="#222222"/>
+<text x="788.0" y="175.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#ffffff" text-anchor="middle" opacity="1">78.8×</text>
+<text x="788.0" y="188.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#ffffff" text-anchor="middle" opacity="0.65">11.2 s</text>
+<text x="32.0" y="217.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="start" opacity="1">mandelbrot</text>
+<text x="32.0" y="232.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="start" opacity="1">f64 math, 1000×1000</text>
+<rect x="232" y="202" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="278.0" y="217.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="278.0" y="230.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">203 ms</text>
+<rect x="334" y="202" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="380.0" y="217.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="380.0" y="230.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">203 ms</text>
+<rect x="436" y="202" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="482.0" y="217.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="482.0" y="230.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">197 ms</text>
+<rect x="538" y="202" width="92" height="34" rx="3" fill="#fdfdfd"/>
+<text x="584.0" y="217.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="584.0" y="230.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">205 ms</text>
+<rect x="640" y="202" width="92" height="34" rx="3" fill="#eaeaea"/>
+<text x="686.0" y="217.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.2×</text>
+<text x="686.0" y="230.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">242 ms</text>
+<rect x="742" y="202" width="92" height="34" rx="3" fill="#222222"/>
+<text x="788.0" y="217.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#ffffff" text-anchor="middle" opacity="1">32.5×</text>
+<text x="788.0" y="230.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#ffffff" text-anchor="middle" opacity="0.65">6.6 s</text>
+<text x="32.0" y="259.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="start" opacity="1">spectral</text>
+<text x="32.0" y="274.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="start" opacity="1">small f64 functions</text>
+<rect x="232" y="244" width="92" height="34" rx="3" fill="#e3e3e3"/>
+<text x="278.0" y="259.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.3×</text>
+<text x="278.0" y="272.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">147 ms</text>
+<rect x="334" y="244" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="380.0" y="259.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="380.0" y="272.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">114 ms</text>
+<rect x="436" y="244" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="482.0" y="259.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="482.0" y="272.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">111 ms</text>
+<rect x="538" y="244" width="92" height="34" rx="3" fill="#dedede"/>
+<text x="584.0" y="259.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.4×</text>
+<text x="584.0" y="272.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">155 ms</text>
+<rect x="640" y="244" width="92" height="34" rx="3" fill="#b7b7b7"/>
+<text x="686.0" y="259.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">2.3×</text>
+<text x="686.0" y="272.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">261 ms</text>
+<rect x="742" y="244" width="92" height="34" rx="3" fill="#222222"/>
+<text x="788.0" y="259.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#ffffff" text-anchor="middle" opacity="1">123.2×</text>
+<text x="788.0" y="272.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#ffffff" text-anchor="middle" opacity="0.65">14.0 s</text>
+<text x="32.0" y="301.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="start" opacity="1">matmul</text>
+<text x="32.0" y="316.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="start" opacity="1">400×400 matrices</text>
+<rect x="232" y="286" width="92" height="34" rx="3" fill="#b8b8b8"/>
+<text x="278.0" y="301.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">2.3×</text>
+<text x="278.0" y="314.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">81 ms</text>
+<rect x="334" y="286" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="380.0" y="301.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="380.0" y="314.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">36 ms</text>
+<rect x="436" y="286" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="482.0" y="301.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">0.7×</text>
+<text x="482.0" y="314.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">25 ms</text>
+<rect x="538" y="286" width="92" height="34" rx="3" fill="#cccccc"/>
+<text x="584.0" y="301.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.7×</text>
+<text x="584.0" y="314.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">61 ms</text>
+<rect x="640" y="286" width="92" height="34" rx="3" fill="#959595"/>
+<text x="686.0" y="301.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">3.9×</text>
+<text x="686.0" y="314.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">140 ms</text>
+<rect x="742" y="286" width="92" height="34" rx="3" fill="#222222"/>
+<text x="788.0" y="301.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#ffffff" text-anchor="middle" opacity="1">78.0×</text>
+<text x="788.0" y="314.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#ffffff" text-anchor="middle" opacity="0.65">2.8 s</text>
+<text x="32.0" y="343.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="start" opacity="1">sort</text>
+<text x="32.0" y="358.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="start" opacity="1">quicksort, 2M items</text>
+<rect x="232" y="328" width="92" height="34" rx="3" fill="#ededed"/>
+<text x="278.0" y="343.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.2×</text>
+<text x="278.0" y="356.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">216 ms</text>
+<rect x="334" y="328" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="380.0" y="343.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="380.0" y="356.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">186 ms</text>
+<rect x="436" y="328" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="482.0" y="343.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="482.0" y="356.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">178 ms</text>
+<rect x="538" y="328" width="92" height="34" rx="3" fill="#ececec"/>
+<text x="584.0" y="343.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.2×</text>
+<text x="584.0" y="356.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">219 ms</text>
+<rect x="640" y="328" width="92" height="34" rx="3" fill="#b1b1b1"/>
+<text x="686.0" y="343.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">2.5×</text>
+<text x="686.0" y="356.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">474 ms</text>
+<rect x="742" y="328" width="92" height="34" rx="3" fill="#2f2f2f"/>
+<text x="788.0" y="343.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#ffffff" text-anchor="middle" opacity="1">23.6×</text>
+<text x="788.0" y="356.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#ffffff" text-anchor="middle" opacity="0.65">4.4 s</text>
+<text x="32.0" y="385.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="start" opacity="1">sieve</text>
+<text x="32.0" y="400.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="start" opacity="1">primes up to 20M</text>
+<rect x="232" y="370" width="92" height="34" rx="3" fill="#dcdcdc"/>
+<text x="278.0" y="385.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.4×</text>
+<text x="278.0" y="398.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">253 ms</text>
+<rect x="334" y="370" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="380.0" y="385.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="380.0" y="398.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">181 ms</text>
+<rect x="436" y="370" width="92" height="34" rx="3" fill="#fefefe"/>
+<text x="482.0" y="385.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="482.0" y="398.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">182 ms</text>
+<rect x="538" y="370" width="92" height="34" rx="3" fill="#fafafa"/>
+<text x="584.0" y="385.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="584.0" y="398.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">186 ms</text>
+<rect x="640" y="370" width="92" height="34" rx="3" fill="#d6d6d6"/>
+<text x="686.0" y="385.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.5×</text>
+<text x="686.0" y="398.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">274 ms</text>
+<rect x="742" y="370" width="92" height="34" rx="3" fill="#545454"/>
+<text x="788.0" y="385.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#ffffff" text-anchor="middle" opacity="1">11.9×</text>
+<text x="788.0" y="398.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#ffffff" text-anchor="middle" opacity="0.65">2.1 s</text>
+<text x="32.0" y="427.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="start" opacity="1">structs</text>
+<text x="32.0" y="442.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="start" opacity="1">500k structs, methods</text>
+<rect x="232" y="412" width="92" height="34" rx="3" fill="#c8c8c8"/>
+<text x="278.0" y="427.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.8×</text>
+<text x="278.0" y="440.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">148 ms</text>
+<rect x="334" y="412" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="380.0" y="427.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="380.0" y="440.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">81 ms</text>
+<rect x="436" y="412" width="92" height="34" rx="3" fill="#f9f9f9"/>
+<text x="482.0" y="427.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="482.0" y="440.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">84 ms</text>
+<rect x="538" y="412" width="92" height="34" rx="3" fill="#d9d9d9"/>
+<text x="584.0" y="427.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.5×</text>
+<text x="584.0" y="440.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">119 ms</text>
+<rect x="640" y="412" width="92" height="34" rx="3" fill="#5b5b5b"/>
+<text x="686.0" y="427.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#ffffff" text-anchor="middle" opacity="1">10.4×</text>
+<text x="686.0" y="440.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#ffffff" text-anchor="middle" opacity="0.65">848 ms</text>
+<rect x="742" y="412" width="92" height="34" rx="3" fill="#222222"/>
+<text x="788.0" y="427.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#ffffff" text-anchor="middle" opacity="1">32.5×</text>
+<text x="788.0" y="440.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#ffffff" text-anchor="middle" opacity="0.65">2.6 s</text>
+<text x="32.0" y="469.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="start" opacity="1">mapint</text>
+<text x="32.0" y="484.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="start" opacity="1">map&lt;i64, i64&gt;, 1M ops</text>
+<rect x="232" y="454" width="92" height="34" rx="3" fill="#c2c2c2"/>
+<text x="278.0" y="469.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">2.0×</text>
+<text x="278.0" y="482.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">380 ms</text>
+<rect x="334" y="454" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="380.0" y="469.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="380.0" y="482.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">191 ms</text>
+<rect x="436" y="454" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="482.0" y="469.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="482.0" y="482.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">182 ms</text>
+<rect x="538" y="454" width="92" height="34" rx="3" fill="#c4c4c4"/>
+<text x="584.0" y="469.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.9×</text>
+<text x="584.0" y="482.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">369 ms</text>
+<rect x="640" y="454" width="92" height="34" rx="3" fill="#9f9f9f"/>
+<text x="686.0" y="469.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">3.3×</text>
+<text x="686.0" y="482.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">632 ms</text>
+<rect x="742" y="454" width="92" height="34" rx="3" fill="#7a7a7a"/>
+<text x="788.0" y="469.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">6.1×</text>
+<text x="788.0" y="482.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">1.2 s</text>
+<text x="32.0" y="511.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="start" opacity="1">mapstr</text>
+<text x="32.0" y="526.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="start" opacity="1">map&lt;string, i64&gt;, 1M ops</text>
+<rect x="232" y="496" width="92" height="34" rx="3" fill="#b0b0b0"/>
+<text x="278.0" y="511.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">2.6×</text>
+<text x="278.0" y="524.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">267 ms</text>
+<rect x="334" y="496" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="380.0" y="511.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="380.0" y="524.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">105 ms</text>
+<rect x="436" y="496" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="482.0" y="511.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="482.0" y="524.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">104 ms</text>
+<rect x="538" y="496" width="92" height="34" rx="3" fill="#e9e9e9"/>
+<text x="584.0" y="511.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.2×</text>
+<text x="584.0" y="524.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">126 ms</text>
+<rect x="640" y="496" width="92" height="34" rx="3" fill="#afafaf"/>
+<text x="686.0" y="511.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">2.6×</text>
+<text x="686.0" y="524.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">272 ms</text>
+<rect x="742" y="496" width="92" height="34" rx="3" fill="#898989"/>
+<text x="788.0" y="511.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">4.7×</text>
+<text x="788.0" y="524.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">496 ms</text>
+<text x="32.0" y="553.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="start" opacity="1">strings</text>
+<text x="32.0" y="568.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="start" opacity="1">2M concatenations</text>
+<rect x="232" y="538" width="92" height="34" rx="3" fill="#b4b4b4"/>
+<text x="278.0" y="553.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">2.4×</text>
+<text x="278.0" y="566.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">384 ms</text>
+<rect x="334" y="538" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="380.0" y="553.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="380.0" y="566.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">160 ms</text>
+<rect x="436" y="538" width="92" height="34" rx="3" fill="#fdfdfd"/>
+<text x="482.0" y="553.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="482.0" y="566.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">161 ms</text>
+<rect x="538" y="538" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="584.0" y="553.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">0.7×</text>
+<text x="584.0" y="566.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">108 ms</text>
+<rect x="640" y="538" width="92" height="34" rx="3" fill="#dfdfdf"/>
+<text x="686.0" y="553.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.4×</text>
+<text x="686.0" y="566.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">216 ms</text>
+<rect x="742" y="538" width="92" height="34" rx="3" fill="#969696"/>
+<text x="788.0" y="553.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">3.8×</text>
+<text x="788.0" y="566.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">612 ms</text>
+<text x="32.0" y="595.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="start" opacity="1">parse</text>
+<text x="32.0" y="610.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="start" opacity="1">split + toInt, 300k lines</text>
+<rect x="232" y="580" width="92" height="34" rx="3" fill="#a5a5a5"/>
+<text x="278.0" y="595.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">3.0×</text>
+<text x="278.0" y="608.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">218 ms</text>
+<rect x="334" y="580" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="380.0" y="595.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="380.0" y="608.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">72 ms</text>
+<rect x="436" y="580" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="482.0" y="595.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="482.0" y="608.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">72 ms</text>
+<rect x="538" y="580" width="92" height="34" rx="3" fill="#f7f7f7"/>
+<text x="584.0" y="595.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.1×</text>
+<text x="584.0" y="608.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">76 ms</text>
+<rect x="640" y="580" width="92" height="34" rx="3" fill="#a0a0a0"/>
+<text x="686.0" y="595.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">3.2×</text>
+<text x="686.0" y="608.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">234 ms</text>
+<rect x="742" y="580" width="92" height="34" rx="3" fill="#878787"/>
+<text x="788.0" y="595.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">4.9×</text>
+<text x="788.0" y="608.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">354 ms</text>
+<text x="32.0" y="637.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="700" fill="#ffffff" text-anchor="start" opacity="1">bintree</text>
+<text x="32.0" y="652.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="start" opacity="1">allocation, GC pressure</text>
+<rect x="232" y="622" width="92" height="34" rx="3" fill="#b9b9b9"/>
+<text x="278.0" y="637.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">2.2×</text>
+<text x="278.0" y="650.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">1.0 s</text>
+<rect x="334" y="622" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="380.0" y="637.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="380.0" y="650.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">452 ms</text>
+<rect x="436" y="622" width="92" height="34" rx="3" fill="#f6f6f6"/>
+<text x="482.0" y="637.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.1×</text>
+<text x="482.0" y="650.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">482 ms</text>
+<rect x="538" y="622" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="584.0" y="637.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">1.0×</text>
+<text x="584.0" y="650.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">432 ms</text>
+<rect x="640" y="622" width="92" height="34" rx="3" fill="#ffffff"/>
+<text x="686.0" y="637.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">0.6×</text>
+<text x="686.0" y="650.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">265 ms</text>
+<rect x="742" y="622" width="92" height="34" rx="3" fill="#9e9e9e"/>
+<text x="788.0" y="637.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13.5" font-weight="800" fill="#000000" text-anchor="middle" opacity="1">3.3×</text>
+<text x="788.0" y="650.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="9.5" font-weight="400" fill="#000000" text-anchor="middle" opacity="0.65">1.5 s</text>
+<defs><linearGradient id="g"><stop offset="0.0" stop-color="#ffffff"/><stop offset="0.1" stop-color="#dcdcdc"/><stop offset="0.2" stop-color="#c2c2c2"/><stop offset="0.3" stop-color="#ababab"/><stop offset="0.4" stop-color="#959595"/><stop offset="0.5" stop-color="#808080"/><stop offset="0.6" stop-color="#6c6c6c"/><stop offset="0.7" stop-color="#595959"/><stop offset="0.8" stop-color="#464646"/><stop offset="0.9" stop-color="#343434"/><stop offset="1.0" stop-color="#222222"/></linearGradient></defs>
+<rect x="232" y="688" width="300" height="8" rx="1" fill="url(#g)" stroke="#4d4d4d"/>
+<text x="232.0" y="712.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="start" opacity="1">≤1×</text>
+<text x="328.9" y="712.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="middle" opacity="1">3×</text>
+<text x="435.1" y="712.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="middle" opacity="1">10×</text>
+<text x="532.0" y="712.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="10.5" font-weight="400" fill="#737373" text-anchor="end" opacity="1">30×+</text>
+<text x="32.0" y="696.0" font-family="'JetBrains Mono','Fira Code','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="11" font-weight="400" fill="#737373" text-anchor="start" opacity="1">slower than C →</text>
+</svg>
