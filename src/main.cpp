@@ -58,7 +58,7 @@ int main(int argc, char* argv[]) {
         if (options.compileExecutable) {
             // Компиляция в исполняемый файл
             std::string outputFile = options.ExecutableFile.empty() ? "output" : options.ExecutableFile;
-            if (!compileToExecutable(combinedAST, outputFile)) {
+            if (!compileToExecutable(combinedAST, outputFile, options.offOptimization)) {
                 return 1;
             }
             ui::pipelineStop();

@@ -18,7 +18,7 @@ void printHelp(const char* programName) {
               << bold << "RUN" << reset << "\n";
     option("run FILE", "Run a program through the JIT");
     option("--compile OUT FILE", "Build a native executable");
-    option("--offOptimization", "Run without LLVM optimization");
+    option("--offOptimization", "Run or build without LLVM optimization");
     option("--timings", "Show how long each compiler stage took");
     std::cout << "\n" << bold << "INSPECT" << reset << "\n";
     option("--tokens", "Show tokens");
