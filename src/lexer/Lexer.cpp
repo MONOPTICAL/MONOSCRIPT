@@ -374,6 +374,7 @@ TokenType Lexer::IsKeyword(const std::string &value) const
         "use", // Import module
         "const", // Constant declaration
         "in", // In operator for iteration
+        "band", "bor", "xor", "shl", "shr", "bnot", // Битовые операции словами, как and и or: | уже занят отступом
         "is", // Type check operator
         "final", // Final keyword for initialization
         "public", // Public access modifier
@@ -384,7 +385,7 @@ TokenType Lexer::IsKeyword(const std::string &value) const
     }; 
 
     std::vector<std::string> builtinTypes = {
-        "i1", "i8", "i16","i32", "i64", "string", "void", "array", "map", "float", "f64", "char", "struct", "func"
+        "i1", "i8", "i16","i32", "i64", "u8", "u16", "u32", "u64", "string", "void", "array", "map", "float", "f64", "char", "struct", "func"
     };
 
     std::vector<std::string> labels = {

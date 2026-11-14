@@ -114,7 +114,9 @@ public:
     llvm::Value* emitCall(llvm::Function* function, std::vector<llvm::Value*> arguments = {}, const std::string& name = "");
     void checkPanic();
     void propagatePanic();
-    llvm::Function* functionAdapter(llvm::Function* function);
+    // Значение func<> это объект {адрес функции, захваченное...}, функция получает его перед контекстом паники
+    llvm::StructType* getClosureStruct(const std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>>& captures);
+    llvm::Value* functionClosure(llvm::Function* function);
 
     void LogError(const std::string& message);
     void LogWarning(const std::string& message);

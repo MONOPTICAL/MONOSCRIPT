@@ -55,7 +55,8 @@ namespace Objects
         auto outerPanicContext = context.PanicContext;
         context.PanicContext = layout.constructor->getArg(0);
         auto outerNamedValues = context.NamedValues;
-        context.NamedValues.clear();
+        // Значение поля может читать глобальную переменную (Color.Blue), alloca чужой функции здесь не видна
+        std::erase_if(context.NamedValues, [](const auto& entry) { return !llvm::isa_and_nonnull<llvm::GlobalValue>(entry.second); });
 
         context.Builder.SetInsertPoint(llvm::BasicBlock::Create(context.TheContext, "entry", layout.constructor));
         llvm::Value* object = allocate(context, layout);

@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <set>
 #include <map>
 
 class ASTNodeVisitor {
@@ -46,6 +47,28 @@ class ASTNodeVisitor {
 
 class TypeNode;
 class FunctionNode;
+
+// u8..u64 хранятся без знака: расширяются нулями, делятся, сравниваются и сдвигаются вправо без знака
+inline bool isUnsignedTypeName(const std::string& type) {
+    return type == "u8" || type == "u16" || type == "u32" || type == "u64";
+}
+inline bool isIntegerTypeName(const std::string& type) {
+    return type == "i1" || type == "i8" || type == "i16" || type == "i32" || type == "i64" || isUnsignedTypeName(type);
+}
+inline int integerWidth(const std::string& type) {
+    if (type == "i1") return 1;
+    if (type == "i8" || type == "u8") return 8;
+    if (type == "i16" || type == "u16") return 16;
+    if (type == "i32" || type == "u32") return 32;
+    return 64;
+}
+// Неявно можно только без потерь: без знака в знаковое лишь более широкое, знаковое в беззнаковое никогда. i1 это 0 или 1
+inline bool isLosslessInt(const std::string& from, const std::string& to) {
+    if (from == to || from == "i1") return true;
+    const bool fromUnsigned = isUnsignedTypeName(from), toUnsigned = isUnsignedTypeName(to);
+    if (fromUnsigned == toUnsigned) return integerWidth(from) <= integerWidth(to);
+    return fromUnsigned && integerWidth(from) < integerWidth(to);
+}
 
 class ASTNode : public std::enable_shared_from_this<ASTNode> {
     public:
@@ -137,10 +160,14 @@ class ProgramNode : public ASTNode {
         }
 };
 
+// Имена enum: в LLVM это i32, а семантика держит их отдельными типами. Заполняет парсер
+inline std::set<std::string>& enumTypeNames() { static std::set<std::string> names; return names; }
+
 class NamespaceNode: public ASTNode {
     public:
         std::string name;
         std::shared_ptr<ASTNode> body;
+        bool isEnum = false; // [enum]Color: namespace из констант типа Color
         NamespaceNode() = default;
         NamespaceNode(const std::string& name, std::shared_ptr<ASTNode> body)
             : name(name), body(body) {}
@@ -169,6 +196,9 @@ class FunctionNode : public ASTNode {
         // копия получается как только что разобранный код, и семантика может свободно её менять
         std::vector<std::string> typeParameters;
         std::function<std::shared_ptr<FunctionNode>(const std::map<std::string, std::string>&)> instantiate;
+        // Тело лямбды, вынесенное в функцию: захваченные значения приходят в объекте замыкания перед контекстом паники
+        bool isLambda = false;
+        std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> captures; // {тип, имя}
         
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);
@@ -185,6 +215,7 @@ class LambdaNode : public ASTNode {
                             const std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>> parameters,
                             std::shared_ptr<ASTNode> body)
             : returnType(returnType), parameters(parameters), body(body) {}
+        std::shared_ptr<FunctionNode> lifted; // Функция верхнего уровня с телом лямбды, её создаёт семантика
     
         void accept(ASTNodeVisitor& visitor) override { visitor.visit(*this); }
 };
@@ -195,6 +226,9 @@ class StructNode : public ASTNode {
         StructNode(const std::string& name, std::shared_ptr<ASTNode> body) : name(name), body(body) {}
         std::string name;
         std::shared_ptr<ASTNode> body;
+        // Шаблон [struct]Stack<T>: копию Stack<i32> парсер собирает заново, подставив типы вместо T
+        std::vector<std::string> typeParameters;
+        std::function<std::shared_ptr<StructNode>(const std::map<std::string, std::string>&)> instantiate;
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);
@@ -221,6 +255,7 @@ class VariableAssignNode : public ASTNode {
         std::shared_ptr<TypeNode> type;
         bool isConst;
         bool isDeferred = false; // final без значения: присвоить можно ровно один раз, позже
+        bool isCaptured = false; // Копия в лямбде: присвоить нельзя, а объект менять можно
         std::shared_ptr<ASTNode> expression;
 
         void accept(ASTNodeVisitor& visitor) override {

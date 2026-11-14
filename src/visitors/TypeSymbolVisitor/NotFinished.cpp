@@ -353,6 +353,13 @@ void TypeSymbolVisitor::visit(ReassignMemberNode& node) {
     }
 
     access->accept(*this);
+    // m.x = 6: после свёртки namespace цель это сама переменная, и константу так не поменять
+    if (auto target = std::dynamic_pointer_cast<IdentifierNode>(access->expression); target && !access->nextAccess) {
+        auto it = contexts.back().variables.find(target->name);
+        if (it != contexts.back().variables.end())
+            if (auto var = std::dynamic_pointer_cast<VariableAssignNode>(it->second); var && var->isConst)
+                LogError("Cannot reassign constant variable: " + target->name, node.shared_from_this());
+    }
     checkPureAlias(access->expression);
     auto targetType = access->inferredType;
     if (!targetType)

@@ -134,6 +134,13 @@ ret = "string"
 args = ["i64"]
 
 [[function]]
+name = "toString_ulong"
+panic_context = true
+pure = true
+ret = "string"
+args = ["u64"]
+
+[[function]]
 name = "toArray"
 pure = true
 ret = "array<char>"

@@ -11,7 +11,7 @@
 #include <string>
 
 // float в целое. Значение, которое не помещается, и NaN для LLVM это неопределённое поведение: получался мусор
-static llvm::Value* emitFloatToInt(CodeGenContext& context, llvm::Value* value, llvm::Type* targetType, const std::string& name) {
+static llvm::Value* emitFloatToInt(CodeGenContext& context, llvm::Value* value, llvm::Type* targetType, const std::string& name, bool targetUnsigned) {
     llvm::Type* floatType = value->getType();
     const unsigned width = targetType->getIntegerBitWidth();
 
@@ -21,10 +21,12 @@ static llvm::Value* emitFloatToInt(CodeGenContext& context, llvm::Value* value, 
     if (width == 1) {
         fits = context.Builder.CreateFCmpOEQ(value, value, "is_number");
     } else {
-        const double limit = std::ldexp(1.0, width - 1);
+        // Без знака [0, 2^w), со знаком [-2^(w-1), 2^(w-1))
+        const double low = targetUnsigned ? 0.0 : -std::ldexp(1.0, width - 1);
+        const double high = std::ldexp(1.0, targetUnsigned ? width : width - 1);
         fits = context.Builder.CreateAnd(
-            context.Builder.CreateFCmpOGE(truncated, llvm::ConstantFP::get(floatType, -limit)),
-            context.Builder.CreateFCmpOLT(truncated, llvm::ConstantFP::get(floatType, limit)),
+            context.Builder.CreateFCmpOGE(truncated, llvm::ConstantFP::get(floatType, low)),
+            context.Builder.CreateFCmpOLT(truncated, llvm::ConstantFP::get(floatType, high)),
             "fits"
         );
     }
@@ -35,12 +37,13 @@ static llvm::Value* emitFloatToInt(CodeGenContext& context, llvm::Value* value, 
     context.Builder.CreateCondBr(fits, okBlock, errorBlock);
 
     context.Builder.SetInsertPoint(errorBlock);
-    context.emitPanic("float value out of range for i" + std::to_string(width), context.CurrentLine);
+    context.emitPanic(std::string("float value out of range for ") + (targetUnsigned ? "u" : "i") + std::to_string(width), context.CurrentLine);
 
     context.Builder.SetInsertPoint(okBlock);
     // В i1 истина это всё, что не ноль: fptosi дал бы -1, который в i1 не помещается
     if (width == 1)
         return context.Builder.CreateFCmpUNE(truncated, llvm::ConstantFP::get(floatType, 0.0), name + "_fp2bool");
+    if (targetUnsigned) return context.Builder.CreateFPToUI(value, targetType, name + "_fp2uint");
     return context.Builder.CreateFPToSI(value, targetType, name + "_fp2int");
 }
 
@@ -97,7 +100,8 @@ llvm::Value* TypeConversions::loadValueIfPointer(CodeGenContext& context, llvm::
     return value;  // Для других указателей оставляем как есть
 }
 
-llvm::Value* TypeConversions::convertValueToType(CodeGenContext& context, llvm::Value* value, llvm::Type* targetType, const std::string& name) {
+llvm::Value* TypeConversions::convertValueToType(CodeGenContext& context, llvm::Value* value, llvm::Type* targetType, const std::string& name,
+                                                 bool sourceUnsigned, bool targetUnsigned) {
     if (!value || !targetType || value->getType() == targetType) {
         return value;  // Если типы совпадают или что-то из входных параметров равно nullptr
     }
@@ -111,13 +115,13 @@ llvm::Value* TypeConversions::convertValueToType(CodeGenContext& context, llvm::
     // Целое в плавающую точку
     if (value->getType()->isIntegerTy() && targetType->isFloatingPointTy()) {
         // i1 это 0 или 1, со знаком истина превратилась бы в -1
-        if (value->getType()->isIntegerTy(1))
-            return context.Builder.CreateUIToFP(value, targetType, castName + "_i1tofp");
+        if (value->getType()->isIntegerTy(1) || sourceUnsigned)
+            return context.Builder.CreateUIToFP(value, targetType, castName + "_uint2fp");
         return context.Builder.CreateSIToFP(value, targetType, castName + "_int2fp");
     } 
     // Плавающая точка в целое
     else if (value->getType()->isFloatingPointTy() && targetType->isIntegerTy()) {
-        return emitFloatToInt(context, value, targetType, castName);
+        return emitFloatToInt(context, value, targetType, castName, targetUnsigned);
     } 
     // Целое в целое
     else if (value->getType()->isIntegerTy() && targetType->isIntegerTy()) {
@@ -127,7 +131,8 @@ llvm::Value* TypeConversions::convertValueToType(CodeGenContext& context, llvm::
         // В i1 истина это всё, что не ноль: обрезка превратила бы 2 в ложь
         if (targetType->isIntegerTy(1))
             return context.Builder.CreateICmpNE(value, llvm::ConstantInt::get(value->getType(), 0), castName + "_int2bool");
-        return context.Builder.CreateIntCast(value, targetType, true, castName + "_int2int");
+        // Расширение без знака нулями, сужение у обоих просто обрезает биты
+        return context.Builder.CreateIntCast(value, targetType, !sourceUnsigned, castName + "_int2int");
     }
     // Плавающая точка в плавающую точку
     else if (value->getType()->isFloatingPointTy() && targetType->isFloatingPointTy()) {
@@ -145,15 +150,37 @@ llvm::Value* TypeConversions::convertValueToType(CodeGenContext& context, llvm::
     return value;
 }
 
+llvm::Value* TypeConversions::convertNodeValue(CodeGenContext& context, llvm::Value* value, llvm::Type* targetType,
+                                              const std::shared_ptr<ASTNode>& source, const std::shared_ptr<TypeNode>& target) {
+    auto isUnsigned = [](const std::shared_ptr<TypeNode>& type) { return type && isUnsignedTypeName(type->toString()); };
+    const auto before = source ? source->inferredType : nullptr;
+    const auto after = source && source->implicitCastTo ? source->implicitCastTo : before;
+    // Без беззнаковых всё как раньше
+    if (!isUnsigned(before) && !isUnsigned(after) && !isUnsigned(target))
+        return convertValueToType(context, value, targetType);
+
+    // Каст узла ещё не применён: расширение по знаку типа до каста, (i8 -1)->u32 это 4294967295
+    if (source && source->implicitCastTo) {
+        llvm::Type* castType = context.getLLVMType(source->implicitCastTo, context.TheContext);
+        if (castType && value->getType() != castType)
+            value = applyImplicitCast(context, value, source->implicitCastTo, "", isUnsigned(before));
+    }
+    return convertValueToType(context, value, targetType, "", isUnsigned(after), isUnsigned(target));
+}
+
 llvm::Value* TypeConversions::applyCharCast(CodeGenContext& context, ASTNode& node, llvm::Value* value) {
-    if (!value || !node.inferredType || !node.implicitCastTo || node.inferredType->toString() != "char") return value;
+    if (!value || !node.inferredType || !node.implicitCastTo) return value;
+    if (isUnsignedTypeName(node.inferredType->toString()))
+        return applyImplicitCast(context, loadValueIfPointer(context, value), node.implicitCastTo, "unsigned", true);
+    if (node.inferredType->toString() != "char") return value;
 
     llvm::Type* target = context.getLLVMType(node.implicitCastTo, context.TheContext);
     if (!target->isIntegerTy() || target->isIntegerTy(8) || target->isIntegerTy(1)) return value;
     return context.Builder.CreateZExt(loadValueIfPointer(context, value), target, "char_to_int");
 }
 
-llvm::Value* TypeConversions::applyImplicitCast(CodeGenContext& context, llvm::Value* value, std::shared_ptr<TypeNode> targetTypeNode, const std::string& name) {
+llvm::Value* TypeConversions::applyImplicitCast(CodeGenContext& context, llvm::Value* value, std::shared_ptr<TypeNode> targetTypeNode, const std::string& name,
+                                                bool sourceUnsigned) {
     if (!targetTypeNode || !value) {
         return value;
     }
@@ -163,5 +190,5 @@ llvm::Value* TypeConversions::applyImplicitCast(CodeGenContext& context, llvm::V
         return value;
     }
     
-    return convertValueToType(context, value, targetType, name);
+    return convertValueToType(context, value, targetType, name, sourceUnsigned, isUnsignedTypeName(targetTypeNode->toString()));
 }

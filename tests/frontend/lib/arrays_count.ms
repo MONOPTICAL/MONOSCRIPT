@@ -9,14 +9,14 @@ use
 
 [i32]main()
 |   array<i32> a = [1, 2, 1]
-|   echo(cstr(count(a, 1)))
-|   echo(cstr(count(a, 9)))
+|   echo(cstr(arrays.count(a, 1)))
+|   echo(cstr(arrays.count(a, 9)))
 |   array<i32> empty = []
-|   echo(cstr(count(empty, 1)))
+|   echo(cstr(arrays.count(empty, 1)))
 |   array<string> s = ["x", "x", "x"]
-|   echo(cstr(count(s, "x")))
+|   echo(cstr(arrays.count(s, "x")))
 |   array<i64> wide = [5000000000, 1]
-|   echo(cstr(count(wide, 5000000000)))
+|   echo(cstr(arrays.count(wide, 5000000000)))
 |   array<char> c = ['a', 'b']
-|   echo(cstr(count(c, 'b')))
+|   echo(cstr(arrays.count(c, 'b')))
 |   return 0

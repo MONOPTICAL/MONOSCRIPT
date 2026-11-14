@@ -34,7 +34,63 @@ static bool constructsItself(const std::string& name, const std::string& target,
     return false;
 }
 
+void TypeSymbolVisitor::instantiateStruct(const std::string& name)
+{
+    const auto open = name.find('<');
+    if (open == std::string::npos) return;
+    auto found = genericStructs.find(name.substr(0, open));
+    if (found == genericStructs.end() || registry.findStruct(name)) return;
+    const auto& generic = found->second;
+
+    // Аргументы до верхней запятой: Pair<map<string, i32>,u8> это map<string, i32> и u8
+    std::vector<std::string> arguments;
+    int depth = 0;
+    std::string current;
+    for (char c : name.substr(open + 1, name.size() - open - 2)) {
+        if (c == '<') depth++;
+        if (c == '>') depth--;
+        if (c == ',' && depth == 0) { arguments.push_back(current); current.clear(); continue; }
+        current += c;
+    }
+    arguments.push_back(current);
+    if (arguments.size() != generic->typeParameters.size()) {
+        LogError("Struct " + generic->name + " expects " + std::to_string(generic->typeParameters.size()) + " type arguments, got " + std::to_string(arguments.size()));
+        return;
+    }
+
+    std::map<std::string, std::string> types;
+    for (size_t i = 0; i < arguments.size(); i++) types[generic->typeParameters[i]] = arguments[i];
+    auto instance = generic->instantiate(types);
+
+    // Поле типа T без значения получает нулевое значение своего типа: ссылка всё равно не бывает пустой
+    if (auto block = std::dynamic_pointer_cast<BlockNode>(instance->body))
+        for (auto& statement : block->statements) {
+            auto field = std::dynamic_pointer_cast<VariableAssignNode>(statement);
+            auto none = field ? std::dynamic_pointer_cast<NoneNode>(field->expression) : nullptr;
+            if (!none || none->isEmptyLiteral) continue;
+            const std::string type = field->type->toString();
+            if (isIntegerTypeName(type)) field->expression = std::make_shared<NumberNode>(0, std::make_shared<SimpleTypeNode>("i1"));
+            else if (isFloatType(type)) field->expression = std::make_shared<FloatNumberNode>(0.0);
+            else if (type == "string") field->expression = std::make_shared<StringNode>("");
+            else if (type.starts_with("array<") || type.starts_with("map<")) none->isEmptyLiteral = true;
+            else if (registry.findStruct(type) || type.find('<') != std::string::npos) field->expression = std::make_shared<CallNode>(type, std::vector<std::shared_ptr<ASTNode>>{});
+            if (field->expression != none) { field->expression->line = field->line; field->expression->column = field->column; }
+        }
+
+    // Копия проверяется как структура верхнего уровня, а не внутри того, кто её упомянул
+    std::vector<Context> callerContexts(contexts.begin() + 1, contexts.end());
+    contexts.resize(1);
+    const std::string outerNamespace = contexts[0].currentNamespace, outerScopePath = contexts[0].scopePath;
+    contexts[0].currentNamespace = contexts[0].scopePath = "";
+    instance->accept(*this);
+    contexts[0].currentNamespace = outerNamespace;
+    contexts[0].scopePath = outerScopePath;
+    contexts.insert(contexts.end(), callerContexts.begin(), callerContexts.end());
+    hoistedStructs.push_back(instance); // Кодгену копия нужна как обычная структура верхнего уровня
+}
+
 void TypeSymbolVisitor::visit(StructNode& node) {
+    if (!node.typeParameters.empty()) return; // Проверяются только копии шаблона
     // Проверяем, существует ли структура в реестре
     // Сбор объявлений уже положил сюда эту же структуру, повтор это другая структура с тем же именем
     auto existingStruct = registry.findStruct(node.name);
@@ -58,8 +114,6 @@ void TypeSymbolVisitor::visit(StructNode& node) {
     contexts.back().structsFullName.emplace(node.name, fullName);
     node.name = fullName;
 
-    std::cout << "Processing struct: " << fullName << std::endl;
-    std::cout << "Current context: " << contexts.back().currentFunctionName << std::endl;
     contexts.push_back(structContext);
 
     registry.addStruct(fullName, std::make_shared<StructNode>(node.name, node.body));

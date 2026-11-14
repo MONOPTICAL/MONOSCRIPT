@@ -33,8 +33,11 @@ bool isTerminal(FILE* stream) {
 #endif
 }
 
+bool forceColor = false;
+
 bool colorEnabled(FILE* stream) {
     if (std::getenv("NO_COLOR")) return false;
+    if (forceColor) return true;
     const char* term = std::getenv("TERM");
     if (term && std::strcmp(term, "dumb") == 0) return false;
     return isTerminal(stream);
@@ -216,10 +219,15 @@ void pipelineBegin(int totalStages, bool keepLines) {
     state.total = totalStages;
     state.keepLines = keepLines;
     state.animated = isTerminal(stderr);
+    // REPL запускает полосу на каждую строку
+    state.index = 0;
+    state.finished.clear();
     if (!state.animated) return;
 
     // Выход через exit() не должен застать работающий поток
-    std::atexit(pipelineStop);
+    static bool hooked = false;
+    if (!hooked) std::atexit(pipelineStop);
+    hooked = true;
 
     state.running = true;
     state.worker = std::thread([&state]() {

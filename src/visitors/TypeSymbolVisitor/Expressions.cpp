@@ -1,4 +1,6 @@
 #include "../headers/TypeSymbolVisitor.h"
+#include <algorithm>
+std::shared_ptr<TypeNode> functionTypeOf(const FunctionNode& function); // Types.cpp
 
 // Только литералы: они принимают нужный тип сами, каст им не нужен
 bool isLiteralExpression(const std::shared_ptr<ASTNode>& node) {
@@ -33,12 +35,34 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
         LogError("Implicit cast is not allowed in @strict mode: " + leftType->toString() + " and " + rightType->toString() + ", use ->", node.right);
     }
 
+    // Знаковое и беззнаковое смешиваются, только если одно целиком влезает в другое: u8 + i32 можно, i32 + u32 нельзя
+    if (leftType && rightType && isIntegerTypeName(leftType->toString()) && isIntegerTypeName(rightType->toString())
+        && (isUnsignedTypeName(leftType->toString()) || isUnsignedTypeName(rightType->toString()))
+        && !isLiteralExpression(node.left) && !isLiteralExpression(node.right)
+        && !isLosslessInt(leftType->toString(), rightType->toString()) && !isLosslessInt(rightType->toString(), leftType->toString())) {
+        LogError("Cannot mix " + leftType->toString() + " and " + rightType->toString() + ": one does not fit in the other, use ->", node.right);
+    }
+
     std::shared_ptr<BinaryOpNode> root = std::make_shared<BinaryOpNode>(node.left, node.op, node.right);
     root->implicitCastTo = node.implicitCastTo; // Явный каст (a + b)->i32 не должен потеряться
     root->line = node.line; root->column = node.column;
 
     // Обработчики операторов создают новый узел, а место в исходном коде остаётся прежним
     auto finish = [&]() {
+        // Общий тип без знака: деление, остаток, сравнение, сдвиг вправо и степень берут беззнаковые инструкции.
+        // Только для чисел: у склейки строк правая часть ещё не обойдена
+        const bool numeric = root->op != "scat" && root->op != "and" && root->op != "or" && !root->op.starts_with("strcmp_")
+            && (root->left->implicitCastTo || root->left->inferredType) && (root->right->implicitCastTo || root->right->inferredType);
+        const std::string leftOperand = numeric ? resolveExprType(root->left) : "", rightOperand = numeric ? resolveExprType(root->right) : "";
+        const std::string common = getTypeRank(leftOperand) >= getTypeRank(rightOperand) ? leftOperand : rightOperand;
+        if (isUnsignedTypeName(common)) {
+            static const std::map<std::string, std::string> unsignedOps = {
+                {"sdiv", "udiv"}, {"srem", "urem"}, {"shr", "lshr"}, {"ipow", "upow"},
+                {"icmp_slt", "icmp_ult"}, {"icmp_sgt", "icmp_ugt"}, {"icmp_sle", "icmp_ule"}, {"icmp_sge", "icmp_uge"},
+            };
+            if (auto op = unsignedOps.find(root->op); op != unsignedOps.end()) root->op = op->second;
+            if (!root->op.starts_with("icmp_")) root->inferredType = registry.findType(common);
+        }
         const int line = node.line, column = node.column;
         node = *root;
         node.line = line; node.column = column;
@@ -66,15 +90,29 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
     }
 
     // "/"
-    if (node.op == "/" || node.op == "sdiv" || node.op == "fdiv") {
+    if (node.op == "/" || node.op == "sdiv" || node.op == "udiv" || node.op == "fdiv") {
         handleDivOperator(root, leftType, rightType);
         finish();
         return;
     }
 
     // "%"
-    if (node.op == "%" || node.op == "srem" || node.op == "frem") {
+    if (node.op == "%" || node.op == "srem" || node.op == "urem" || node.op == "frem") {
         handleModOperator(root, leftType, rightType);
+        finish();
+        return;
+    }
+
+    // band, bor, xor, shl, shr
+    if (node.op == "band" || node.op == "bor" || node.op == "xor" || node.op == "shl" || node.op == "shr" || node.op == "lshr") {
+        handleBitwiseOperator(root, leftType, rightType);
+        finish();
+        return;
+    }
+
+    // "**"
+    if (node.op == "**" || node.op == "ipow" || node.op == "upow" || node.op == "fpow") {
+        handlePowOperator(root, leftType, rightType);
         finish();
         return;
     }
@@ -104,7 +142,7 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
     }
 
     // Синтаксис есть, а работы с ним пока нет
-    if (node.op == "**" || node.op == "|>")
+    if (node.op == "|>")
         LogError("Operator '" + node.op + "' is not implemented yet", node.right);
 }
 
@@ -176,6 +214,22 @@ void TypeSymbolVisitor::visit(UnaryOpNode& node) {
         return;
     }
 
+    if (node.op == "bnot")
+    {
+        // bnot 0->u64: тип это каст операнда, а не тип литерала
+        if (node.operand->implicitCastTo) operandType = node.operand->implicitCastTo;
+        // Голый литерал это i32, а не i1: bnot 0 это -1, а не логическое не
+        else if (auto number = std::dynamic_pointer_cast<NumberNode>(node.operand); number && !number->isBoolLiteral && getTypeRank(operandType->toString()) < getTypeRank("i32")) {
+            operandType = registry.findType("i32");
+            number->implicitCastTo = operandType;
+        }
+        const std::string type = operandType ? operandType->toString() : "";
+        if (!isIntegerTypeName(type))
+            LogError("Unsupported operand type for 'bnot': " + type + ", only integers", node.shared_from_this());
+        node.inferredType = operandType;
+        return;
+    }
+
     // ?r это r.ok. На остальных типах ?x появится вместе с nullable-типами
     if (node.op == "?")
     {
@@ -230,5 +284,50 @@ void TypeSymbolVisitor::visit(UnaryOpNode& node) {
 
 void TypeSymbolVisitor::visit(LambdaNode &node)
 {
-    LogError("Lambdas are not implemented yet", node.shared_from_this());
+    if (node.lifted) { node.inferredType = functionTypeOf(*node.lifted); return; } // Уже вынесена
+
+    // Тело-выражение это return этого выражения
+    std::shared_ptr<ASTNode> body = node.body;
+    if (!std::dynamic_pointer_cast<BlockNode>(body)) {
+        std::shared_ptr<ASTNode> statement = body;
+        if (node.returnType->toString() != "void") statement = std::make_shared<ReturnNode>(body);
+        statement->line = node.line; statement->column = node.column;
+        body = std::make_shared<BlockNode>(std::vector<std::shared_ptr<ASTNode>>{statement});
+    }
+
+    static int lambdas = 0;
+    auto lifted = std::make_shared<FunctionNode>("__lambda" + std::to_string(++lambdas), "", node.returnType, node.parameters, std::vector<std::string>{}, body);
+    lifted->line = node.line; lifted->column = node.column;
+    lifted->isLambda = true;
+
+    // Захват по значению в момент создания, как у Java: внутри лямбды захваченное только читается.
+    // shortcut: захватываются все видимые локальные переменные, а не только использованные. Считать использованные, если замыкания станут тяжёлыми
+    if (contexts.size() > 1)
+        for (const auto& [name, variable] : contexts.back().variables) {
+            auto global = contexts[0].variables.find(name);
+            if (global != contexts[0].variables.end() && global->second == variable) continue;
+            if (std::any_of(node.parameters.begin(), node.parameters.end(), [&](const auto& p) { return p.second == name; })) continue;
+            auto type = variable->inferredType;
+            if (auto declared = std::dynamic_pointer_cast<VariableAssignNode>(variable); declared && !type) type = declared->type;
+            if (!type || type->toString() == "auto") continue;
+            lifted->captures.push_back({type, name});
+        }
+    node.lifted = lifted;
+    declaredFunctions[lifted->name] = lifted;
+    genericInstances.push_back(lifted); // Кодгену нужна как обычная функция верхнего уровня
+
+    // Тело проверяется как функция верхнего уровня, как копия шаблона
+    std::vector<Context> callerContexts(contexts.begin() + 1, contexts.end());
+    contexts.resize(1);
+    const int outerLoopDepth = loopDepth;
+    const bool outerInMethod = insideMethod, outerIndexedString = lastAccessIndexedString;
+    loopDepth = 0;
+    insideMethod = false;
+    lifted->accept(*this);
+    loopDepth = outerLoopDepth;
+    insideMethod = outerInMethod;
+    lastAccessIndexedString = outerIndexedString;
+    contexts.insert(contexts.end(), callerContexts.begin(), callerContexts.end());
+
+    node.inferredType = functionTypeOf(*lifted);
 }

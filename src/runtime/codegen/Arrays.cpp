@@ -26,8 +26,8 @@ namespace Arrays
             throw std::runtime_error("Codegen Error: could not generate a collection element");
 
         value = TypeConversions::loadValueIfPointer(context, value);
-        value = TypeConversions::applyImplicitCast(context, value, expression->implicitCastTo);
-        return TypeConversions::convertValueToType(context, value, context.getLLVMType(type, context.TheContext));
+        value = TypeConversions::applyImplicitCast(context, value, expression->implicitCastTo, "", TypeConversions::isUnsignedNode(expression));
+        return TypeConversions::convertNodeValue(context, value, context.getLLVMType(type, context.TheContext), expression, type);
     }
 
     llvm::Value* emitLiteral(CodeGenContext& context, const std::shared_ptr<ASTNode>& literal, const std::shared_ptr<TypeNode>& arrayType)
@@ -126,8 +126,8 @@ namespace Arrays
             } else if (link->notation == "[]" && currentType && currentType->toString() == "string") {
                 next->expression->accept(codeGen);
                 llvm::Value* index = TypeConversions::loadValueIfPointer(context, codeGen.getResult());
-                index = TypeConversions::applyImplicitCast(context, index, next->expression->implicitCastTo);
-                llvm::Value* wideIndex = index->getType()->isIntegerTy(1)
+                index = TypeConversions::applyImplicitCast(context, index, next->expression->implicitCastTo, "", TypeConversions::isUnsignedNode(next->expression));
+                llvm::Value* wideIndex = index->getType()->isIntegerTy(1) || TypeConversions::isUnsignedNode(next->expression)
                     ? context.Builder.CreateZExt(index, context.Builder.getInt64Ty(), "index")
                     : context.Builder.CreateSExt(index, context.Builder.getInt64Ty(), "index");
                 elementPtr = context.emitCall(context.getOrDeclareFunction("ms_str_at",
@@ -136,7 +136,10 @@ namespace Arrays
             } else if (link->notation == "[]") {
                 next->expression->accept(codeGen);
                 llvm::Value* index = TypeConversions::loadValueIfPointer(context, codeGen.getResult());
-                index = TypeConversions::applyImplicitCast(context, index, next->expression->implicitCastTo);
+                index = TypeConversions::applyImplicitCast(context, index, next->expression->implicitCastTo, "", TypeConversions::isUnsignedNode(next->expression));
+                // Индекс без знака расширяем нулями сами: getArrayElementPtr расширяет со знаком
+                if (TypeConversions::isUnsignedNode(next->expression) && !next->expression->implicitCastTo && !index->getType()->isIntegerTy(64))
+                    index = context.Builder.CreateZExt(index, context.Builder.getInt64Ty(), "uindex");
                 elementPtr = context.getArrayElementPtr(base, elementType, index, next->line);
             } else {
                 auto layout = currentType ? context.Structs.find(currentType->toString()) : context.Structs.end();

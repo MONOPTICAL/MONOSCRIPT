@@ -45,6 +45,51 @@ static void emitDivisionOverflowCheck(CodeGenContext& context, llvm::Value* divi
     context.Builder.SetInsertPoint(okBlock);
 }
 
+// Целая степень быстрым возведением: O(log n) умножений. Переполнение заворачивается, как у *
+static llvm::Value* emitIntegerPow(CodeGenContext& context, llvm::Value* base, llvm::Value* exponent, int line, bool isUnsigned) {
+    auto& builder = context.Builder;
+    auto* type = base->getType();
+    // i1 это 0 или 1: x ** 0 = 1, x ** 1 = x
+    if (type->isIntegerTy(1))
+        return builder.CreateSelect(exponent, base, llvm::ConstantInt::get(type, 1), "powtmp_bool");
+
+    llvm::Function* function = builder.GetInsertBlock()->getParent();
+    auto* start = llvm::BasicBlock::Create(context.TheContext, "pow.start", function);
+    if (isUnsigned) builder.CreateBr(start); // степень без знака не бывает отрицательной
+    else {
+        auto* negative = llvm::BasicBlock::Create(context.TheContext, "pow.negative", function);
+        builder.CreateCondBr(builder.CreateICmpSLT(exponent, llvm::ConstantInt::get(type, 0)), negative, start);
+        builder.SetInsertPoint(negative);
+        context.emitPanic("negative exponent in integer power", line);
+    }
+
+    builder.SetInsertPoint(start);
+    auto* loop = llvm::BasicBlock::Create(context.TheContext, "pow.loop", function);
+    auto* body = llvm::BasicBlock::Create(context.TheContext, "pow.body", function);
+    auto* done = llvm::BasicBlock::Create(context.TheContext, "pow.done", function);
+    builder.CreateBr(loop);
+
+    builder.SetInsertPoint(loop);
+    auto* result = builder.CreatePHI(type, 2, "pow.result");
+    auto* square = builder.CreatePHI(type, 2, "pow.base");
+    auto* rest = builder.CreatePHI(type, 2, "pow.exp");
+    result->addIncoming(llvm::ConstantInt::get(type, 1), start);
+    square->addIncoming(base, start);
+    rest->addIncoming(exponent, start);
+    builder.CreateCondBr(builder.CreateICmpEQ(rest, llvm::ConstantInt::get(type, 0)), done, body);
+
+    builder.SetInsertPoint(body);
+    auto* odd = builder.CreateTrunc(rest, builder.getInt1Ty(), "pow.odd");
+    auto* nextResult = builder.CreateSelect(odd, builder.CreateMul(result, square), result);
+    result->addIncoming(nextResult, body);
+    square->addIncoming(builder.CreateMul(square, square), body);
+    rest->addIncoming(builder.CreateLShr(rest, 1), body);
+    builder.CreateBr(loop);
+
+    builder.SetInsertPoint(done);
+    return result;
+}
+
 llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryOpNode& node, llvm::Value* left, llvm::Value* right) {
     left = TypeConversions::loadValueIfPointer(context, left, "left");
     right = TypeConversions::loadValueIfPointer(context, right, "right");
@@ -59,11 +104,11 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
 
     // Приведение типов
     if (node.left->implicitCastTo) {
-        left = TypeConversions::applyImplicitCast(context, left, node.left->implicitCastTo, "left");
+        left = TypeConversions::applyImplicitCast(context, left, node.left->implicitCastTo, "left", TypeConversions::isUnsignedNode(node.left));
     }
     
     if (node.right->implicitCastTo) {
-        right = TypeConversions::applyImplicitCast(context, right, node.right->implicitCastTo, "right");
+        right = TypeConversions::applyImplicitCast(context, right, node.right->implicitCastTo, "right", TypeConversions::isUnsignedNode(node.right));
     }
     
     // Семантика приводит не всё: элемент массива или вызов могут прийти с другим типом.
@@ -71,9 +116,9 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
     if (left->getType() != right->getType()) {
         if (left->getType()->isIntegerTy() && right->getType()->isIntegerTy()) {
             if (left->getType()->getIntegerBitWidth() > right->getType()->getIntegerBitWidth())
-                right = TypeConversions::convertValueToType(context, right, left->getType(), "implicit_cast_right");
+                right = TypeConversions::convertValueToType(context, right, left->getType(), "implicit_cast_right", TypeConversions::isUnsignedNode(node.right));
             else
-                left = TypeConversions::convertValueToType(context, left, right->getType(), "implicit_cast_left");
+                left = TypeConversions::convertValueToType(context, left, right->getType(), "implicit_cast_left", TypeConversions::isUnsignedNode(node.left));
         } else if (left->getType()->isFloatTy() && right->getType()->isDoubleTy()) {
             left = TypeConversions::convertValueToType(context, left, right->getType(), "implicit_cast_left");
         } else if (left->getType()->isDoubleTy() && right->getType()->isFloatTy()) {
@@ -125,6 +170,11 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
             return context.Builder.CreateMul(left, right, "multmp_int");
         }
     } 
+    else if (node.op == "udiv" || node.op == "urem") {
+        emitDivisionByZeroCheck(context, right, node.line);
+        if (node.op == "udiv") return context.Builder.CreateUDiv(left, right, "udivtmp");
+        return context.Builder.CreateURem(left, right, "uremtmp");
+    }
     else if (node.op == "sdiv" || node.op == "fdiv") {
         if (left->getType()->isFloatingPointTy() || right->getType()->isFloatingPointTy()) {
             // Обработка float деления...
@@ -164,6 +214,29 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
             return context.Builder.CreateSRem(left, safeDivisor, "remtmp_int");
         }
     } 
+    else if (node.op == "band") return context.Builder.CreateAnd(left, right, "andtmp");
+    else if (node.op == "bor") return context.Builder.CreateOr(left, right, "ortmp");
+    else if (node.op == "xor") return context.Builder.CreateXor(left, right, "xortmp");
+    else if (node.op == "shl" || node.op == "shr" || node.op == "lshr") {
+        // Сдвиг на ширину типа и больше в LLVM это poison: останавливаем программу, как при делении на ноль
+        auto* type = left->getType();
+        llvm::Function* function = context.Builder.GetInsertBlock()->getParent();
+        auto* bad = llvm::BasicBlock::Create(context.TheContext, "shift.bad", function);
+        auto* ok = llvm::BasicBlock::Create(context.TheContext, "shift.ok", function);
+        auto* width = llvm::ConstantInt::get(type, type->getIntegerBitWidth());
+        context.Builder.CreateCondBr(context.Builder.CreateICmpUGE(right, width), bad, ok); // отрицательное без знака огромное
+        context.Builder.SetInsertPoint(bad);
+        context.emitPanic("shift amount out of range", node.line);
+        context.Builder.SetInsertPoint(ok);
+        if (node.op == "shl") return context.Builder.CreateShl(left, right, "shltmp");
+        if (node.op == "lshr") return context.Builder.CreateLShr(left, right, "lshrtmp");
+        return context.Builder.CreateAShr(left, right, "shrtmp");
+    }
+    else if (node.op == "ipow" || node.op == "upow" || node.op == "fpow") {
+        if (left->getType()->isFloatingPointTy())
+            return context.Builder.CreateBinaryIntrinsic(llvm::Intrinsic::pow, left, right, nullptr, "powtmp_float");
+        return emitIntegerPow(context, left, right, node.line, node.op == "upow");
+    }
     else if (node.op == "scat") {
         std::string TOML_path = loader::findTomlPath();
         if (TOML_path.empty()) {
@@ -237,6 +310,10 @@ llvm::Value* Expressions::handleBinaryOperation(CodeGenContext& context, BinaryO
         { // <=
             predicate = llvm::CmpInst::ICMP_SLE;
         } 
+        else if (node.op == "icmp_ult") predicate = llvm::CmpInst::ICMP_ULT;
+        else if (node.op == "icmp_ugt") predicate = llvm::CmpInst::ICMP_UGT;
+        else if (node.op == "icmp_ule") predicate = llvm::CmpInst::ICMP_ULE;
+        else if (node.op == "icmp_uge") predicate = llvm::CmpInst::ICMP_UGE;
         else 
         {
 #if DEBUG
@@ -270,7 +347,7 @@ llvm::Value* Expressions::handleUnaryOperation(CodeGenContext& context, UnaryOpN
     operand = TypeConversions::loadValueIfPointer(context, operand, "operand");
 
     if (node.operand->implicitCastTo) {
-        operand = TypeConversions::applyImplicitCast(context, operand, node.operand->implicitCastTo, "operand");
+        operand = TypeConversions::applyImplicitCast(context, operand, node.operand->implicitCastTo, "operand", TypeConversions::isUnsignedNode(node.operand));
     }
     
     // r?: propagate an error using the caller's result layout; unwrap on success.
@@ -348,6 +425,9 @@ llvm::Value* Expressions::handleUnaryOperation(CodeGenContext& context, UnaryOpN
             return nullptr;
         }
     } 
+    else if (node.op == "bnot") {
+        return context.Builder.CreateNot(operand, "bnottmp");
+    }
     else if (node.op == "not") {  // Логическое отрицание
         if (operand->getType()->isIntegerTy(1)) {  // boolean
             return context.Builder.CreateNot(operand, "nottmp");

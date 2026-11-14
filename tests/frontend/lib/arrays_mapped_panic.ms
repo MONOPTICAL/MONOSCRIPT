@@ -8,5 +8,5 @@ use
 
 [i32]main()
 |   array<i32> a = [1, 0, 5]
-|   r ^= mapped(a, boom)
+|   r ^= arrays.mapped(a, boom)
 |   return len(r)

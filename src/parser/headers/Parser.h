@@ -53,6 +53,7 @@ private:
     std::shared_ptr<ASTNode> parseCall();
     std::shared_ptr<ASTNode> parseStruct();
     std::shared_ptr<ASTNode> parseNamespace();
+    std::shared_ptr<ASTNode> parseEnum();
 
     std::shared_ptr<ASTNode> parseUse();
 

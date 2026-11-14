@@ -87,6 +87,7 @@ if(LLVM_FOUND)
     core
     support
     irreader
+    asmparser
     executionengine
     mcjit
     orcjit
@@ -122,6 +123,8 @@ if(LLVM_FOUND)
       src/runtime/codegen/Expressions.cpp
       src/runtime/codegen/TypeConversions.cpp
       src/CLI/runner.cpp
+      src/CLI/repl.cpp
+      src/CLI/lineedit.cpp
       src/CLI/compile.cpp
   )
 

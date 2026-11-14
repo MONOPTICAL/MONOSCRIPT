@@ -4,5 +4,5 @@ use
 
 [i32]main()
 |   array<i32> a = [1]
-|   n ^= indexOf(a, "x")
+|   n ^= arrays.indexOf(a, "x")
 |   return n

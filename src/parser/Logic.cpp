@@ -175,6 +175,8 @@ std::shared_ptr<TypeNode> Parser::getFullType()
     }
     
     std::string baseName = current().value;
+    // result лексер читает как идентификатор, но это встроенный generic-тип, как array и map
+    const bool userType = currentToken.type == TokenType::Identifier && baseName != "result";
     advance();
 
     // Тип из namespace: Xyi.x
@@ -186,7 +188,15 @@ std::shared_ptr<TypeNode> Parser::getFullType()
 
     // В копии шаблона T это уже конкретный тип
     if (auto substituted = typeSubstitution.find(baseName); substituted != typeSubstitution.end()) {
-        auto type = parseTomlType(substituted->second);
+        // Копия generic-структуры (Stack<u8>) это простой тип с таким именем, а не array или map
+        const std::string& value = substituted->second;
+        const std::string base = value.substr(0, value.find('<'));
+        if (value.find('<') != std::string::npos && base != "array" && base != "map" && base != "result" && base != "func") {
+            auto type = std::make_shared<SimpleTypeNode>(value);
+            type->line = lineIndex; type->column = tokenIndex;
+            return type;
+        }
+        auto type = parseTomlType(value);
         type->line = lineIndex; type->column = tokenIndex;
         return type;
     }
@@ -215,7 +225,16 @@ std::shared_ptr<TypeNode> Parser::getFullType()
             throwError("Expected > to close generic type");
         }
         advance(); // Пропускаем >
-        
+
+        // Stack<i32> это обычная структура с таким именем: её копию создаст семантика. array, map, result и func это Type
+        if (userType) {
+            std::string arguments;
+            for (const auto& parameter : genericType->typeParameters)
+                arguments += (arguments.empty() ? "" : ",") + parameter->toString();
+            auto node = std::make_shared<SimpleTypeNode>(baseName + "<" + arguments + ">");
+            node->line = genericType->line; node->column = genericType->column;
+            return node;
+        }
         return genericType;
     } else {
         // Простой тип
@@ -235,8 +254,14 @@ int Parser::getPrecedence(const Token &token) const
     if (token.value == "and") return 2; // keyword
     if (token.value == "|>") return 3; // keyword
     if (token.value == "==" || token.value == "<" || token.value == ">" || token.value == "!=" || token.value == "<=" || token.value == ">=") return 4; // operator
-    if (token.value == "+" || token.value == "-") return 5; // operator
-    if (token.value == "*" || token.value == "/" || token.value == "%" || token.value == "**") return 6; // operator
+    // Битовые выше сравнения, как в Python: x band 1 == 0 это (x band 1) == 0
+    if (token.value == "bor") return 5; // keyword
+    if (token.value == "xor") return 6; // keyword
+    if (token.value == "band") return 7; // keyword
+    if (token.value == "shl" || token.value == "shr") return 8; // keyword
+    if (token.value == "+" || token.value == "-") return 9; // operator
+    if (token.value == "*" || token.value == "/" || token.value == "%") return 10; // operator
+    if (token.value == "**") return 11; // operator
 
     return -1; // Для компилятора, чтобы не ругался на -Wreturn-type
 }
@@ -285,7 +310,8 @@ std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
         if (currentPrecedence < precedence) break; // Если текущий приоритет меньше, чем заданный, выходим из цикла
 
         advance(); // Переходим к следующему токену
-        auto right = parseBinary(currentPrecedence + 1); // +1 чтобы 10 - 3 - 2 было (10 - 3) - 2
+        // +1 чтобы 10 - 3 - 2 было (10 - 3) - 2. Степень наоборот: 2 ** 3 ** 2 это 2 ** (3 ** 2)
+        auto right = parseBinary(currentToken.value == "**" ? currentPrecedence : currentPrecedence + 1);
 
         left = std::make_shared<BinaryOpNode>(left, currentToken.value, right); // Создаём новый узел бинарной операции
         left->line = lineIndex; left->column = tokenIndex; // Устанавливаем строку и колонку для узла
@@ -297,7 +323,8 @@ std::shared_ptr<ASTNode> Parser::parseBinary(int precedence)
 std::shared_ptr<ASTNode> Parser::parseUnary()
 {
     Token currentToken = current();
-    if (currentToken.type == TokenType::Operator && (currentToken.value == "!" || currentToken.value == "-" || currentToken.value == "?"))
+    if ((currentToken.type == TokenType::Operator && (currentToken.value == "!" || currentToken.value == "-" || currentToken.value == "?"))
+        || (currentToken.type == TokenType::Keyword && currentToken.value == "bnot"))
     {
         advance(); // Переходим к следующему токену
         auto right = parseUnary(); // Рекурсивно разбираем правую часть выражения

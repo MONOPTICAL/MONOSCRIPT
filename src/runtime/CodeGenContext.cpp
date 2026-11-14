@@ -60,6 +60,12 @@ llvm::Type* CodeGenContext::getLLVMType(std::shared_ptr<TypeNode> typeNode, llvm
         if (simpleType->name == "i16") return llvm::Type::getInt16Ty(ctx); // 16-битное целое
         if (simpleType->name == "i32") return llvm::Type::getInt32Ty(ctx); // 32-битное целое
         if (simpleType->name == "i64") return llvm::Type::getInt64Ty(ctx); // 64-битное целое
+        if (enumTypeNames().count(simpleType->name)) return llvm::Type::getInt32Ty(ctx); // enum это i32
+        // Без знака те же биты: знак выбирают инструкции (udiv, icmp ult, lshr, zext)
+        if (simpleType->name == "u8") return llvm::Type::getInt8Ty(ctx);
+        if (simpleType->name == "u16") return llvm::Type::getInt16Ty(ctx);
+        if (simpleType->name == "u32") return llvm::Type::getInt32Ty(ctx);
+        if (simpleType->name == "u64") return llvm::Type::getInt64Ty(ctx);
         if (simpleType->name == "float") return llvm::Type::getFloatTy(ctx); // 32-битное число с плавающей точкой
         if (simpleType->name == "f64") return llvm::Type::getDoubleTy(ctx); // 64-битное число с плавающей точкой
         if (simpleType->name == "char") return llvm::Type::getInt8Ty(ctx); // символ
@@ -282,22 +288,40 @@ llvm::Value* CodeGenContext::emitCall(llvm::Function* function, std::vector<llvm
     return value;
 }
 
-// Every func<> value uses the language calling convention, including native functions.
-llvm::Function* CodeGenContext::functionAdapter(llvm::Function* function) {
-    if (function->hasFnAttribute("ms.panic_context")) return function;
-    const std::string name = "__ms_adapter_" + function->getName().str();
-    if (auto existing = TheModule->getFunction(name)) return existing;
+llvm::StructType* CodeGenContext::getClosureStruct(const std::vector<std::pair<std::shared_ptr<TypeNode>, std::string>>& captures) {
+    std::vector<llvm::Type*> fields = {Builder.getPtrTy()};
+    for (const auto& capture : captures) fields.push_back(getLLVMType(capture.first, TheContext));
+    return llvm::StructType::get(TheContext, fields);
+}
+
+// Функция по имени как значение func<>: объект замыкания без захваченного.
+// Адаптер принимает объект и контекст паники, как лямбда, и зовёт функцию в её собственном соглашении
+llvm::Value* CodeGenContext::functionClosure(llvm::Function* function) {
+    auto layout = getClosureStruct({});
+    // shortcut: объект создаётся в куче при каждом упоминании, глобальную константу loadValueIfPointer загрузил бы как переменную
+    auto closureOf = [&](llvm::Function* adapter) {
+        llvm::Value* closure = allocateObject(llvm::ConstantExpr::getSizeOf(layout), true, "closure");
+        Builder.CreateStore(adapter, closure);
+        return closure;
+    };
+    if (auto existing = TheModule->getFunction("__ms_adapter_" + function->getName().str())) return closureOf(existing);
+    const bool checked = function->hasFnAttribute("ms.panic_context");
     std::vector<llvm::Type*> types(function->getFunctionType()->params().begin(), function->getFunctionType()->params().end());
-    types.push_back(Builder.getPtrTy());
+    if (checked) types.pop_back(); // контекст паники добавим сами в конец
+    const size_t userArguments = types.size();
+    types.push_back(Builder.getPtrTy()); // объект замыкания
+    types.push_back(Builder.getPtrTy()); // контекст паники
     auto adapter = llvm::Function::Create(llvm::FunctionType::get(function->getReturnType(), types, false),
-        llvm::Function::PrivateLinkage, name, TheModule.get());
+        llvm::Function::PrivateLinkage, "__ms_adapter_" + function->getName().str(), TheModule.get());
     adapter->addFnAttr("ms.panic_context");
     llvm::IRBuilder<> builder(llvm::BasicBlock::Create(TheContext, "entry", adapter));
     std::vector<llvm::Value*> args;
-    for (unsigned i = 0; i < function->arg_size(); ++i) args.push_back(adapter->getArg(i));
+    for (size_t i = 0; i < userArguments; ++i) args.push_back(adapter->getArg(i));
+    if (checked) args.push_back(adapter->getArg(userArguments + 1));
     auto value = builder.CreateCall(function, args);
     if (function->getReturnType()->isVoidTy()) builder.CreateRetVoid(); else builder.CreateRet(value);
-    return adapter;
+
+    return closureOf(adapter);
 }
 
 std::string CodeGenContext::findEntryName(const ProgramNode& program) {

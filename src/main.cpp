@@ -5,6 +5,7 @@
 #include "CLI/headers/compile.h"
 #include "CLI/headers/test_runner.h"
 #include "CLI/headers/ui.h"
+#include "CLI/headers/repl.h"
 #include "errors/headers/ErrorEngine.h"
 #include "loader/headers/loader.h"
 #include <gc/gc.h>
@@ -29,6 +30,11 @@ int main(int argc, char* argv[]) {
         if (options.runTests) {
             std::string self = loader::getExecutableDir() + "/" + std::filesystem::path(argv[0]).filename().string();
             return runFrontendTests({self, "--check-file"}, {self, "run"}, loader::findTestsPath(), options.verbose, options.inputFile);
+        }
+
+        // Без файла в терминале: интерактивная сессия. Ввод из конвейера по-прежнему читается как программа
+        if (options.inputFile.empty() && !options.compileExecutable && ui::isTerminal(stdin)) {
+            return runRepl();
         }
 
         // Сколько всего стадий, зависит от режима: см. вызовы ui::stage

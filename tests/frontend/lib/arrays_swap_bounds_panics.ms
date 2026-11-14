@@ -4,5 +4,5 @@ use
 
 [i32]main()
 |   array<i32> a = [1, 2]
-|   swapInArray(a, 0, 5)
+|   arrays.swapInArray(a, 0, 5)
 |   return 0

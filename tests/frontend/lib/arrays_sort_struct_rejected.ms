@@ -7,5 +7,5 @@ use
 
 [i32]main()
 |   array<P> a = [P(), P()]
-|   b ^= sort(a)
+|   b ^= arrays.sort(a)
 |   return 0

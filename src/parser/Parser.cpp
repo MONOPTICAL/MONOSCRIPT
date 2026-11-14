@@ -64,6 +64,10 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     {
         return parseStruct();
     }
+    else if (currentToken.type == TokenType::LeftBracket && peek().value == "enum")
+    {
+        return parseEnum();
+    }
     // If statement
         // if [expression] or if [expression]
         // if 2 > 0

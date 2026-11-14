@@ -16,6 +16,7 @@ void TypeSymbolVisitor::resolveNamespaceVariable(std::string& name) const
 
 void TypeSymbolVisitor::visit(SimpleTypeNode &node)
 {
+    if (node.name.find('<') != std::string::npos) instantiateStruct(node.name);
     // Проверяем, существует ли тип в реестре
     auto type = registry.findType(node.name);
     auto fullName = findStructFullName(node.name);
@@ -81,7 +82,13 @@ void TypeSymbolVisitor::visit(IdentifierNode& node)
     resolveNamespaceVariable(node.name);
     // Проверяем, существует ли переменная в реестре
     auto it = contexts.back().variables.find(node.name);
+    // Color.Blue в значении поля структуры: у структуры свой контекст без глобальных, а переменные namespace глобальные
+    if (it == contexts.back().variables.end() && node.name.find('.') != std::string::npos)
+        if (auto global = contexts[0].variables.find(node.name); global != contexts[0].variables.end())
+            it = contexts.back().variables.emplace(node.name, global->second).first;
     if (it == contexts.back().variables.end()) {
+        if (overloads.count(node.name))
+            LogError("Function " + node.name + " is overloaded and cannot be passed by name, wrap the one you need in a lambda", node.shared_from_this());
         // Не переменная, а имя функции: её передают как значение
         std::shared_ptr<FunctionNode> function;
         std::string internalName = node.name;
@@ -134,6 +141,9 @@ void TypeSymbolVisitor::checkCharCast(ASTNode& node)
     const bool integerFrom = getTypeRank(from) > 0 && !isFloatType(from);
     const bool integerTo = getTypeRank(to) > 0 && !isFloatType(to);
     if ((to == "char" && !integerFrom) || (from == "char" && !integerTo))
+        LogError("Cannot cast " + from + " to " + to, node.shared_from_this());
+    // enum хранится как i32: явный каст только в целое и из целого
+    if ((enumTypeNames().count(to) && !integerFrom) || (enumTypeNames().count(from) && !integerTo))
         LogError("Cannot cast " + from + " to " + to, node.shared_from_this());
 }
 

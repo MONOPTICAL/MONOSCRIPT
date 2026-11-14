@@ -27,7 +27,7 @@ void printHelp(const char* programName) {
     std::cout << "\n" << bold << "TEST" << reset << "\n";
     option("--run_tests [FILTER]", "Run the test suite, FILTER selects tests by path");
     option("--verbose", "Show every test");
-    std::cout << "\n" << dim << "  Without FILE the source is read from standard input." << reset << "\n" << std::endl;
+    std::cout << "\n" << dim << "  Without FILE: an interactive session in a terminal, otherwise the source is read from standard input." << reset << "\n" << std::endl;
 }
 
 CLIOptions parseArgs(int argc, char* argv[]) {
@@ -92,10 +92,6 @@ std::string readSourceCode(const std::string& inputFile) {
             sourceCode += line + "\n";
         }
     } else {
-        if (ui::isTerminal(stdin)) {
-            ui::printBanner(stderr);
-            std::cerr << "\n" << ui::style(stderr, ui::DIM) << "  Enter source code, Ctrl+D to finish" << ui::style(stderr, ui::RESET) << "\n\n";
-        }
         std::string line;
         while (std::getline(std::cin, line)) {
             sourceCode += line + "\n";

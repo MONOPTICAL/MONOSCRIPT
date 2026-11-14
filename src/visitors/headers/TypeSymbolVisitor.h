@@ -55,6 +55,12 @@ private:
     // Копии шаблонов: добавляются в программу после обхода, из какого модуля шаблон
     std::vector<std::shared_ptr<ASTNode>>                           genericInstances;
     std::map<std::string, std::string>                              genericModules;
+    std::map<std::string, std::string>                              genericNamespaces; // m.sort -> m: копия шаблона проверяется внутри своего namespace
+    std::map<std::string, std::shared_ptr<StructNode>>              genericStructs; // Stack -> шаблон [struct]Stack<T>
+    std::map<std::string, std::vector<std::shared_ptr<FunctionNode>>> overloads; // f -> f(i32), f(string)
+    std::string                                                     resolveOverload(const std::string& name, const std::vector<std::shared_ptr<FunctionNode>>& candidates,
+                                                                        CallNode& call, const std::vector<std::shared_ptr<TypeNode>>& argTypes);
+    void                                                            instantiateStruct(const std::string& name); // Stack<i32> -> копия шаблона
     std::string                                                     instantiateGeneric(const std::shared_ptr<FunctionNode>& generic, CallNode& call,
                                                                         const std::vector<std::shared_ptr<TypeNode>>& argTypes);
     bool                                                            lastAccessIndexedString = false; // Последнее звено цепочки это s[i]: писать туда нельзя
@@ -134,6 +140,16 @@ private:
                                                                             std::shared_ptr<TypeNode> rightType);
 
     void                                                            handleModOperator(
+                                                                            std::shared_ptr<BinaryOpNode>& node, 
+                                                                            std::shared_ptr<TypeNode> leftType, 
+                                                                            std::shared_ptr<TypeNode> rightType);
+
+    void                                                            handleBitwiseOperator(
+                                                                            std::shared_ptr<BinaryOpNode>& node, 
+                                                                            std::shared_ptr<TypeNode> leftType, 
+                                                                            std::shared_ptr<TypeNode> rightType);
+
+    void                                                            handlePowOperator(
                                                                             std::shared_ptr<BinaryOpNode>& node, 
                                                                             std::shared_ptr<TypeNode> leftType, 
                                                                             std::shared_ptr<TypeNode> rightType);

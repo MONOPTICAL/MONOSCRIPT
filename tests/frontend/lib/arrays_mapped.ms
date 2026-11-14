@@ -16,18 +16,18 @@ use
 
 [i32]main()
 |   array<i32> a = [1, 2]
-|   for x in mapped(a, twice)
+|   for x in arrays.mapped(a, twice)
 |   |   echo(cstr(x))
 |   array<string> fallback = []
-|   for s in mapped(a, label)
+|   for s in arrays.mapped(a, label)
 |   |   echo(s)
 |   array<i32> empty = []
-|   echo(cstr(len(mapped(empty, twice))))
+|   echo(cstr(len(arrays.mapped(empty, twice))))
 |   echo(cstr(a[0]))
 |   [char]first(string: s)
 |   |   return s[0]
 |   array<string> words = ["xy"]
 |   array<char> noChars = []
-|   for c in mapped(words, first)
+|   for c in arrays.mapped(words, first)
 |   |   echo(cstr(c))
 |   return 0

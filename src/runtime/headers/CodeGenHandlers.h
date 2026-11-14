@@ -2,12 +2,16 @@
 #define CODEGENHANDLERS_H
 
 #include "CodeGenContext.h"
+#include <map>
 
 class ASTGen;
 
 namespace Declarations {
     llvm::Value*                    handleSimpleAssignment(CodeGenContext& context, VariableAssignNode& node, llvm::Type* varType);
     llvm::Value*                    handleGlobalVariable(CodeGenContext& context, VariableAssignNode& node, llvm::Type* varType);
+    // REPL: глобальные переменные, которые уже живут в JIT прошлых строк, имя -> символ. Пусто вне REPL
+    extern std::map<std::string, std::string> replGlobals;
+    extern std::string replPrefix; // Префикс символов новых глобальных переменных. Пустой: обычная программа
   //llvm::Value*                    handleFunctionDeclaration(CodeGenContext& context, const std::string& name, llvm::FunctionType* type);
     llvm::Value*                    handleSimpleReassignment(CodeGenContext& context, VariableReassignNode& node, llvm::Type* varType);
 };
@@ -51,10 +55,20 @@ namespace Expressions {
 }
 
 namespace TypeConversions {
-    llvm::Value*                    convertValueToType(CodeGenContext& context, llvm::Value* value, llvm::Type* targetType, const std::string& name = "");
-    // char хранится как байт без знака: явный каст в целое расширяет нулями. Вызывается там, где значение появляется
+    // sourceUnsigned и targetUnsigned: у LLVM знака нет, его знает только тип в AST (u8..u64)
+    llvm::Value*                    convertValueToType(CodeGenContext& context, llvm::Value* value, llvm::Type* targetType, const std::string& name = "",
+                                                       bool sourceUnsigned = false, bool targetUnsigned = false);
+    // char и u8..u64 хранятся без знака: каст в целое расширяет нулями, в float идёт как uitofp. Вызывается там, где значение появляется
     llvm::Value*                    applyCharCast(CodeGenContext& context, ASTNode& node, llvm::Value* value);
-    llvm::Value*                    applyImplicitCast(CodeGenContext& context, llvm::Value* value, std::shared_ptr<TypeNode> targetTypeNode, const std::string& name = "");
+    llvm::Value*                    applyImplicitCast(CodeGenContext& context, llvm::Value* value, std::shared_ptr<TypeNode> targetTypeNode, const std::string& name = "",
+                                                      bool sourceUnsigned = false);
+    // Запись значения узла source в ячейку типа target: знак берётся из типа узла после каста и из target
+    llvm::Value*                    convertNodeValue(CodeGenContext& context, llvm::Value* value, llvm::Type* targetType,
+                                                     const std::shared_ptr<ASTNode>& source, const std::shared_ptr<TypeNode>& target);
+    // Тип узла без знака: передаётся в applyImplicitCast
+    inline bool                     isUnsignedNode(const std::shared_ptr<ASTNode>& node) {
+                                        return node && node->inferredType && isUnsignedTypeName(node->inferredType->toString());
+                                    }
     llvm::Value*                    loadValueIfPointer(CodeGenContext& context, llvm::Value* value, const std::string& name = "");
 }
 #endif

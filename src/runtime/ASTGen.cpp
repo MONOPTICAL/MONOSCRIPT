@@ -64,6 +64,7 @@ llvm::Function* declareUserFunction(CodeGenContext& context, FunctionNode& node)
         returnLLVMType = llvm::Type::getInt32Ty(context.TheContext);
     }
 
+    if (node.isLambda) paramTypes.push_back(context.Builder.getPtrTy()); // Объект замыкания
     paramTypes.push_back(context.Builder.getPtrTy());
     llvm::FunctionType* funcType = llvm::FunctionType::get(returnLLVMType, paramTypes, false);
     auto function = llvm::Function::Create(funcType, llvm::Function::InternalLinkage, symbol, context.TheModule.get());
@@ -108,7 +109,7 @@ void ASTGen::visit(ProgramNode& node) {
     // Раскладка структур нужна раньше всего: P() можно вызвать до объявления структуры
     // TODO: Локальных структур нет, они все переносятся в глобалку
     for (auto& n : node.body) {
-        if (auto structure = std::dynamic_pointer_cast<StructNode>(n)) {
+        if (auto structure = std::dynamic_pointer_cast<StructNode>(n); structure && structure->typeParameters.empty()) {
             Objects::registerStruct(context, *structure);
         }
     }
@@ -238,6 +239,19 @@ void ASTGen::visit(FunctionNode& node) {
         context.NamedValues[arg.getName().str()] = paramSlot;
     }
 
+    // Лямбда: захваченные значения лежат в объекте замыкания {функция, захваченное...} и становятся локальными
+    if (node.isLambda) {
+        llvm::Value* closure = func->getArg(node.parameters.size());
+        closure->setName("closure");
+        auto layout = context.getClosureStruct(node.captures);
+        for (size_t i = 0; i < node.captures.size(); i++) {
+            auto type = layout->getElementType(i + 1);
+            auto slot = context.createEntryAlloca(type, node.captures[i].second);
+            context.Builder.CreateStore(context.Builder.CreateLoad(type, context.Builder.CreateStructGEP(layout, closure, i + 1)), slot);
+            context.NamedValues[node.captures[i].second] = slot;
+        }
+    }
+
     // Переполнение стека это обычная паника: указатель стека ниже предела из ms_stack_init
     {
         auto limit = context.Builder.CreateLoad(context.Builder.getPtrTy(),
@@ -298,6 +312,7 @@ void ASTGen::visit(FunctionNode& node) {
 }
 
 void ASTGen::visit(StructNode& node) {
+    if (!node.typeParameters.empty()) return; // Шаблон: генерируются только копии
     Objects::emitConstructor(context, node);
     for (auto& [name, method] : context.Structs.at(node.name).methods) {
         method->accept(*this);
@@ -408,9 +423,17 @@ void ASTGen::visit(ReassignMemberNode& node) {
         value = TypeConversions::loadValueIfPointer(context, getResult());
     }
 
+    // m.x = 6: семантика свернула namespace, цель это сама глобальная переменная
+    if (auto target = std::dynamic_pointer_cast<IdentifierNode>(access->expression); target && !access->nextAccess) {
+        llvm::Type* type = context.getLLVMType(access->inferredType, context.TheContext);
+        context.Builder.CreateStore(TypeConversions::convertNodeValue(context, value, type, node.expression, access->inferredType), context.NamedValues.at(target->name));
+        result = nullptr;
+        return;
+    }
+
     llvm::Type* elementType = nullptr;
     llvm::Value* elementPtr = Arrays::emitElementPtr(context, *access, elementType, true);
-    context.Builder.CreateStore(TypeConversions::convertValueToType(context, value, elementType), elementPtr);
+    context.Builder.CreateStore(TypeConversions::convertNodeValue(context, value, elementType, node.expression, node.accessExpression->inferredType), elementPtr);
     result = nullptr;
 }
 
@@ -733,7 +756,11 @@ void ASTGen::visit(CallNode& node) {
             arguments.push_back(Arrays::emitValue(context, node.arguments[i], type->typeParameters[i]));
         }
         llvm::Type* returnType = context.getLLVMType(type->typeParameters.back(), context.TheContext);
-        llvm::Value* target = context.Builder.CreateLoad(context.Builder.getPtrTy(), context.NamedValues.at(node.callee), "function");
+        // Значение func это объект замыкания: первое поле адрес функции, сам объект идёт ей скрытым аргументом
+        llvm::Value* closure = context.Builder.CreateLoad(context.Builder.getPtrTy(), context.NamedValues.at(node.callee), "closure");
+        llvm::Value* target = context.Builder.CreateLoad(context.Builder.getPtrTy(), closure, "function");
+        parameterTypes.push_back(context.Builder.getPtrTy());
+        arguments.push_back(closure);
         parameterTypes.push_back(context.Builder.getPtrTy());
         arguments.push_back(context.PanicContext);
         llvm::Value* call = context.Builder.CreateCall(llvm::FunctionType::get(returnType, parameterTypes, false), target, arguments);
@@ -902,8 +929,12 @@ void ASTGen::visit(CallNode& node) {
 
         // Сначала значение переменной, потом приведение: и то, что выбрала семантика, и к типу параметра
         argVal = TypeConversions::loadValueIfPointer(context, argVal, "arg");
-        argVal = TypeConversions::applyImplicitCast(context, argVal, node.arguments[i]->implicitCastTo);
-        argVal = TypeConversions::convertValueToType(context, argVal, calleeFunc->getFunctionType()->getParamType(i));
+        argVal = TypeConversions::applyImplicitCast(context, argVal, node.arguments[i]->implicitCastTo, "", TypeConversions::isUnsignedNode(node.arguments[i]));
+        // Расширение до параметра по знаку значения после каста: u8 200 в u64 это 200, а не -56
+        const auto& argument = node.arguments[i];
+        const auto finalType = argument->implicitCastTo ? argument->implicitCastTo : argument->inferredType;
+        argVal = TypeConversions::convertValueToType(context, argVal, calleeFunc->getFunctionType()->getParamType(i), "",
+                                                     finalType && isUnsignedTypeName(finalType->toString()));
 
         argsV.push_back(argVal);
     }
@@ -1026,7 +1057,7 @@ void ASTGen::visit(IdentifierNode& node) {
         llvm::Function* function = context.TheModule->getFunction(node.name);
         if (!function) function = declareFunctionFromTOML(node.name, context.TheModule.get(), context.TheContext, loader::findTomlPath());
         if (!function) throw std::runtime_error("Codegen Error: unknown function: " + node.name);
-        result = context.functionAdapter(function);
+        result = context.functionClosure(function);
         return;
     }
 
@@ -1154,8 +1185,16 @@ void ASTGen::visit(NamespaceNode &node)
 
 void ASTGen::visit(LambdaNode &node)
 {
-    LogWarning("visit не реализован для LambdaNode");
-    result = nullptr;
+    // Объект замыкания в куче: адрес вынесенной функции и копии захваченных значений на этот момент
+    llvm::Function* function = declareUserFunction(context, *node.lifted);
+    auto layout = context.getClosureStruct(node.lifted->captures);
+    llvm::Value* closure = context.allocateObject(llvm::ConstantExpr::getSizeOf(layout), true, "closure");
+    context.Builder.CreateStore(function, context.Builder.CreateStructGEP(layout, closure, 0));
+    for (size_t i = 0; i < node.lifted->captures.size(); i++) {
+        llvm::Value* value = TypeConversions::loadValueIfPointer(context, context.NamedValues.at(node.lifted->captures[i].second));
+        context.Builder.CreateStore(value, context.Builder.CreateStructGEP(layout, closure, i + 1));
+    }
+    result = closure;
 }
 
 void ASTGen::visit(AttemptNode& node) {

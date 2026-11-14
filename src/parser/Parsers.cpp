@@ -182,6 +182,14 @@ std::shared_ptr<ASTNode> Parser::parseCast(std::shared_ptr<ASTNode> expression)
         advance();
         return expression;
     }
+    // n->Color: каст в enum, объявленный выше
+    if (check(TokenType::Identifier) && enumTypeNames().count(current().value))
+    {
+        expression->implicitCastTo = std::make_shared<SimpleTypeNode>(current().value);
+        expression->implicitCastTo->line = lineIndex; expression->implicitCastTo->column = tokenIndex;
+        advance();
+        return expression;
+    }
     if(check(TokenType::Type))
     {
         std::string typeName = current().value; // Сохраняем имя типа
@@ -412,7 +420,7 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
         advance();                                                 // Переходим к следующему токену
     }
 
-    if(current().type == TokenType::Type && (current().value != "array" && current().value != "map"))                       // Проверяем наличие типа
+    if(current().type == TokenType::Type && (current().value != "array" && current().value != "map" && current().value != "func"))                       // Проверяем наличие типа
     {
         type = std::make_shared<SimpleTypeNode>(current().value); // Сохраняем тип переменной   
         type->line = lineIndex; type->column = tokenIndex; // Устанавливаем строку и колонку для узла
@@ -539,6 +547,62 @@ std::shared_ptr<ASTNode> Parser::parseNamespace()
     return namespaceNode;
 }
 
+std::shared_ptr<ASTNode> Parser::parseEnum()
+{
+    /*
+    [enum]Color
+    |   Red
+    |   Green = 5     // значение по умолчанию: предыдущее + 1, первое 0
+    Это namespace Color с константами типа Color: Color.Red
+    */
+    int line = lineIndex; int token = tokenIndex;
+    consume(TokenType::LeftBracket, "Expected '[' before enum declaration");
+    advance(); // enum
+    consume(TokenType::RightBracket, "Expected ']' after enum");
+    std::string name = current().value;
+    consume(TokenType::Identifier, "Expected enum name");
+    if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
+    enumTypeNames().insert(name);
+
+    auto body = std::make_shared<BlockNode>();
+    const int expectedIndent = getIndentLevel(lines[lineIndex]) + 1;
+    int64_t next = 0;
+    std::set<std::string> members;
+    nextLine();
+    while (!isEndOfFile() && getIndentLevel(lines[lineIndex]) >= expectedIndent) {
+        if (getIndentLevel(lines[lineIndex]) > expectedIndent) throwError("Unexpected indentation");
+        tokenIndex = expectedIndent;
+        if (isEndOfLine()) { nextLine(); continue; }
+
+        int memberLine = lineIndex, memberToken = tokenIndex;
+        std::string member = current().value;
+        consume(TokenType::Identifier, "Expected enum member name");
+        if (!members.insert(member).second) throwError("Enum " + name + " already has a member named " + member);
+        if (check(TokenType::Operator) && current().value == "=") {
+            advance();
+            const bool negative = check(TokenType::Operator) && current().value == "-";
+            if (negative) advance();
+            next = std::stoll(current().value) * (negative ? -1 : 1);
+            consume(TokenType::Number, "Expected a number for enum member value");
+        }
+        if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
+
+        auto value = std::make_shared<NumberNode>(next++, std::make_shared<SimpleTypeNode>("i32"));
+        value->line = memberLine; value->column = memberToken;
+        auto constant = std::make_shared<VariableAssignNode>(member, true, std::make_shared<SimpleTypeNode>(name), value);
+        constant->line = memberLine; constant->column = memberToken;
+        body->statements.push_back(constant);
+        nextLine();
+    }
+    lineIndex--; // как у namespace: следующую строку разбирает вызывающий
+    if (body->statements.empty()) throwError("Enum " + name + " has no members");
+
+    auto enumNode = std::make_shared<NamespaceNode>(name, body);
+    enumNode->isEnum = true;
+    enumNode->line = line; enumNode->column = token;
+    return enumNode;
+}
+
 std::shared_ptr<ASTNode> Parser::parseCall()
 {
     /*
@@ -584,7 +648,31 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
 
     std::string name = current().value; // Сохраняем имя структуры
     consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора структуры
+
+    // Шаблон: [struct]Stack<T>
+    std::vector<std::string> typeParameters;
+    if (check(TokenType::Operator) && current().value == "<") {
+        advance();
+        do {
+            typeParameters.push_back(current().value);
+            consume(TokenType::Identifier, "Expected type parameter name");
+        } while (match(TokenType::Comma));
+        if (!check(TokenType::Operator) || current().value != ">")
+            throwError("Expected > to close type parameters");
+        advance();
+    }
     if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
+
+    // Пока разбираем шаблон, T это имя типа. В копии подстановка уже задана, и имя копии Stack<i32>
+    const bool isTemplate = !typeParameters.empty() && typeSubstitution.empty();
+    if (isTemplate)
+        for (const auto& parameter : typeParameters) typeSubstitution[parameter] = parameter;
+    else if (!typeParameters.empty()) {
+        std::string arguments;
+        for (const auto& parameter : typeParameters)
+            arguments += (arguments.empty() ? "" : ",") + typeSubstitution.at(parameter);
+        name += "<" + arguments + ">";
+    }
 
     int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока структуры
     nextLine(); // Переходим к следующему токену
@@ -606,6 +694,21 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
 
     auto structNode = std::make_shared<StructNode>(name, body); // Создаём узел структуры
     structNode->line = line; structNode->column = token; // Устанавливаем строку и колонку для узла
+
+    if (isTemplate) {
+        typeSubstitution.clear();
+        if (!sharedLines) sharedLines = std::make_shared<std::vector<std::vector<Token>>>(lines);
+        structNode->typeParameters = typeParameters;
+        auto source = sharedLines;
+        const std::string module = moduleName;
+        structNode->instantiate = [source, module, line, token](const std::map<std::string, std::string>& types) {
+            Parser copy(*source, module);
+            copy.typeSubstitution = types;
+            copy.lineIndex = line;
+            copy.tokenIndex = token;
+            return std::static_pointer_cast<StructNode>(copy.parseStruct());
+        };
+    }
     return structNode; // Возвращаем узел структуры
 }
 
