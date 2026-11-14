@@ -127,10 +127,47 @@ static size_t columns(const std::string& text) {
     return count;
 }
 
+static size_t visibleColumns(const std::string& text) { // Без ANSI-последовательностей вида \033[...m
+    size_t count = 0;
+    for (size_t i = 0; i < text.size(); i++) {
+        if (text[i] == '\033') {
+            while (i < text.size() && !std::isalpha(static_cast<unsigned char>(text[i]))) i++;
+            continue;
+        }
+        count += (static_cast<unsigned char>(text[i]) & 0xC0) != 0x80;
+    }
+    return count;
+}
+
+// Пункт меню, который подходит к набранному ':...', или -1
+static int menuMatch(const std::vector<std::string>& menu, const std::string& line) {
+    if (line.empty() || line[0] != ':') return -1;
+    for (size_t i = 0; i < menu.size(); i++)
+        if (menu[i].rfind(line, 0) == 0) return static_cast<int>(i);
+    return -1;
+}
+
+static std::string menuBar(const std::vector<std::string>& menu, const std::string& line) {
+    const bool color = ui::colorEnabled(stdout);
+    const int chosen = menuMatch(menu, line);
+    std::string out = "  ";
+    for (size_t i = 0; i < menu.size(); i++) {
+        if (static_cast<int>(i) == chosen) out += color ? "\033[7;38;5;141m " + menu[i] + " \033[0m" : "[" + menu[i] + "]";
+        else out += ui::style(stdout, ui::DIM) + " " + menu[i] + " " + ui::style(stdout, ui::RESET);
+    }
+    return out + ui::style(stdout, ui::DIM) + "   ←/→ pick · Enter run" + ui::style(stdout, ui::RESET);
+}
+
 // shortcut: строка длиннее терминала переносится и перерисовка ломается. Если понадобится, считать строки как linenoise
-static void refresh(const std::string& prompt, const std::string& line, size_t cursor) {
+static void refresh(const std::string& prompt, const std::string& line, size_t cursor, const std::vector<std::string>& menu = {}) {
     std::string out = "\r" + prompt + highlight(line) + "\033[0m\033[K";
-    if (size_t tail = columns(line.substr(cursor))) out += "\033[" + std::to_string(tail) + "D";
+    if (!menu.empty()) {
+        // Меню на строке ниже, потом относительный подъём: у нижнего края экрана \r\n прокручивает, абсолютная позиция бы съехала
+        out += "\r\n" + menuBar(menu, line) + "\033[0m\033[K\033[1A\r";
+        if (size_t col = visibleColumns(prompt) + columns(line.substr(0, cursor))) out += "\033[" + std::to_string(col) + "C";
+    } else if (size_t tail = columns(line.substr(cursor))) {
+        out += "\033[" + std::to_string(tail) + "D";
+    }
     put(out);
 }
 
@@ -186,7 +223,7 @@ static void complete(const std::string& prompt, std::string& line, size_t& curso
     cursor += common.size() - prefix.size();
 
     if (matches.size() > 1 && common == prefix) {
-        std::string list = "\r\n";
+        std::string list = "\r\n\033[J"; // Поверх меню, если оно было
         for (const auto& word : matches) list += ui::style(stdout, ui::DIM) + word + ui::style(stdout, ui::RESET) + "  ";
         put(list + "\r\n");
     }
@@ -198,13 +235,24 @@ static bool onlyIndent(const std::string& text) {
     return text.find_first_not_of(" \t|") == std::string::npos;
 }
 
-Result read(const std::string& prompt, std::string& line, const std::string& prefill) {
+Result read(const std::string& prompt, std::string& line, const std::string& prefill, const std::vector<std::string>& menu) {
     raw();
     line = prefill;
     size_t cursor = line.size();
     size_t historyIndex = history.size();
     std::string draft;
-    refresh(prompt, line, cursor);
+    refresh(prompt, line, cursor, menu);
+
+    // Меню слушает стрелки, пока набрана не программа: пусто или ':команда'
+    auto inMenu = [&]() { return !menu.empty() && (line.empty() || line[0] == ':') && line.find(' ') == std::string::npos; };
+    auto pick = [&](int step) {
+        const int n = static_cast<int>(menu.size());
+        int i = menuMatch(menu, line);
+        if (i < 0) i = step > 0 ? 0 : n - 1;
+        else if (line == menu[i]) i = (i + step + n) % n; // Недонабранное ':c' сначала дополняется до своего пункта
+        line = menu[i];
+        cursor = line.size();
+    };
 
     auto prevChar = [&]() { size_t p = cursor - 1; while (p > 0 && (static_cast<unsigned char>(line[p]) & 0xC0) == 0x80) p--; return p; };
     auto nextChar = [&]() { size_t p = cursor + 1; while (p < line.size() && (static_cast<unsigned char>(line[p]) & 0xC0) == 0x80) p++; return p; };
@@ -220,14 +268,14 @@ Result read(const std::string& prompt, std::string& line, const std::string& pre
         case '\r':
         case '\n':
             refresh(prompt, line, line.size());
-            put("\r\n");
+            put("\033[J\r\n"); // \033[J стирает меню
             return Result::Line;
         case 3: // Ctrl+C
-            put(ui::style(stdout, ui::DIM) + "^C" + ui::style(stdout, ui::RESET) + "\r\n");
+            put("\033[J" + ui::style(stdout, ui::DIM) + "^C" + ui::style(stdout, ui::RESET) + "\r\n");
             return Result::Cancel;
         case 4: // Ctrl+D
             if (line.empty()) {
-                put("\r\n");
+                put("\033[J\r\n");
                 return Result::Eof;
             }
             if (cursor < line.size()) line.erase(cursor, nextChar() - cursor);
@@ -245,7 +293,9 @@ Result read(const std::string& prompt, std::string& line, const std::string& pre
             }
             break;
         case '\t':
-            if (onlyIndent(line.substr(0, cursor))) {
+            if (inMenu() && !line.empty()) {
+                pick(1);
+            } else if (onlyIndent(line.substr(0, cursor))) {
                 line.insert(cursor, "|   ");
                 cursor += 4;
             } else {
@@ -277,7 +327,8 @@ Result read(const std::string& prompt, std::string& line, const std::string& pre
                 else if (b == '3' && cursor < line.size()) line.erase(cursor, nextChar() - cursor);
                 break;
             }
-            if (b == 'A' && historyIndex > 0) showHistory(historyIndex - 1);
+            if ((b == 'C' || b == 'D') && inMenu()) pick(b == 'C' ? 1 : -1);
+            else if (b == 'A' && historyIndex > 0) showHistory(historyIndex - 1);
             else if (b == 'B' && historyIndex < history.size()) showHistory(historyIndex + 1);
             else if (b == 'C' && cursor < line.size()) cursor = nextChar();
             else if (b == 'D' && cursor > 0) cursor = prevChar();
@@ -295,9 +346,9 @@ Result read(const std::string& prompt, std::string& line, const std::string& pre
             line.insert(cursor, 1, c);
             cursor++;
         }
-        refresh(prompt, line, cursor);
+        refresh(prompt, line, cursor, menu);
     }
-    put("\r\n");
+    put("\033[J\r\n");
     return Result::Eof;
 }
 

@@ -341,7 +341,7 @@ int runRepl() {
 
     std::string line;
     while (true) {
-        const auto read = lineedit::read(prompt(ok), line);
+        const auto read = lineedit::read(prompt(ok), line, "", {":defs", ":clear", ":help", ":q"});
         if (read == lineedit::Result::Eof) break;
         if (read == lineedit::Result::Cancel) continue;
         lineedit::addHistory(line);

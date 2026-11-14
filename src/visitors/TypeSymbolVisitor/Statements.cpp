@@ -705,7 +705,8 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
                 LogError("Global final variable '" + node.name + "' must have a value", node.shared_from_this());
         } else if (!noValue->isEmptyLiteral && node.isConst) {
             LogError("Constant '" + node.name + "' must have a value", node.shared_from_this());
-        } else if (!noValue->isEmptyLiteral && (isCollection || registry.findStruct(varType))) {
+        // У func и enum нет значения по умолчанию: пустая функция упадёт при вызове, а 0 может не быть значением enum
+        } else if (!noValue->isEmptyLiteral && (isCollection || registry.findStruct(varType) || varType.starts_with("func") || enumTypeNames().count(varType))) {
             LogError("Variable '" + node.name + "' of type " + varType + " must have a value", node.shared_from_this());
         }
     }

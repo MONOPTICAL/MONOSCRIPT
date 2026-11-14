@@ -7,6 +7,7 @@
 |   |   Q tmp = arr[i]
 |   |   arr[i] = arr[j]
 |   |   arr[j] = tmp
+|   
 |   // Функция сортировки массива
 |   
 |   [array<T>]sort<T>(array<T>: arr)
@@ -23,8 +24,6 @@
 |   |   |   |   |   swapInArray(arr, i, j)
 |   |   |   | 
 |   |   |
-|   |   // Чтобы нормальным людям было понятно наху я этот attempt кидаю
-|   |   // Это потому что ху пойми что могут подсунуть в эту сортировку
 |   |     
 |   |   return arr
 |   
@@ -55,56 +54,94 @@
 |   // Функция отображения элементов массива через заданную функцию, возвращает новый массив
 |   [array<Q>]mapped<T, Q>(array<T>: arr, func: f(T: x) -> Q)
 |   |   array<Q> result = []
-|   |   
 |   |   for i in arr
 |   |   |   push(result, f(i))
-|   |   |
 |   |   
 |   |   return result
 |   
-|   // Функция фильтрации элементов массива через заданную функцию, возвращает новый массив
-|   [array<Q>]filter<T, Q>(array<T>: arr, func: f(T: x) -> Q)
-|   |   array<Q> result = []
-|   |   
+|   // Функция фильтрации: оставляет элементы, для которых f вернула true
+|   [array<T>]filter<T>(array<T>: arr, func: f(T: x) -> i1)
+|   |   array<T> result = []
 |   |   for i in arr
 |   |   |   if f(i)
 |   |   |   |   push(result, i)
 |   |   
 |   |   return result
 |   
-   // Функция реверса массива, изменяе элементы оригинального массива
+|   // Функция реверса массива, изменяет элементы оригинального массива
 |   [void]reverse<T>(array<T>: arr)
 |   |   i32 n = len(arr)
 |   |   for i in range(n / 2)
 |   |   |   swapInArray(arr, i, n - i - 1)
-|   |   
 |   
-   // Функция получения реверсированного массива, не изменяет оригинальный массив
+|   // Функция получения реверсированного массива, не изменяет оригинальный массив
 |   [array<T>]reversed<T>(array<T>: arr)
 |   |   array<T> result = []
-|   |   for i in range(len(arr) - 1, -1, -1)
+|   |   for i in range(len(arr))
+|   |   |   push(result, arr[len(arr) - 1 - i])
+|   |   
+|   |   return result
+|   
+|   // Возвращает копию элементов [start, end); неверные границы дают пустой массив
+|   [array<T>]slice<T>(array<T>: arr, i32: start, i32: end)
+|   |   array<T> result = []
+|   |   if start >= end or start < 0 or end > len(arr)
+|   |   |   return result
+|   |   for i in range(start, end)
 |   |   |   push(result, arr[i])
 |   |   
 |   |   return result
 |   
-|   [array<T>]slice<T>(array<T>: arr, i32: start, i32: end)
-|   |      array<T> result = []
-|   |      // Если пользователь еблан
-|   |      if start >= end or start < 0 or end > len(arr)
-|   |      |   return result
-|   |
-|   |      for i in range(start, end)
-|   |      |   push(result, arr[i])
-|   |      
-|   |      return result
-|   
 |   [i1]contains<T>(array<T>: arr, T: element)
-|   |   if(len(arr)==0)
-|   |   |   return false
-|   |   
 |   |   for i in arr
 |   |   |   if i == element
 |   |   |   |   return true
 |   |   
 |   |   return false
 |   
+|   // Максимальный элемент; на пустом массиве паника выхода за границы
+|   [T]max<T>(array<T>: arr)
+|   |   T result = arr[0]
+|   |   for i in arr
+|   |   |   if i > result
+|   |   |   |   result = i
+|   |   |   
+|   |   
+|   |   return result
+|   
+|   // Минимальный элемент; на пустом массиве паника выхода за границы
+|   [T]min<T>(array<T>: arr)
+|   |   T result = arr[0]
+|   |   for i in arr
+|   |   |   if i < result
+|   |   |   |   result = i
+|   |   |   
+|   |   
+|   |   return result
+|   
+|   // Удаление элемента по индексу; неверный индекс даёт панику выхода за границы
+|   [void]removeAt<T>(array<T>: arr, i32: index)
+|   |   arr[index] = arr[index] // проверка границ до изменения массива
+|   |   for i in range(index, len(arr) - 1)
+|   |   |   arr[i] = arr[i + 1]
+|   |   
+|   |   pop(arr)
+|   
+|   // Вставка элемента по индексу (index == len добавляет в конец); иначе паника выхода за границы
+|   [void]insert<T>(array<T>: arr, i32: index, T: element)
+|   |   if index != len(arr)
+|   |   |   arr[index] = arr[index] // проверка границ до push, чтобы не испортить массив
+|   |   push(arr, element)
+|   |   for k in range(len(arr) - 1 - index)
+|   |   |   i32 i = len(arr) - 1 - k
+|   |   |   arr[i] = arr[i - 1]
+|   |   
+|   |   arr[index] = element
+|   
+|   // Сумма элементов, пустой массив даёт 0
+|   [i64]sum<T>(array<T>: arr)
+|   |   i64 result = 0
+|   |   for i in arr
+|   |   |   result = result + i
+|   |   
+|   |   return result
