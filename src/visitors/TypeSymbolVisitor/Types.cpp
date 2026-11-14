@@ -177,10 +177,20 @@ void TypeSymbolVisitor::visit(NoneNode& node)
 }
 
 void TypeSymbolVisitor::visit(KeyValueNode& node) {
-    node.key->accept(*this);
-    node.value->accept(*this);
-    auto keyType = checkForIdentifier(node.key);
-    auto valueType = checkForIdentifier(node.value);
+    auto typeOf = [this](std::shared_ptr<ASTNode>& value)
+        -> std::shared_ptr<TypeNode>
+    {
+        if (auto block = std::dynamic_pointer_cast<BlockNode>(value)) {
+            block->inferredType = infer_collection_type_revised(block);
+            return block->inferredType;
+        }
+
+        value->accept(*this);
+        return checkForIdentifier(value);
+    };
+
+    auto keyType = typeOf(node.key);
+    auto valueType = typeOf(node.value);
 }
 
 void TypeSymbolVisitor::visit(ModuleMark &node)

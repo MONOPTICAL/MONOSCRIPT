@@ -8,6 +8,7 @@
 |   |   arr[i] = arr[j]
 |   |   arr[j] = tmp
 |   // Функция сортировки массива
+|   
 |   [array<T>]sort<T>(array<T>: arr)
 |   |   // Обычный бубл сорт ну и хух с ним, потом заменю на что-то более нормальное
 |   |   i32 n = len(arr)
@@ -26,6 +27,7 @@
 |   |   // Это потому что ху пойми что могут подсунуть в эту сортировку
 |   |     
 |   |   return arr
+|   
 |   // Функция проверки наличия элемента в массиве, возвращает количество вхождений
 |   [i32]count<T>(array<T>: arr, T: value)
 |   |   i32 result = 0
@@ -39,6 +41,7 @@
 |   |   |   
 |   |   
 |   |   return result
+|   
 |   // Функция поиска индекса элемента в массиве, возвращает -1 если не найден
 |   [i32]indexOf<T>(array<T>: arr, T: value)
 |   |   
@@ -48,6 +51,7 @@
 |   |   |   
 |   |   
 |   |   return -1
+|   
 |   // Функция отображения элементов массива через заданную функцию, возвращает новый массив
 |   [array<Q>]mapped<T, Q>(array<T>: arr, func: f(T: x) -> Q)
 |   |   array<Q> result = []
@@ -57,4 +61,50 @@
 |   |   |
 |   |   
 |   |   return result
+|   
+|   // Функция фильтрации элементов массива через заданную функцию, возвращает новый массив
+|   [array<Q>]filter<T, Q>(array<T>: arr, func: f(T: x) -> Q)
+|   |   array<Q> result = []
+|   |   
+|   |   for i in arr
+|   |   |   if f(i)
+|   |   |   |   push(result, i)
+|   |   
+|   |   return result
+|   
+   // Функция реверса массива, изменяе элементы оригинального массива
+|   [void]reverse<T>(array<T>: arr)
+|   |   i32 n = len(arr)
+|   |   for i in range(n / 2)
+|   |   |   swapInArray(arr, i, n - i - 1)
+|   |   
+|   
+   // Функция получения реверсированного массива, не изменяет оригинальный массив
+|   [array<T>]reversed<T>(array<T>: arr)
+|   |   array<T> result = []
+|   |   for i in range(len(arr) - 1, -1, -1)
+|   |   |   push(result, arr[i])
+|   |   
+|   |   return result
+|   
+|   [array<T>]slice<T>(array<T>: arr, i32: start, i32: end)
+|   |      array<T> result = []
+|   |      // Если пользователь еблан
+|   |      if start >= end or start < 0 or end > len(arr)
+|   |      |   return result
+|   |
+|   |      for i in range(start, end)
+|   |      |   push(result, arr[i])
+|   |      
+|   |      return result
+|   
+|   [i1]contains<T>(array<T>: arr, T: element)
+|   |   if(len(arr)==0)
+|   |   |   return false
+|   |   
+|   |   for i in arr
+|   |   |   if i == element
+|   |   |   |   return true
+|   |   
+|   |   return false
 |   

@@ -33,10 +33,10 @@ static std::shared_ptr<TypeNode> widenLiteralType(const std::shared_ptr<TypeNode
 }
 
 // Тип литерала коллекции для вывода T. Ничего не меняет в узлах: приведёт уже проверка вызова с готовым типом
-static std::shared_ptr<TypeNode> literalCollectionType(const std::shared_ptr<BlockNode>& block);
+static std::shared_ptr<TypeNode> literalCollectionType(const std::shared_ptr<BlockNode>& block, TypeSymbolVisitor& visitor);
 
 static std::shared_ptr<TypeNode> literalValueType(const std::shared_ptr<ASTNode>& value, TypeSymbolVisitor& visitor) {
-    if (auto block = std::dynamic_pointer_cast<BlockNode>(value)) return literalCollectionType(block);
+    if (auto block = std::dynamic_pointer_cast<BlockNode>(value)) return literalCollectionType(block, visitor);
     value->accept(visitor);
     return value->implicitCastTo ? value->implicitCastTo : value->inferredType;
 }
@@ -81,9 +81,7 @@ static void unifyTypes(const std::shared_ptr<TypeNode>& parameter, const std::sh
             unifyTypes(generic->typeParameters[i], other->typeParameters[i], names, bindings, fromLiteral, conflict);
 }
 
-static TypeSymbolVisitor* literalVisitor = nullptr;
-
-static std::shared_ptr<TypeNode> literalCollectionType(const std::shared_ptr<BlockNode>& block) {
+static std::shared_ptr<TypeNode> literalCollectionType(const std::shared_ptr<BlockNode>& block, TypeSymbolVisitor& visitor) {
     if (!block || block->statements.empty()) return nullptr;
 
     if (std::dynamic_pointer_cast<KeyValueNode>(block->statements[0])) {
@@ -92,8 +90,8 @@ static std::shared_ptr<TypeNode> literalCollectionType(const std::shared_ptr<Blo
         for (const auto& statement : block->statements) {
             auto pair = std::dynamic_pointer_cast<KeyValueNode>(statement);
             if (!pair) return nullptr;
-            key = mergeElementType(key, literalValueType(pair->key, *literalVisitor), isLiteralExpression(pair->key), haveKey);
-            value = mergeElementType(value, literalValueType(pair->value, *literalVisitor), isLiteralExpression(pair->value), haveValue);
+            key = mergeElementType(key, literalValueType(pair->key, visitor), isLiteralExpression(pair->key), haveKey);
+            value = mergeElementType(value, literalValueType(pair->value, visitor), isLiteralExpression(pair->value), haveValue);
         }
         if (!key || !value) return nullptr;
         auto map = std::make_shared<GenericTypeNode>("map");
@@ -104,7 +102,7 @@ static std::shared_ptr<TypeNode> literalCollectionType(const std::shared_ptr<Blo
     std::shared_ptr<TypeNode> element;
     bool haveValue = false;
     for (const auto& statement : block->statements) {
-        element = mergeElementType(element, literalValueType(statement, *literalVisitor), isLiteralExpression(statement), haveValue);
+        element = mergeElementType(element, literalValueType(statement, visitor), isLiteralExpression(statement), haveValue);
     }
     if (!element) return nullptr;
     auto array = std::make_shared<GenericTypeNode>("array");
@@ -182,8 +180,7 @@ std::string TypeSymbolVisitor::instantiateGeneric(const std::shared_ptr<Function
     for (size_t i = 0; i < call.arguments.size(); i++) {
         std::shared_ptr<TypeNode> literalType;
         if (auto block = std::dynamic_pointer_cast<BlockNode>(call.arguments[i])) {
-            literalVisitor = this;
-            literalType = literalCollectionType(block);
+            literalType = literalCollectionType(block, *this);
         } else if (isLiteralExpression(call.arguments[i])) {
             literalType = argTypes[i];
         }
@@ -1231,6 +1228,27 @@ void TypeSymbolVisitor::visit(CallNode& node) {
         }
         node.inferredType = registry.findType("i32");
         return;
+    }
+
+    if(node.callee == "typeof")
+    {
+        // просто меняем call node на cstr() и пишем в аргумент тип
+        node.callee = "cstr";
+        if (node.arguments.empty()) {
+            LogError("type() expects one argument", node.shared_from_this());
+        }
+        
+        if(node.arguments.size() > 1)
+            LogError("type() expects at most one argument", node.shared_from_this());
+
+        // если он решил проверить array или map(не переменную а чисто её инициализировать внутри вызова) то их надо завалидейтить 
+        if (auto block = std::dynamic_pointer_cast<BlockNode>(node.arguments[0])) {
+            argTypes[0] = literalCollectionType(block, *this); // GenericTypeNode("array", {elementType}) 
+        }
+
+        node.arguments.pop_back();
+        node.arguments.push_back(std::make_shared<StringNode>(argTypes[0] ? argTypes[0]->toString() : "unknown"));
+        argTypes[0] = registry.findType("string");
     }
 
     // cstr(x): значение в строку, тем же способом, что и в склейке "x=" + n. Функция с таким же именем важнее
