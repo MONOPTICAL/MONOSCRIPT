@@ -417,7 +417,9 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
     const std::string& parent = contexts.back().scopePath;
     currentFunction.scopePath = parent.empty() ? visibleName : parent + "." + visibleName;
 
+#if DEBUG
     std::cout << "Current scope path: " << currentFunction.scopePath << std::endl;
+#endif
     // Добавляем параметры функции в текущий контекст
     for (const auto& param : args) {
         auto varNode = std::make_shared<VariableAssignNode>(
