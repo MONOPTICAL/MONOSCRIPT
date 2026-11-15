@@ -25,6 +25,12 @@ ret = "i1"
 args = ["string", "string"]
 
 [[function]]
+name = "endsWith"
+pure = true
+ret = "i1"
+args = ["string", "string"]
+
+[[function]]
 name = "count"
 pure = true
 ret = "i32"
