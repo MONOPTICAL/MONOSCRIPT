@@ -882,6 +882,14 @@ void ASTGen::visit(CallNode& node) {
     }
     if (!calleeFunc && context.Structs.count(node.callee)) {
         result = Objects::emitNew(context, node.callee);
+        // init выбрала семантика
+        if (!node.init.empty()) {
+            auto init = context.Structs.at(node.callee).methods.find(node.init);
+            std::vector<llvm::Value*> arguments{result};
+            for (size_t i = 0; i < node.arguments.size(); i++)
+                arguments.push_back(Arrays::emitValue(context, node.arguments[i], init->second->parameters[i + 1].first));
+            context.emitCall(declareUserFunction(context, *init->second), arguments);
+        }
         return;
     }
 

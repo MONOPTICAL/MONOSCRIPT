@@ -59,7 +59,8 @@ private:
     std::map<std::string, std::shared_ptr<StructNode>>              genericStructs; // Stack -> шаблон [struct]Stack<T>
     std::map<std::string, std::vector<std::shared_ptr<FunctionNode>>> overloads; // f -> f(i32), f(string)
     std::string                                                     resolveOverload(const std::string& name, const std::vector<std::shared_ptr<FunctionNode>>& candidates,
-                                                                        CallNode& call, const std::vector<std::shared_ptr<TypeNode>>& argTypes);
+                                                                        CallNode& call, const std::vector<std::shared_ptr<TypeNode>>& argTypes, size_t skip = 0); // skip: self у метода
+    std::vector<std::shared_ptr<FunctionNode>>                      findMethods(const std::shared_ptr<StructNode>& structure, const std::string& name); // push и push(i32), push(string)
     void                                                            instantiateStruct(const std::string& name); // Stack<i32> -> копия шаблона
     std::string                                                     instantiateGeneric(const std::shared_ptr<FunctionNode>& generic, CallNode& call,
                                                                         const std::vector<std::shared_ptr<TypeNode>>& argTypes);

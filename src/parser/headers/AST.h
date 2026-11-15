@@ -360,6 +360,7 @@ class CallNode : public ASTNode {
         std::string callee;
         std::vector<std::shared_ptr<ASTNode>> arguments;
         std::shared_ptr<TypeNode> functionValueType; // Вызов параметра типа func: keep(x)
+        std::string init; // P(args): имя выбранного init, init(string,u16) у перегрузки
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);

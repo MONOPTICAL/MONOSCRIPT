@@ -128,7 +128,8 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
                 [&](const auto& stmt) {
                     if (auto var = std::dynamic_pointer_cast<VariableAssignNode>(stmt)) return var->name == accessNode->memberName;
                     if (auto str = std::dynamic_pointer_cast<StructNode>(stmt)) return str->name == accessNode->memberName;
-                    if (auto method = std::dynamic_pointer_cast<FunctionNode>(stmt)) return method->name == accessNode->memberName;
+                    if (auto method = std::dynamic_pointer_cast<FunctionNode>(stmt))
+                        return method->name == accessNode->memberName || method->name.starts_with(accessNode->memberName + "(");
                     return false;
                 });
 
@@ -140,6 +141,18 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
             auto memberLink = std::dynamic_pointer_cast<AccessExpression>(accessNode->nextAccess);
             auto call = memberLink ? std::dynamic_pointer_cast<CallNode>(memberLink->expression) : nullptr;
             auto method = std::dynamic_pointer_cast<FunctionNode>(*fieldIt);
+            // Перегруженный метод: выбираем по типам аргументов, как функцию
+            if (method && call && method->name != accessNode->memberName) {
+                std::vector<std::shared_ptr<TypeNode>> argTypes;
+                for (const auto& argument : call->arguments) {
+                    argument->accept(*this);
+                    argTypes.push_back(argument->implicitCastTo ? argument->implicitCastTo : argument->inferredType);
+                }
+                auto candidates = findMethods(currentStructDef, accessNode->memberName);
+                const std::string chosen = resolveOverload(currentStructDef->name + "." + accessNode->memberName, candidates, *call, argTypes, 1);
+                for (const auto& candidate : candidates) if (candidate->name == chosen) method = candidate;
+            }
+            if (method && call) call->callee = method->name;
             if (call && !method)
                 LogError("'" + accessNode->memberName + "' is a field of struct '" + currentStructDef->name + "', not a method", accessNode);
             if (method && !call)

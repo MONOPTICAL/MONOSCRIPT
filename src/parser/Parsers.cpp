@@ -690,6 +690,22 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
                 method->parameters.insert(method->parameters.begin(), {std::make_shared<SimpleTypeNode>(name), "self"});
             }
         }
+        // Перегруженный метод, как и функция, получает имя с сигнатурой без self: push(i32). Вызов выбирает семантика
+        std::map<std::string, std::vector<std::shared_ptr<FunctionNode>>> sameName;
+        for (const auto& statement : block->statements)
+            if (auto method = std::dynamic_pointer_cast<FunctionNode>(statement)) sameName[method->name].push_back(method);
+        for (auto& [methodName, methods] : sameName) {
+            if (methods.size() < 2) continue;
+            std::set<std::string> signatures;
+            for (const auto& method : methods) {
+                std::string signature;
+                for (size_t i = 1; i < method->parameters.size(); i++)
+                    signature += (i == 1 ? "" : ",") + method->parameters[i].first->toString();
+                if (!signatures.insert(signature).second)
+                    throwError("Method " + name + "." + methodName + "(" + signature + ") is already defined");
+                method->name = methodName + "(" + signature + ")";
+            }
+        }
     }
 
     auto structNode = std::make_shared<StructNode>(name, body); // Создаём узел структуры

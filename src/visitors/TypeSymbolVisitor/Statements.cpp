@@ -113,7 +113,7 @@ static std::shared_ptr<TypeNode> literalCollectionType(const std::shared_ptr<Blo
 // Выбор перегрузки по стоимости приведения аргументов: точное совпадение 0, расширение тем дороже, чем дальше тип,
 // целое в float дороже любого целого. Целый литерал дешевле всего идёт в i32, дробный в f64: f(5) при f(i32) и f(i64) это f(i32)
 std::string TypeSymbolVisitor::resolveOverload(const std::string& name, const std::vector<std::shared_ptr<FunctionNode>>& candidates,
-                                               CallNode& call, const std::vector<std::shared_ptr<TypeNode>>& argTypes)
+                                               CallNode& call, const std::vector<std::shared_ptr<TypeNode>>& argTypes, size_t skip)
 {
     auto literalOf = [](const std::shared_ptr<ASTNode>& argument) -> std::shared_ptr<ASTNode> {
         if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(argument); unary && unary->op == "-") return unary->operand;
@@ -140,10 +140,10 @@ std::string TypeSymbolVisitor::resolveOverload(const std::string& name, const st
     std::vector<std::shared_ptr<FunctionNode>> best;
     int bestCost = 0;
     for (const auto& candidate : candidates) {
-        if (candidate->parameters.size() != call.arguments.size()) continue;
+        if (candidate->parameters.size() != call.arguments.size() + skip) continue;
         int total = 0;
         for (size_t i = 0; i < call.arguments.size() && total != impossible; i++) {
-            const int c = cost(call.arguments[i], argTypes[i], candidate->parameters[i].first->toString());
+            const int c = cost(call.arguments[i], argTypes[i], candidate->parameters[i + skip].first->toString());
             total = c == impossible ? impossible : total + c;
         }
         if (total == impossible) continue;
@@ -158,6 +158,16 @@ std::string TypeSymbolVisitor::resolveOverload(const std::string& name, const st
     if (best.size() > 1)
         LogError("Call of overloaded " + name + "(" + given + ") is ambiguous: " + best[0]->name + " and " + best[1]->name + " fit equally, use ->", call.shared_from_this());
     return best[0]->name;
+}
+
+std::vector<std::shared_ptr<FunctionNode>> TypeSymbolVisitor::findMethods(const std::shared_ptr<StructNode>& structure, const std::string& name)
+{
+    std::vector<std::shared_ptr<FunctionNode>> methods;
+    if (auto body = std::dynamic_pointer_cast<BlockNode>(structure->body))
+        for (const auto& statement : body->statements)
+            if (auto method = std::dynamic_pointer_cast<FunctionNode>(statement); method && (method->name == name || method->name.starts_with(name + "(")))
+                methods.push_back(method);
+    return methods;
 }
 
 std::string TypeSymbolVisitor::instantiateGeneric(const std::shared_ptr<FunctionNode>& generic, CallNode& call,
@@ -1365,8 +1375,28 @@ void TypeSymbolVisitor::visit(CallNode& node) {
     if (contexts.back().functions.find(node.callee) == contexts.back().functions.end()
         && declaredFunctions.find(node.callee) == declaredFunctions.end()
         && registry.findStruct(node.callee)) {
-        if (!node.arguments.empty()) {
-            LogError("Struct " + node.callee + " has no constructor with arguments yet", node.shared_from_this());
+        // P(args) это P() и затем init(args). P() вызывает init, только если есть init без параметров
+        auto inits = findMethods(registry.findStruct(node.callee), "init");
+        for (const auto& init : inits)
+            if (init->returnType->toString() != "void")
+                LogError("init of struct " + node.callee + " must return void", init);
+        std::shared_ptr<FunctionNode> init;
+        if (inits.empty() && !node.arguments.empty())
+            LogError("Struct " + node.callee + " has no init method, so it cannot take arguments", node.shared_from_this());
+        else if (inits.size() == 1 && (!node.arguments.empty() || inits[0]->parameters.size() == 1))
+            init = inits[0];
+        else if (inits.size() > 1 && node.arguments.empty()) {
+            for (const auto& candidate : inits) if (candidate->parameters.size() == 1) init = candidate;
+        }
+        else if (inits.size() > 1) {
+            const std::string chosen = resolveOverload(node.callee + ".init", inits, node, argTypes, 1);
+            for (const auto& candidate : inits) if (candidate->name == chosen) init = candidate;
+        }
+        if (init) {
+            if (node.arguments.size() + 1 != init->parameters.size())
+                LogError("Constructor " + node.callee + " expects " + std::to_string(init->parameters.size() - 1) + " arguments, got " + std::to_string(node.arguments.size()), node.shared_from_this());
+            checkCallArguments(node.arguments, init->parameters, 1, "Constructor " + node.callee);
+            node.init = init->name;
         }
         node.inferredType = std::make_shared<SimpleTypeNode>(node.callee);
         return;

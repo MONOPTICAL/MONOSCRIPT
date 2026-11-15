@@ -1,6 +1,6 @@
 [namespace]arrays
 |   // Функции для swap в массивах
-|   [void]swapInArray<T, Q>(array<Q>: arr, T: i, T: j)
+|   [void]swapInArray<T, Q>(array<Q>: arr, T: i, T: j) @private
 |   |   // Потому что у нас тут д0хуя питон, то литералы передаются по значению, а не по ссылке
 |   |   // Поэтому н1хуя через swap обычные переменные не сработают
 |   |   // Нужно менять элементы массива напрямую который кстати вот приколь передаётся по ссылке
@@ -9,13 +9,12 @@
 |   |   arr[j] = tmp
 |   
 |   // Функция сортировки массива
-|   
-|   [array<T>]sort<T>(array<T>: arr)
+|   [void]sort<T>(array<T>: arr)
 |   |   // Обычный бубл сорт ну и хух с ним, потом заменю на что-то более нормальное
 |   |   i32 n = len(arr)
 |   |   
 |   |   if len(arr) <= 1 // Если элементов нет или только один, то пусть не вы3бывается
-|   |   |   return arr
+|   |   |   return null
 |   |   
 |   |   for i in range(n)
 |   |   |   for j in range(i, n)
@@ -25,7 +24,12 @@
 |   |   |   | 
 |   |   |
 |   |     
-|   |   return arr
+|   
+|   // Функция возвращает новый отсортированный массив, не изменяя оригинальный
+|   [array<T>]sorted<T>(array<T>: arr)
+|   |   array<T> result = copy(arr)
+|   |   sort(result)
+|   |   return result
 |   
 |   // Функция проверки наличия элемента в массиве, возвращает количество вхождений
 |   [i32]count<T>(array<T>: arr, T: value)
@@ -92,6 +96,7 @@
 |   |   
 |   |   return result
 |   
+   // Проверка наличия элемента в массиве, возвращает true если элемент найден, иначе false
 |   [i1]contains<T>(array<T>: arr, T: element)
 |   |   for i in arr
 |   |   |   if i == element
@@ -145,3 +150,8 @@
 |   |   |   result = result + i
 |   |   
 |   |   return result
+|   
+   // Очистка массива, удаляет все элементы
+|   [void]clear<T>(array<T>: arr)
+|   |   while len(arr) > 0
+|   |   |   pop(arr)
