@@ -196,7 +196,7 @@ void Lexer::tokenize()
 
                 // Склеиваем только настоящие пары, иначе x=-1 станет оператором =-
                 static const std::vector<std::string> operatorPairs = {
-                    "==", "!=", "<=", ">=", "^=", "**", "//", "/*", "->", ">>"
+                    "==", "!=", "<=", ">=", "^=", "**", "//", "/*", "->", ">>", "+=", "-=", "*=", "/=", "%="
                 };
                 if (std::find(operatorPairs.begin(), operatorPairs.end(), currentTokenValue) == operatorPairs.end())
                 {

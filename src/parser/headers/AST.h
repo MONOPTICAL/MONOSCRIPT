@@ -367,14 +367,21 @@ class CallNode : public ASTNode {
         }
 };
     
+// [Vec]operator+(Vec: other) парсер называет op_add, и a + b у структуры вызывает этот метод
+inline const std::map<std::string, std::string> operatorMethods = {
+    {"+", "op_add"}, {"-", "op_sub"}, {"*", "op_mul"}, {"/", "op_div"}, {"%", "op_mod"}, {"**", "op_pow"},
+    {"==", "op_eq"}, {"!=", "op_ne"}, {"<", "op_lt"}, {">", "op_gt"}, {"<=", "op_le"}, {">=", "op_ge"},
+};
+
 class BinaryOpNode : public ASTNode {
     public:
         BinaryOpNode() = default;
-        BinaryOpNode(std::shared_ptr<ASTNode> left, const std::string& op, std::shared_ptr<ASTNode> right) 
+        BinaryOpNode(std::shared_ptr<ASTNode> left, const std::string& op, std::shared_ptr<ASTNode> right)
             : left(left), op(op), right(right) {}
         std::string op;
         std::shared_ptr<ASTNode> left;
         std::shared_ptr<ASTNode> right;
+        std::shared_ptr<FunctionNode> overload; // Метод op_add левой структуры: кодген вызывает его вместо операции
 
         void accept(ASTNodeVisitor& visitor) override {
             visitor.visit(*this);

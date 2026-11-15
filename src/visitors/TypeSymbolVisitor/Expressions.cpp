@@ -18,7 +18,41 @@ void TypeSymbolVisitor::visit(BinaryOpNode& node) {
     // Важен тип значения после приведения: (a->i32) + 1 при float a это целая операция
     std::shared_ptr<TypeNode> leftType = node.left->implicitCastTo ? node.left->implicitCastTo : node.left->inferredType;
     std::shared_ptr<TypeNode> rightType = node.right->implicitCastTo ? node.right->implicitCastTo : node.right->inferredType;
-    
+
+    // a + b у структуры это вызов a.op_add(b). Без такого метода остаётся прежнее поведение
+    auto operatorName = operatorMethods.find(node.op);
+    auto structure = leftType && operatorName != operatorMethods.end() ? registry.findStruct(leftType->toString()) : nullptr;
+    auto candidates = structure ? findMethods(structure, operatorName->second) : std::vector<std::shared_ptr<FunctionNode>>{};
+    if (!candidates.empty()) {
+        const std::string methodName = structure->name + "." + operatorName->second;
+        auto call = std::make_shared<CallNode>(operatorName->second, std::vector<std::shared_ptr<ASTNode>>{node.right});
+        call->line = node.line; call->column = node.column;
+        auto method = candidates[0];
+        if (candidates.size() > 1) {
+            const std::string chosen = resolveOverload(methodName, candidates, *call, {rightType}, 1);
+            for (const auto& candidate : candidates) if (candidate->name == chosen) method = candidate;
+        }
+        if (method->parameters.size() != 2) {
+            LogError("Operator method " + methodName + " must take exactly one argument", node.shared_from_this());
+            return;
+        }
+        checkCallArguments(call->arguments, method->parameters, 1, "Operator " + node.op + " of " + structure->name);
+        node.right = call->arguments[0];
+
+        const bool methodIsPure = std::find(method->labels.begin(), method->labels.end(), "@pure") != method->labels.end();
+        if (checkLabels("@pure") && !methodIsPure)
+            LogError("Pure function cannot call impure method: " + methodName, node.shared_from_this());
+        if (auto baseId = std::dynamic_pointer_cast<IdentifierNode>(node.left); baseId && !methodIsPure) {
+            auto base = contexts.back().variables.find(baseId->name);
+            if (base != contexts.back().variables.end())
+                if (auto var = std::dynamic_pointer_cast<VariableAssignNode>(base->second); var && var->isConst)
+                    LogError("Constant '" + baseId->name + "' can only call @pure methods, not " + methodName, node.shared_from_this());
+        }
+        node.overload = method;
+        node.inferredType = method->returnType;
+        return;
+    }
+
     // Литерал рядом с float становится float: иначе f == 0.1 сравнивало бы f с более точным 0.1 и было бы ложью
     if (rightType && rightType->toString() == "float" && isLiteralExpression(node.left) && !isLiteralExpression(node.right)) {
         castAllNumbersToType(node.left, "float");

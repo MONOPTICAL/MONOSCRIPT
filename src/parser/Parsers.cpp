@@ -20,6 +20,10 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
     consume(TokenType::RightBracket, "Expected ']' before function declaration"); 
     std::string functionName = current().value; // Сохраняем имя функции
     consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора
+    if (functionName == "operator" && check(TokenType::Operator) && operatorMethods.count(current().value)) {
+        functionName = operatorMethods.at(current().value); // operator+ это op_add
+        advance();
+    }
 
     // Шаблон: [T]first<T>(array<T>: a)
     std::vector<std::string> typeParameters;
@@ -450,6 +454,20 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
         {
             throwError("Expected '^=' operator after static variable declaration");
         }
+    }
+    else if(current().type == TokenType::Identifier && isCompoundAssignment(peek().value))
+    {
+        variableName = current().value;
+        auto target = std::make_shared<IdentifierNode>(variableName);
+        target->line = lineIndex; target->column = tokenIndex;
+        advance();
+        const std::string op = current().value.substr(0, 1);
+        advance();
+        auto value = std::make_shared<BinaryOpNode>(target, op, parseExpression());
+        value->line = target->line; value->column = target->column;
+        auto varReassign = std::make_shared<VariableReassignNode>(variableName, value);
+        varReassign->line = target->line; varReassign->column = target->column;
+        return varReassign;
     }
     else if(current().type == TokenType::Identifier && peek().value == "=")
     {

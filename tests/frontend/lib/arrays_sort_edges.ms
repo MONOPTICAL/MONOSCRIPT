@@ -16,19 +16,19 @@ use
 
 [i32]main()
 |   array<i32> empty = []
-|   echo(cstr(len(arrays.sort(empty))))
+|   echo(cstr(len(arrays.sorted(empty))))
 |   array<i32> one = [7]
-|   echo(show(arrays.sort(one)))
+|   echo(show(arrays.sorted(one)))
 |   array<i32> dup = [2, 1, 2, 1]
-|   echo(show(arrays.sort(dup)))
+|   echo(show(arrays.sorted(dup)))
 |   array<i32> done = [1, 2, 3, 4]
-|   echo(show(arrays.sort(done)))
+|   echo(show(arrays.sorted(done)))
 |   array<i32> back = [4, 3, 2, 1]
-|   echo(show(arrays.sort(back)))
+|   echo(show(arrays.sorted(back)))
 |   array<i32> many = []
 |   for i in range(100)
 |   |   push(many, 100 - i)
-|   sorted ^= arrays.sort(many)
+|   sorted ^= arrays.sorted(many)
 |   i1 ascending = true
 |   for i in range(1, 100)
 |   |   if sorted[i - 1] > sorted[i]: ascending = false

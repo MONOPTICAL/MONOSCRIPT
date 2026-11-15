@@ -130,10 +130,28 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     }
     else if (currentToken.type == TokenType::Identifier && (peek().type == TokenType::Dot || peek().type == TokenType::LeftBracket))
     {
+        const int startLine = lineIndex, startToken = tokenIndex;
         auto memberExpression = parsePostfix(parseMemberExpression());
 
         if(!isEndOfLine() && check(TokenType::Operator))
         {
+            if(isCompoundAssignment(current().value))
+            {
+                // p.x += e это p.x = p.x + (e). Цель читаем второй раз, чтобы не делить один узел AST
+                // shortcut: индекс в a[f()] += 1 вычисляется дважды, если понадобится однократно — нужен временный адрес в кодгене
+                const std::string op = current().value.substr(0, 1);
+                const int opLine = lineIndex, opToken = tokenIndex;
+                lineIndex = startLine; tokenIndex = startToken;
+                auto operand = parsePostfix(parseMemberExpression());
+                lineIndex = opLine; tokenIndex = opToken;
+                advance();
+                auto reassignNode = std::make_shared<ReassignMemberNode>();
+                reassignNode->line = lineIndex; reassignNode->column = tokenIndex;
+                reassignNode->accessExpression = memberExpression;
+                reassignNode->expression = std::make_shared<BinaryOpNode>(operand, op, parseExpression());
+                reassignNode->expression->line = reassignNode->line; reassignNode->expression->column = reassignNode->column;
+                return reassignNode;
+            }
             if(current().value == "=")
             {
                 advance();

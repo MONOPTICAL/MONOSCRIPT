@@ -8,6 +8,11 @@
 #include <optional>
 #include <algorithm>
 
+// x += e парсер разворачивает в x = x + (e), поэтому работают и числа, и строки, и operator+ у структур
+inline bool isCompoundAssignment(const std::string& op) {
+    return op.size() == 2 && op[1] == '=' && std::string_view("+-*/%").find(op[0]) != std::string_view::npos;
+}
+
 class Parser {
 public:
     Parser(const std::vector<std::vector<Token>>& tokens, std::string module) : 

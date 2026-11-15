@@ -36,7 +36,8 @@ use
 |   array<i32> m = [3, 1, 2]
 |   echo(cstr(arrays.min(m)) + " " + cstr(arrays.max(m)))
 |   arrays.removeAt(m, 2)
-|   echo(show(arrays.sort(m)))
+|   arrays.sort(m)
+|   echo(show(m))
 |   arrays.insert(m, 0, 0)
 |   arrays.insert(m, 3, 9)
 |   echo(show(m))

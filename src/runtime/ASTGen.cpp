@@ -969,6 +969,12 @@ void ASTGen::visit(BinaryOpNode& node) {
         result = nullptr;
         return;
     }
+    if (node.overload) { // a + b у структуры: вызов a.op_add(b), его выбрала семантика
+        const auto& parameters = node.overload->parameters;
+        result = context.emitCall(declareUserFunction(context, *node.overload),
+            {Arrays::emitValue(context, node.left, parameters[0].first), Arrays::emitValue(context, node.right, parameters[1].first)});
+        return;
+    }
     node.left->accept(*this);
     llvm::Value* left = getResult();
     

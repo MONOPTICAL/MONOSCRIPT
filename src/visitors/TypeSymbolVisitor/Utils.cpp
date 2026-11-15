@@ -189,7 +189,7 @@ void TypeSymbolVisitor::castAllNumbersToType(const std::shared_ptr<ASTNode>& nod
             if (getTypeRank(ident->inferredType->toString()) > 0)
                 ident->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
     }
-    if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+    if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node); bin && !bin->overload) { // a + b у структуры это вызов, числа в нём не приводим
         if (bin->op.starts_with("strcmp_")) return; // Строки к числам не приводим
         castAllNumbersToType(bin->left, targetType);
         castAllNumbersToType(bin->right, targetType);
@@ -273,7 +273,7 @@ void TypeSymbolVisitor::castAndValidate(const std::shared_ptr<ASTNode>& node, co
             if (getTypeRank(ident->inferredType->toString()) > 0)
                 ident->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
     }
-    if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+    if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node); bin && !bin->overload) { // a + b у структуры это вызов, числа в нём не приводим
         castAndValidate(bin->left, targetType, visitor);
         castAndValidate(bin->right, targetType, visitor);
         bin->inferredType = std::make_shared<SimpleTypeNode>(targetType);
@@ -305,6 +305,7 @@ std::string TypeSymbolVisitor::resolveExprType(const std::shared_ptr<ASTNode>& n
     if (std::dynamic_pointer_cast<FloatNumberNode>(node)) return "float";
 
     if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+        if (bin->overload) return bin->overload->returnType->toString();
         if (isBooleanOperator(bin->op)) return "i1";
         if (bin->op == "scat") return "string";
 
@@ -470,7 +471,7 @@ void TypeSymbolVisitor::findMaxRank(const std::shared_ptr<ASTNode>& node, int& m
             maxRank = std::max(maxRank, getTypeRank(ident->inferredType->toString()));
         return;
     }
-    if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+    if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node); bin && !bin->overload) { // a + b у структуры это вызов, числа в нём не приводим
         if (bin->op.starts_with("strcmp_")) return; // Строки на ранг не влияют
         findMaxRank(bin->left, maxRank);
         findMaxRank(bin->right, maxRank);
