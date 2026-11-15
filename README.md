@@ -11,7 +11,7 @@
 
 <img src=".github/readme/tagline.svg" alt="secure by default · reads like a script · runs like C" width="860">
 
-[Language guide](LANGUAGE.md) · [Quick start](#quick-start) · [Performance](#performance) · [Status](#status)
+[Language examples](tests/frontend/examples) · [Quick start](#quick-start) · [Performance](#performance) · [Status](#status)
 
 ![status](https://img.shields.io/badge/status-early%20development-ffb224?style=flat-square)
 ![LLVM](https://img.shields.io/badge/compiled%20with-LLVM-3f3f46?style=flat-square&logo=llvm)
@@ -27,7 +27,7 @@
 
 <br>
 
-MONOSCRIPT is a small, statically typed language that **reads like a script and runs like C**. Write a plugin in a few minutes, run it instantly through the JIT, or ship it as a single native binary. The compiler checks types, purity and narrowing before anything runs, so the bug in the branch nobody tested never makes it to production.
+MONOSCRIPT is a small, statically typed language that **reads like a script and runs like C**. Write a plugin in a few minutes, run it instantly through the JIT, or compile it to a native executable. The compiler checks types, purity and narrowing before anything runs, so the bug in the branch nobody tested never makes it to production.
 
 - **Script-short.** Type inference, no boilerplate, `ms run file.ms` and you're done.
 - **Checked before it runs.** Static types, no silent narrowing, `@pure` enforced by the compiler.
@@ -100,7 +100,7 @@ index 9 out of bounds (len 1) at line 6
   <img src=".github/readme/pipeline.svg" alt="hello.ms goes through the lexer, parser, checks and LLVM, then either runs in the JIT or becomes a native executable" width="860">
 </p>
 
-The same front end feeds both modes: `ms run` JIT-compiles and runs in about 60 ms, and `ms --compile` produces a standalone executable. Memory is managed by a garbage collector (Boehm), and references are never null.
+The same front end feeds both modes: `ms run` JIT-compiles and runs in about 60 ms, and `ms --compile` produces a native executable. Memory is managed by a garbage collector (Boehm), and references are never null.
 
 
 
@@ -195,7 +195,21 @@ Or build a native executable:
 
 Add `--timings` to see where the compile time goes, or run the test suite with `./ms --run_tests`.
 
+Native executables currently depend on the D runtime library (`libm_std.so`) and Boehm GC on the target system.
 
+### Testing
+
+After a full build, run `ctest --test-dir build --output-on-failure` to include the language suite, test-runner checks and CLI path tests. Runtime cases exercise JIT and native execution with and without optimization.
+
+To build and test only the frontend, without LLVM or a D compiler:
+
+```bash
+cmake -B build-frontend -DCMAKE_BUILD_TYPE=Release -DCMAKE_DISABLE_FIND_PACKAGE_LLVM=TRUE
+cmake --build build-frontend
+ctest --test-dir build-frontend --output-on-failure
+```
+
+Runtime cases are skipped in this configuration. Test expectations are comments inside the `.ms` files; see [the test runner](src/CLI/test_runner.cpp) for supported directives.
 
 ## Status
 
@@ -208,12 +222,12 @@ MONOSCRIPT is young and the syntax can still change. Here's where it stands:
 - [x] `result<T>`, `?`, `? else`, `attempt` and panic handlers
 - [x] Garbage collection, runtime errors with line numbers
 - [x] JIT and native executables
-- [ ] Standart library(mono)
+- [ ] Standard library (mono)
 - [ ] Lambdas and pipes (`|>`)
 - [ ] Null safety
 - [ ] Embedding and sandboxing
 
-Everything else, from types to the native ABI, is in the **[language guide](LANGUAGE.md)**.
+Explore the [language examples](tests/frontend/examples) and [standard-library registrations](mono/mono.toml) for working code and native function signatures.
 
 ## License
 
