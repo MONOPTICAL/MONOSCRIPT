@@ -64,6 +64,10 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
     {
         return parseStruct();
     }
+    else if (currentToken.type == TokenType::LeftBracket && peek().value == "enum")
+    {
+        return parseEnum();
+    }
     // If statement
         // if [expression] or if [expression]
         // if 2 > 0
@@ -116,12 +120,38 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         advance();
         return continueNode;
     }
+    // Переменная с типом из namespace: Xyi.x p = Xyi.x()
+    else if (currentToken.type == TokenType::Identifier && peek().type == TokenType::Dot
+             && tokenIndex + 3 < lines[lineIndex].size()
+             && lines[lineIndex][tokenIndex + 2].type == TokenType::Identifier
+             && lines[lineIndex][tokenIndex + 3].type == TokenType::Identifier)
+    {
+        return parseAssignment(false);
+    }
     else if (currentToken.type == TokenType::Identifier && (peek().type == TokenType::Dot || peek().type == TokenType::LeftBracket))
     {
+        const int startLine = lineIndex, startToken = tokenIndex;
         auto memberExpression = parsePostfix(parseMemberExpression());
 
         if(!isEndOfLine() && check(TokenType::Operator))
         {
+            if(isCompoundAssignment(current().value))
+            {
+                // p.x += e это p.x = p.x + (e). Цель читаем второй раз, чтобы не делить один узел AST
+                // shortcut: индекс в a[f()] += 1 вычисляется дважды, если понадобится однократно — нужен временный адрес в кодгене
+                const std::string op = current().value.substr(0, 1);
+                const int opLine = lineIndex, opToken = tokenIndex;
+                lineIndex = startLine; tokenIndex = startToken;
+                auto operand = parsePostfix(parseMemberExpression());
+                lineIndex = opLine; tokenIndex = opToken;
+                advance();
+                auto reassignNode = std::make_shared<ReassignMemberNode>();
+                reassignNode->line = lineIndex; reassignNode->column = tokenIndex;
+                reassignNode->accessExpression = memberExpression;
+                reassignNode->expression = std::make_shared<BinaryOpNode>(operand, op, parseExpression());
+                reassignNode->expression->line = reassignNode->line; reassignNode->expression->column = reassignNode->column;
+                return reassignNode;
+            }
             if(current().value == "=")
             {
                 advance();
@@ -201,6 +231,11 @@ std::shared_ptr<ASTNode> Parser::parseStatement()
         lines[lineIndex][tokenIndex].type = TokenType::Identifier;
         auto funcCall = parseCall();
         return funcCall;
+    }
+    else if (currentToken.type == TokenType::LeftBracket && peek().value == "namespace")
+    {
+        // [namespace] namespaceName
+        return parseNamespace();
     }
     else
     {

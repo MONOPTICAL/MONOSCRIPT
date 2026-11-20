@@ -125,10 +125,11 @@ bool TypeSymbolVisitor::checkLabels(const std::string &label)
 
 int TypeSymbolVisitor::getTypeRank(const std::string& type) {
     if (type == "i1") return 1;
-    if (type == "i8") return 2;
-    if (type == "i16") return 3;
-    if (type == "i32") return 4;
-    if (type == "i64") return 5;
+    // Ранг это ширина: u8 рядом с i8. Знак проверяет isLosslessInt
+    if (type == "i8" || type == "u8") return 2;
+    if (type == "i16" || type == "u16") return 3;
+    if (type == "i32" || type == "u32") return 4;
+    if (type == "i64" || type == "u64") return 5;
     if (type == "float") return 6;
     if (type == "f64") return 7;
     return 0;
@@ -188,7 +189,7 @@ void TypeSymbolVisitor::castAllNumbersToType(const std::shared_ptr<ASTNode>& nod
             if (getTypeRank(ident->inferredType->toString()) > 0)
                 ident->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
     }
-    if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+    if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node); bin && !bin->overload) { // a + b у структуры это вызов, числа в нём не приводим
         if (bin->op.starts_with("strcmp_")) return; // Строки к числам не приводим
         castAllNumbersToType(bin->left, targetType);
         castAllNumbersToType(bin->right, targetType);
@@ -231,6 +232,11 @@ static bool checkIntLimits(const std::string& type, int64_t value) {
     if (type == "i16") return value >= -32768 && value <= 32767;
     if (type == "i32") return value >= -2147483648 && value <= 2147483647;
     if (type == "i64") return true;
+    if (type == "u8") return value >= 0 && value <= 255;
+    if (type == "u16") return value >= 0 && value <= 65535;
+    if (type == "u32") return value >= 0 && value <= 4294967295LL;
+    // shortcut: литерал u64 не больше i64 max, NumberNode хранит int64. Больше через выражения: bnot 0->u64
+    if (type == "u64") return value >= 0;
     return true;
 }
 
@@ -267,7 +273,7 @@ void TypeSymbolVisitor::castAndValidate(const std::shared_ptr<ASTNode>& node, co
             if (getTypeRank(ident->inferredType->toString()) > 0)
                 ident->implicitCastTo = std::make_shared<SimpleTypeNode>(targetType);
     }
-    if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+    if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node); bin && !bin->overload) { // a + b у структуры это вызов, числа в нём не приводим
         castAndValidate(bin->left, targetType, visitor);
         castAndValidate(bin->right, targetType, visitor);
         bin->inferredType = std::make_shared<SimpleTypeNode>(targetType);
@@ -299,6 +305,7 @@ std::string TypeSymbolVisitor::resolveExprType(const std::shared_ptr<ASTNode>& n
     if (std::dynamic_pointer_cast<FloatNumberNode>(node)) return "float";
 
     if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+        if (bin->overload) return bin->overload->returnType->toString();
         if (isBooleanOperator(bin->op)) return "i1";
         if (bin->op == "scat") return "string";
 
@@ -355,6 +362,9 @@ bool TypeSymbolVisitor::checkResultLiteral(const std::shared_ptr<ASTNode>& node,
 
 void TypeSymbolVisitor::checkConversion(const std::shared_ptr<ASTNode>& node, const std::string& targetType, const std::string& errorPrefix) {
     if (checkResultLiteral(node, targetType)) return;
+    // Числом значение enum задаётся только в его объявлении: Red = 0 внутри [enum]Color
+    if (enumTypeNames().count(targetType) && std::dynamic_pointer_cast<NumberNode>(node) && contexts.back().currentNamespace == targetType)
+        return;
     // Пустой литерал [] или {} подходит к любой коллекции
     if (std::dynamic_pointer_cast<NoneNode>(node) && (targetType.starts_with("array") || targetType.starts_with("map")))
         return;
@@ -376,11 +386,15 @@ void TypeSymbolVisitor::checkConversion(const std::shared_ptr<ASTNode>& node, co
         if (sourceRank == 0 || targetRank == 0)
             LogError(errorPrefix + "Type mismatch: expected " + targetType + ", got " + sourceType, node);
 
-        // Явный каст компилятор не трогает, он должен давать ровно нужный тип
-        if (node->implicitCastTo && !(bin && (bin->op == "and" || bin->op == "or")))
+        // Явный каст компилятор не трогает, он должен давать ровно нужный тип.
+        // Кроме расширения без знака: (x)->u8 в u64 дополняется нулями и значения не меняет
+        const bool unsignedWidening = isUnsignedTypeName(sourceType) && isUnsignedTypeName(targetType) && isLosslessInt(sourceType, targetType);
+        if (node->implicitCastTo && !unsignedWidening && !(bin && (bin->op == "and" || bin->op == "or")))
             LogError(errorPrefix + "Type mismatch: expected " + targetType + ", got " + sourceType, node);
 
         if (sourceRank > targetRank)
+            LogError(errorPrefix + "Type mismatch: expected " + targetType + ", got " + sourceType + ", use explicit cast ->" + targetType, node);
+        else if (isIntegerTypeName(sourceType) && isIntegerTypeName(targetType) && !isLosslessInt(sourceType, targetType))
             LogError(errorPrefix + "Type mismatch: expected " + targetType + ", got " + sourceType + ", use explicit cast ->" + targetType, node);
 
         if (checkLabels("@strict"))
@@ -457,7 +471,7 @@ void TypeSymbolVisitor::findMaxRank(const std::shared_ptr<ASTNode>& node, int& m
             maxRank = std::max(maxRank, getTypeRank(ident->inferredType->toString()));
         return;
     }
-    if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node)) {
+    if (auto bin = std::dynamic_pointer_cast<BinaryOpNode>(node); bin && !bin->overload) { // a + b у структуры это вызов, числа в нём не приводим
         if (bin->op.starts_with("strcmp_")) return; // Строки на ранг не влияют
         findMaxRank(bin->left, maxRank);
         findMaxRank(bin->right, maxRank);
@@ -501,6 +515,9 @@ void TypeSymbolVisitor::castNumbersInBinaryTree(std::shared_ptr<ASTNode>& node, 
     if (expectedType == "auto") {
         findMaxRank(node, maxRank);
         targetType = getTypeByRank(maxRank);
+        // Ранг без знака: тип u8 + u8 это u8, а не i8 той же ширины
+        if (node->inferredType && isUnsignedTypeName(node->inferredType->toString()) && getTypeRank(node->inferredType->toString()) == maxRank)
+            targetType = node->inferredType->toString();
         if (targetType.empty()) {
             // В условии только сравнения строк: числа приводить не к чему
             if (node->inferredType && (node->inferredType->toString() == "i1" || node->inferredType->toString() == "char")) return;
@@ -568,6 +585,7 @@ void TypeSymbolVisitor::validateCollectionElements(
         if (type == "i1") { if (maxRank < 1) maxRank = 1; return 1; }
         if (type == "i8") { if (maxRank < 2) maxRank = 2; return 2; }
         if (type == "i16") { if (maxRank < 3) maxRank = 3; return 3; }
+        if (isUnsignedTypeName(type)) { const int rank = type == "u8" ? 2 : type == "u16" ? 3 : type == "u32" ? 4 : 5; if (maxRank < rank) maxRank = rank; return rank; }
         if (type == "i32") { if (maxRank < 4) maxRank = 4; return 4; }
         if (type == "i64") { if (maxRank < 5) maxRank = 5; return 5; }
         if (type == "float") { if (maxRank < 6) maxRank = 6; return 6; }

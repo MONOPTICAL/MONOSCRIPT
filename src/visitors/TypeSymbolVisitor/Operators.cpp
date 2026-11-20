@@ -69,7 +69,7 @@ std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSym
     } else if (std::dynamic_pointer_cast<BinaryOpNode>(node) || std::dynamic_pointer_cast<UnaryOpNode>(node)) {
         auto binary = std::dynamic_pointer_cast<BinaryOpNode>(node);
         auto unary = std::dynamic_pointer_cast<UnaryOpNode>(node);
-        const bool isBoolean = (unary && unary->op != "neg" && unary->op != "try") ||
+        const bool isBoolean = (unary && unary->op != "neg" && unary->op != "try" && unary->op != "bnot") ||
             (binary && (binary->op.starts_with("icmp_") || binary->op.starts_with("fcmp_") ||
                         binary->op.starts_with("strcmp_") || binary->op == "and" || binary->op == "or"));
 
@@ -80,6 +80,8 @@ std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSym
         else if (typeName == "float") toStringMethod = "toString_float";
         else if (typeName == "f64") toStringMethod = "toString_f64";
         else if (typeName == "i64") toStringMethod = "toString_long";
+        // Любое без знака печатает toString_ulong: аргумент расширяется до u64 нулями, каст узла не трогаем
+        else if (isUnsignedTypeName(typeName)) toStringMethod = "toString_ulong";
         else if (typeName != "i32") node->implicitCastTo = std::make_shared<SimpleTypeNode>("i32");
 
         callNode = std::make_shared<CallNode>(
@@ -99,15 +101,14 @@ std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSym
             toStringMethod = "toString_bool";
         else if (type->toString() == "i64")
             toStringMethod = "toString_long";
+        else if (isUnsignedTypeName(type->toString()))
+            toStringMethod = "toString_ulong";
         else
             toStringMethod = "toString_int";
 
-        callNode = std::make_shared<CallNode>(
-            toStringMethod,
-            std::vector<std::shared_ptr<ASTNode>>{
-                std::make_shared<CallNode>(call->callee, call->arguments)
-            }
-        );
+        auto inner = std::make_shared<CallNode>(call->callee, call->arguments);
+        if (enumTypeNames().count(type->toString())) inner->implicitCastTo = std::make_shared<SimpleTypeNode>("i32"); // enum печатается числом
+        callNode = std::make_shared<CallNode>(toStringMethod, std::vector<std::shared_ptr<ASTNode>>{inner});
     } else if (std::dynamic_pointer_cast<IdentifierNode>(node) || std::dynamic_pointer_cast<AccessExpression>(node)) {
         std::string toStringMethod;
         const std::string typeName = type->toString();
@@ -122,6 +123,8 @@ std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSym
             toStringMethod = "toString_bool";
         else if (typeName == "i64")
             toStringMethod = "toString_long";
+        else if (isUnsignedTypeName(typeName))
+            toStringMethod = "toString_ulong";
         else {
             toStringMethod = "toString_int";
             if (typeName != "i32") // i8 и i16 расширяем под параметр toString_int
@@ -170,7 +173,7 @@ void TypeSymbolVisitor::handlePlusOperator(std::shared_ptr<BinaryOpNode>& node, 
     std::string right = rightType->toString();
 
     auto isIntType = [](const std::string& t) {
-        return t == "i32" || t == "i64" || t == "i16" || t == "i8" || t == "i1";
+        return isIntegerTypeName(t);
     };
 
     // string
@@ -235,7 +238,7 @@ void TypeSymbolVisitor::handleMinusOperator(std::shared_ptr<BinaryOpNode>& node,
     std::string right = rightType->toString();
 
     auto isIntType = [](const std::string& t) {
-        return t == "i32" || t == "i64" || t == "i16" || t == "i8" || t == "i1";
+        return isIntegerTypeName(t);
     };
 
     // string
@@ -280,7 +283,7 @@ void TypeSymbolVisitor::handleMulOperator(std::shared_ptr<BinaryOpNode>& node, s
     std::string right = rightType->toString();
 
     auto isIntType = [](const std::string& t) {
-        return t == "i32" || t == "i64" || t == "i16" || t == "i8" || t == "i1";
+        return isIntegerTypeName(t);
     };
 
     // string
@@ -325,7 +328,7 @@ void TypeSymbolVisitor::handleDivOperator(std::shared_ptr<BinaryOpNode>& node, s
     std::string right = rightType->toString();
     
     auto isIntType = [](const std::string& t) {
-        return t == "i32" || t == "i64" || t == "i16" || t == "i8" || t == "i1";
+        return isIntegerTypeName(t);
     };
 
     if (left == "string" || right == "string") {
@@ -367,7 +370,7 @@ void TypeSymbolVisitor::handleModOperator(std::shared_ptr<BinaryOpNode>& node, s
     std::string right = rightType->toString();
 
     auto isIntType = [](const std::string& t) {
-        return t == "i32" || t == "i64" || t == "i16" || t == "i8" || t == "i1";
+        return isIntegerTypeName(t);
     };
 
     if (left == "string" || right == "string") {
@@ -403,13 +406,59 @@ void TypeSymbolVisitor::handleModOperator(std::shared_ptr<BinaryOpNode>& node, s
     LogError("Unsupported operand types for '%': " + left + " and " + right, node->right->shared_from_this());
 }
 
+void TypeSymbolVisitor::handleBitwiseOperator(std::shared_ptr<BinaryOpNode>& node, std::shared_ptr<TypeNode> leftType, std::shared_ptr<TypeNode> rightType)
+{
+    const std::string left = leftType->toString();
+    const std::string right = rightType->toString();
+    auto isIntType = [](const std::string& t) {
+        return isIntegerTypeName(t);
+    };
+
+    // Биты есть только у целых: float и char сначала кастуют
+    if (!isIntType(left) || !isIntType(right)) {
+        LogError("Unsupported operand types for '" + node->op + "': " + left + " and " + right + ", only integers", node->right->shared_from_this());
+        return;
+    }
+    node->inferredType = resultOfIntegerOperation(node, leftType, rightType, registry);
+}
+
+void TypeSymbolVisitor::handlePowOperator(std::shared_ptr<BinaryOpNode>& node, std::shared_ptr<TypeNode> leftType, std::shared_ptr<TypeNode> rightType)
+{
+    std::string left = leftType->toString();
+    std::string right = rightType->toString();
+
+    auto isIntType = [](const std::string& t) {
+        return isIntegerTypeName(t);
+    };
+
+    // Как у %: float в любом операнде делает степень дробной
+    if (isFloatType(left) || isFloatType(right)) {
+        const std::string type = floatTypeOf(left, right);
+        if (checkLabels("@strict") && left != right)
+            LogError("Implicit type casting is not allowed for '**' in @strict mode: " + left + " and " + right, node->right->shared_from_this());
+        if (left != type) node->left->implicitCastTo = registry.findType(type);
+        if (right != type) node->right->implicitCastTo = registry.findType(type);
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "fpow", node->right); node->implicitCastTo = cast; }
+        node->inferredType = registry.findType(type);
+        return;
+    }
+
+    if (isIntType(left) && isIntType(right)) {
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "ipow", node->right); node->implicitCastTo = cast; }
+        node->inferredType = resultOfIntegerOperation(node, leftType, rightType, registry);
+        return;
+    }
+
+    LogError("Unsupported operand types for '**': " + left + " and " + right, node->right->shared_from_this());
+}
+
 void TypeSymbolVisitor::handleCompareOperator(std::shared_ptr<BinaryOpNode>& node, std::shared_ptr<TypeNode> leftType, std::shared_ptr<TypeNode> rightType)
 {
     std::string left = leftType->toString();
     std::string right = rightType->toString();
 
     auto isIntType = [](const std::string& t) {
-        return t == "i32" || t == "i64" || t == "i16" || t == "i8" || t == "i1";
+        return isIntegerTypeName(t);
     };
 
     // IR-операции по node->op
@@ -425,6 +474,15 @@ void TypeSymbolVisitor::handleCompareOperator(std::shared_ptr<BinaryOpNode>& nod
 
     if (cmpOp.empty()) {
         LogError("Unknown comparison operator: " + node->op, node->right->shared_from_this());
+        return;
+    }
+
+    // Значения одного enum только равны или не равны: порядок у них не задан
+    if (enumTypeNames().count(left) || enumTypeNames().count(right)) {
+        if (left != right || (cmpOp != "eq" && cmpOp != "ne"))
+            LogError("Unsupported operand types for comparison: " + left + " and " + right + ", enum values only support == and !=", node->right->shared_from_this());
+        { auto cast = node->implicitCastTo; node = std::make_shared<BinaryOpNode>(node->left, "icmp_" + cmpOp, node->right); node->implicitCastTo = cast; }
+        node->inferredType = registry.findType("i1");
         return;
     }
 

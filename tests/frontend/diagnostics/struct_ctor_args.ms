@@ -1,4 +1,4 @@
-// expect-error: no constructor with arguments
+// expect-error: has no init method
 [struct]P
 |   i32 age = 1
 |   string name = "x"

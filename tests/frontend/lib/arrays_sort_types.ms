@@ -16,18 +16,18 @@ use
 
 [i32]main()
 |   array<i32> nums = [3, 1, 2]
-|   for x in sort(nums)? else nums
+|   for x in arrays.sorted(nums)
 |   |   echo(cstr(x))
 |   array<string> words = ["c", "a", "b"]
-|   for w in sort(words)? else words
+|   for w in arrays.sorted(words)
 |   |   echo(w)
 |   array<i64> wide = [4, -7, 0]
-|   for x in sort(wide)? else wide
+|   for x in arrays.sorted(wide)
 |   |   echo(cstr(x))
 |   array<f64> reals = [2.5, 0.5]
-|   for x in sort(reals)? else reals
+|   for x in arrays.sorted(reals)
 |   |   echo(cstr(x))
 |   array<char> letters = ['z', 'A']
-|   for c in sort(letters)? else letters
+|   for c in arrays.sorted(letters)
 |   |   echo(cstr(c))
 |   return 0

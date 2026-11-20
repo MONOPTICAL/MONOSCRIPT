@@ -3,6 +3,7 @@
 #include "../../CLI/headers/ui.h"
 #include "../../errors/headers/ErrorEngine.h"
 #include <iostream>
+#include <memory>
 
 std::shared_ptr<ASTNode> toStringHandler(std::shared_ptr<ASTNode>& node, TypeSymbolVisitor& visitor);
 std::shared_ptr<TypeNode> functionTypeOf(const FunctionNode& function);
@@ -32,10 +33,10 @@ static std::shared_ptr<TypeNode> widenLiteralType(const std::shared_ptr<TypeNode
 }
 
 // Тип литерала коллекции для вывода T. Ничего не меняет в узлах: приведёт уже проверка вызова с готовым типом
-static std::shared_ptr<TypeNode> literalCollectionType(const std::shared_ptr<BlockNode>& block);
+static std::shared_ptr<TypeNode> literalCollectionType(const std::shared_ptr<BlockNode>& block, TypeSymbolVisitor& visitor);
 
 static std::shared_ptr<TypeNode> literalValueType(const std::shared_ptr<ASTNode>& value, TypeSymbolVisitor& visitor) {
-    if (auto block = std::dynamic_pointer_cast<BlockNode>(value)) return literalCollectionType(block);
+    if (auto block = std::dynamic_pointer_cast<BlockNode>(value)) return literalCollectionType(block, visitor);
     value->accept(visitor);
     return value->implicitCastTo ? value->implicitCastTo : value->inferredType;
 }
@@ -80,9 +81,7 @@ static void unifyTypes(const std::shared_ptr<TypeNode>& parameter, const std::sh
             unifyTypes(generic->typeParameters[i], other->typeParameters[i], names, bindings, fromLiteral, conflict);
 }
 
-static TypeSymbolVisitor* literalVisitor = nullptr;
-
-static std::shared_ptr<TypeNode> literalCollectionType(const std::shared_ptr<BlockNode>& block) {
+static std::shared_ptr<TypeNode> literalCollectionType(const std::shared_ptr<BlockNode>& block, TypeSymbolVisitor& visitor) {
     if (!block || block->statements.empty()) return nullptr;
 
     if (std::dynamic_pointer_cast<KeyValueNode>(block->statements[0])) {
@@ -91,8 +90,8 @@ static std::shared_ptr<TypeNode> literalCollectionType(const std::shared_ptr<Blo
         for (const auto& statement : block->statements) {
             auto pair = std::dynamic_pointer_cast<KeyValueNode>(statement);
             if (!pair) return nullptr;
-            key = mergeElementType(key, literalValueType(pair->key, *literalVisitor), isLiteralExpression(pair->key), haveKey);
-            value = mergeElementType(value, literalValueType(pair->value, *literalVisitor), isLiteralExpression(pair->value), haveValue);
+            key = mergeElementType(key, literalValueType(pair->key, visitor), isLiteralExpression(pair->key), haveKey);
+            value = mergeElementType(value, literalValueType(pair->value, visitor), isLiteralExpression(pair->value), haveValue);
         }
         if (!key || !value) return nullptr;
         auto map = std::make_shared<GenericTypeNode>("map");
@@ -103,12 +102,72 @@ static std::shared_ptr<TypeNode> literalCollectionType(const std::shared_ptr<Blo
     std::shared_ptr<TypeNode> element;
     bool haveValue = false;
     for (const auto& statement : block->statements) {
-        element = mergeElementType(element, literalValueType(statement, *literalVisitor), isLiteralExpression(statement), haveValue);
+        element = mergeElementType(element, literalValueType(statement, visitor), isLiteralExpression(statement), haveValue);
     }
     if (!element) return nullptr;
     auto array = std::make_shared<GenericTypeNode>("array");
     array->typeParameters = {element};
     return array;
+}
+
+// Выбор перегрузки по стоимости приведения аргументов: точное совпадение 0, расширение тем дороже, чем дальше тип,
+// целое в float дороже любого целого. Целый литерал дешевле всего идёт в i32, дробный в f64: f(5) при f(i32) и f(i64) это f(i32)
+std::string TypeSymbolVisitor::resolveOverload(const std::string& name, const std::vector<std::shared_ptr<FunctionNode>>& candidates,
+                                               CallNode& call, const std::vector<std::shared_ptr<TypeNode>>& argTypes, size_t skip)
+{
+    auto literalOf = [](const std::shared_ptr<ASTNode>& argument) -> std::shared_ptr<ASTNode> {
+        if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(argument); unary && unary->op == "-") return unary->operand;
+        return argument;
+    };
+    constexpr int impossible = -1, toFloat = 10;
+    auto cost = [&](const std::shared_ptr<ASTNode>& argument, const std::shared_ptr<TypeNode>& argumentType, const std::string& parameter) {
+        auto literal = literalOf(argument);
+        if (auto number = std::dynamic_pointer_cast<NumberNode>(literal); number && !number->isCharLiteral && !number->isBoolLiteral) {
+            if (isIntegerTypeName(parameter)) return std::abs(getTypeRank(parameter) - getTypeRank("i32"));
+            return isFloatType(parameter) ? toFloat : impossible;
+        }
+        if (std::dynamic_pointer_cast<FloatNumberNode>(literal)) return parameter == "f64" ? 0 : parameter == "float" ? 1 : impossible;
+        if (!argumentType) return (parameter.starts_with("array<") || parameter.starts_with("map<")) ? 0 : impossible; // [] или {}
+        const std::string type = argumentType->toString();
+        if (type == parameter) return 0;
+        if (isIntegerTypeName(type) && isIntegerTypeName(parameter))
+            return isLosslessInt(type, parameter) ? getTypeRank(parameter) - getTypeRank(type) + 1 : impossible;
+        if (isIntegerTypeName(type) && isFloatType(parameter)) return toFloat;
+        if (type == "float" && parameter == "f64") return 1;
+        return impossible;
+    };
+
+    std::vector<std::shared_ptr<FunctionNode>> best;
+    int bestCost = 0;
+    for (const auto& candidate : candidates) {
+        if (candidate->parameters.size() != call.arguments.size() + skip) continue;
+        int total = 0;
+        for (size_t i = 0; i < call.arguments.size() && total != impossible; i++) {
+            const int c = cost(call.arguments[i], argTypes[i], candidate->parameters[i + skip].first->toString());
+            total = c == impossible ? impossible : total + c;
+        }
+        if (total == impossible) continue;
+        if (best.empty() || total < bestCost) { bestCost = total; best = {candidate}; }
+        else if (total == bestCost) best.push_back(candidate);
+    }
+
+    std::string given;
+    for (const auto& type : argTypes) given += (given.empty() ? "" : ", ") + (type ? type->toString() : std::string("[]"));
+    if (best.empty())
+        LogError("No overload of " + name + " accepts (" + given + ")", call.shared_from_this());
+    if (best.size() > 1)
+        LogError("Call of overloaded " + name + "(" + given + ") is ambiguous: " + best[0]->name + " and " + best[1]->name + " fit equally, use ->", call.shared_from_this());
+    return best[0]->name;
+}
+
+std::vector<std::shared_ptr<FunctionNode>> TypeSymbolVisitor::findMethods(const std::shared_ptr<StructNode>& structure, const std::string& name)
+{
+    std::vector<std::shared_ptr<FunctionNode>> methods;
+    if (auto body = std::dynamic_pointer_cast<BlockNode>(structure->body))
+        for (const auto& statement : body->statements)
+            if (auto method = std::dynamic_pointer_cast<FunctionNode>(statement); method && (method->name == name || method->name.starts_with(name + "(")))
+                methods.push_back(method);
+    return methods;
 }
 
 std::string TypeSymbolVisitor::instantiateGeneric(const std::shared_ptr<FunctionNode>& generic, CallNode& call,
@@ -131,8 +190,7 @@ std::string TypeSymbolVisitor::instantiateGeneric(const std::shared_ptr<Function
     for (size_t i = 0; i < call.arguments.size(); i++) {
         std::shared_ptr<TypeNode> literalType;
         if (auto block = std::dynamic_pointer_cast<BlockNode>(call.arguments[i])) {
-            literalVisitor = this;
-            literalType = literalCollectionType(block);
+            literalType = literalCollectionType(block, *this);
         } else if (isLiteralExpression(call.arguments[i])) {
             literalType = argTypes[i];
         }
@@ -174,6 +232,11 @@ std::string TypeSymbolVisitor::instantiateGeneric(const std::shared_ptr<Function
     insideMethod = false;
     if (auto module = genericModules.find(generic->name); module != genericModules.end())
         currentModuleName = module->second;
+    // Копия видит соседей по своему namespace, а не по namespace того, кто её вызвал
+    const std::string outerNamespace = contexts[0].currentNamespace;
+    const std::string outerScopePath = contexts[0].scopePath;
+    const auto ownNamespace = genericNamespaces.find(generic->name);
+    contexts[0].currentNamespace = contexts[0].scopePath = ownNamespace != genericNamespaces.end() ? ownNamespace->second : "";
 
     try {
         instance->accept(*this);
@@ -187,6 +250,8 @@ std::string TypeSymbolVisitor::instantiateGeneric(const std::shared_ptr<Function
         throw;
     }
 
+    contexts[0].currentNamespace = outerNamespace;
+    contexts[0].scopePath = outerScopePath;
     contexts.insert(contexts.end(), callerContexts.begin(), callerContexts.end());
     loopDepth = outerLoopDepth;
     insideMethod = outerInMethod;
@@ -226,39 +291,97 @@ void TypeSymbolVisitor::collectDeclarations(ProgramNode &node)
     std::unordered_map<std::string, Scope> ownFunctions;
     std::vector<std::pair<std::string, std::shared_ptr<ImportNode>>> imports;
 
+    // У шаблона каждый тип должен выводиться из аргументов: при вызове тип не пишется
+    const auto checkGenericParameters = [&](const std::shared_ptr<FunctionNode>& function) {
+        if (function->typeParameters.empty()) return;
+        if (hasLabel(function, "@entry") || function->name == "main")
+            LogError("Entry function " + function->name + " cannot be generic", function);
+        for (const auto& name : function->typeParameters) {
+            bool mentioned = false;
+            for (const auto& parameter : function->parameters)
+                mentioned = mentioned || typeMentions(parameter.first, name);
+            if (!mentioned)
+                LogError("Type " + name + " of generic function " + function->name + " must appear in its parameters", function);
+        }
+    };
+
+    std::map<std::string, std::vector<std::shared_ptr<FunctionNode>>> sameName; // перегрузки: f с разными параметрами
+
     for (const auto& statement : node.body) {
         if (auto mark = std::dynamic_pointer_cast<ModuleMark>(statement))
             module = moduleNameOf(mark->moduleName);
         else if (auto import = std::dynamic_pointer_cast<ImportNode>(statement))
             imports.push_back({module, import});
         else if (auto structure = std::dynamic_pointer_cast<StructNode>(statement)) {
+            // Шаблон сам не структура: копии Stack<i32> появятся при первом упоминании типа
+            if (!structure->typeParameters.empty()) {
+                if (genericStructs.count(structure->name)) LogError("Struct already defined: " + structure->name, structure);
+                genericStructs[structure->name] = structure;
+            }
             // Структуру можно использовать выше её определения
-            if (!registry.findStruct(structure->name))
+            else if (!registry.findStruct(structure->name))
                 registry.addStruct(structure->name, std::make_shared<StructNode>(structure->name, structure->body));
         }
+        else if (auto ns = std::dynamic_pointer_cast<NamespaceNode>(statement)) {
+            // namespace и его функции видны выше объявления, как обычные функции
+            if (registry.findNamespace(ns->name))
+                LogError("Namespace already defined: " + ns->name, ns);
+            registry.addNamespace(ns->name, ns);
+            if (ns->isEnum) registry.addBuiltinType(ns->name, std::make_shared<SimpleTypeNode>(ns->name)); // Color это тип
+            if (auto block = std::dynamic_pointer_cast<BlockNode>(ns->body))
+                for (const auto& inner : block->statements)
+                    if (auto function = std::dynamic_pointer_cast<FunctionNode>(inner); function && function->associated.empty()) {
+                        checkGenericParameters(function);
+                        function->name = ns->name + "." + function->name;
+                        sameName[function->name].push_back(function);
+                        declaredFunctions.emplace(function->name, function);
+                        if (!function->typeParameters.empty()) {
+                            genericModules[function->name] = module;
+                            genericNamespaces[function->name] = ns->name;
+                        }
+                    }
+        }
         else if (auto function = std::dynamic_pointer_cast<FunctionNode>(statement); function && function->associated.empty()) {
-            // У шаблона каждый тип должен выводиться из аргументов: при вызове тип не пишется
-            if (!function->typeParameters.empty()) {
-                if (hasLabel(function, "@entry") || function->name == "main")
-                    LogError("Entry function " + function->name + " cannot be generic", function);
-                for (const auto& name : function->typeParameters) {
-                    bool mentioned = false;
-                    for (const auto& parameter : function->parameters)
-                        mentioned = mentioned || typeMentions(parameter.first, name);
-                    if (!mentioned)
-                        LogError("Type " + name + " of generic function " + function->name + " must appear in its parameters", function);
-                }
-            }
+            checkGenericParameters(function);
 
             ownFunctions[module].emplace(function->name, function);
 
             // Внутреннее имя, чтобы одинаковые функции разных модулей не мешали друг другу
             if (module != mainModule)
                 function->name = module + "::" + function->name;
+            sameName[function->name].push_back(function);
             declaredFunctions.emplace(function->name, function);
             if (!function->typeParameters.empty()) genericModules[function->name] = module;
         }
     }
+
+    // Перегрузка: у каждой своё внутреннее имя f(i32,string), а вызов выбирает по типам аргументов
+    for (auto& [name, functions] : sameName) {
+        if (functions.size() < 2) continue;
+        std::set<std::string> signatures;
+        for (const auto& function : functions) {
+            if (!function->typeParameters.empty())
+                LogError("Generic function " + name + " cannot be overloaded", function);
+            if (hasLabel(function, "@entry") || name == "main")
+                LogError("Entry function " + name + " cannot be overloaded", function);
+            std::string signature;
+            for (const auto& parameter : function->parameters)
+                signature += (signature.empty() ? "" : ",") + parameter.first->toString();
+            if (!signatures.insert(signature).second)
+                LogError("Function " + name + "(" + signature + ") is already defined", function);
+            function->name = name + "(" + signature + ")";
+            declaredFunctions[function->name] = function;
+        }
+        declaredFunctions.erase(name);
+        overloads[name] = functions;
+    }
+
+    // Сигнатуры видны выше определения функции: Box<i32> из них нужен до её обхода. Шаблоны уже собраны
+    for (const auto& [name, declared] : declaredFunctions)
+        if (auto function = std::dynamic_pointer_cast<FunctionNode>(declared); function && function->typeParameters.empty()) {
+            instantiateStruct(function->returnType->toString());
+            for (const auto& parameter : function->parameters) instantiateStruct(parameter.first->toString());
+        }
 
     moduleScopes = ownFunctions;
 
@@ -319,10 +442,34 @@ void TypeSymbolVisitor::visit(ProgramNode &node)
     node.body.insert(node.body.begin(), hoistedStructs.begin(), hoistedStructs.end());
 }
 
+void TypeSymbolVisitor::visit(NamespaceNode &node)
+{
+    // Добавляем пространство имён в текущий контекст
+    contexts.back().namespaces[node.name] = node.shared_from_this();
+
+    if(!contexts.back().scopePath.empty())
+        LogError("Namespace declaration inside another scope is not allowed");
+
+    // Уже зарегистрирован в collectDeclarations
+    contexts.back().scopePath = node.name;
+    contexts.back().currentNamespace = node.name;
+    // Проходим по телу пространства имён
+    node.body->accept(*this);
+    contexts.back().scopePath = ""; // Убираем пространство имён из текущего контекста после обработки его тела
+    contexts.back().currentNamespace = "";
+}
+
 void TypeSymbolVisitor::visit(FunctionNode &node)
 {
     if (!node.typeParameters.empty()) return; // Проверяются только копии шаблона
     ui::stageDetail(node.name);
+    std::string visibleName = node.name;
+    const std::string parent = contexts.back().scopePath;
+    // Функция namespace получает полное имя ns.f, как структура в StructClass.cpp. Обычно его уже дал collectDeclarations
+    if (contexts.size() == 1 && node.associated.empty() && !parent.empty()) {
+        if (node.name.starts_with(parent + ".")) visibleName = node.name.substr(parent.size() + 1);
+        else node.name = parent + "." + node.name;
+    }
     // Проверяем, существует ли функция в реестре(в текущем контексте или глобальном)
     // Если вызов выше определения уже положил сюда эту же функцию, это не повтор
     auto existingFunction = contexts.back().functions.find(node.name);
@@ -335,7 +482,6 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
 
     // У каждой локальной функции свой символ LLVM, иначе одноимённые в разных функциях сольются в одну
     static int localFunctions = 0;
-    const std::string visibleName = node.name;
     if (contexts.size() > 1 && node.associated.empty())
         node.name += "::local" + std::to_string(++localFunctions);
 
@@ -344,8 +490,9 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
 
     std::unordered_map<std::string, std::shared_ptr<TypeNode>> args = {};
 
-    // Простой тип возврата может быть void, которого нет в реестре типов
-    if (std::dynamic_pointer_cast<GenericTypeNode>(node.returnType)) {
+    // Простой тип возврата может быть void, которого нет в реестре типов. Box<i32> это копия шаблона: её надо создать
+    // Короткое имя структуры из namespace (Addr) тоже надо переписать на полное
+    if (node.returnType->toString() != "void") {
         node.returnType->accept(*this);
     }
 
@@ -411,10 +558,10 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
         .variables = variables, // Добавляем переменные текущего контекста
         .functions = functions, // Добавляем функции текущего контекста
         .currentFunctionName = node.name,       // Имя функции 
+        .currentNamespace = contexts.back().currentNamespace,
         .returnType = node.returnType,          // Тип возвращаемого значения
         .returnedValue = false                  // Возвращаемое значение
     };
-    const std::string& parent = contexts.back().scopePath;
     currentFunction.scopePath = parent.empty() ? visibleName : parent + "." + visibleName;
 
 #if DEBUG
@@ -431,11 +578,19 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
         currentFunction.variables[param.first] = varNode;
     }
 
+    // Захваченное лямбдой видно как константа: это копия значения на момент создания
+    for (const auto& [type, name] : node.captures) {
+        auto captured = std::make_shared<VariableAssignNode>(name, false, type, nullptr);
+        captured->isCaptured = true;
+        captured->inferredType = type;
+        currentFunction.variables[name] = captured;
+    }
+
     // Если функция находится в глобальном контексте, то добавляем ее в глобальный реестр(глобальный контекст - это первый элемент в векторе)
     // Если функция не является методом класса, то добавляем ее в глобальный реестр
     // Метод вызывается только через объект, как функция он не виден
     if(node.associated.empty()) {
-        if(contexts.size() == 1)
+        if(contexts.size() == 1) // снаружи функция namespace видна только по полному имени
             contexts[0].functions[node.name] = node.shared_from_this();
         else {
             contexts.back().functions[node.name] = node.shared_from_this();
@@ -512,13 +667,16 @@ static std::string getType(std::shared_ptr<ASTNode> expression, std::string type
         else
             return type;
     else if (auto unary = std::dynamic_pointer_cast<UnaryOpNode>(expression))
-        return (unary->op == "neg" || unary->op == "try") ? type : "i1";
+        return (unary->op == "neg" || unary->op == "try" || unary->op == "bnot") ? type : "i1";
     else
         return type;
 };
 
 void TypeSymbolVisitor::visit(VariableAssignNode &node)
 {
+    // Переменная namespace получает полное имя Xyi.x, как функции и структуры
+    if (contexts.size() == 1 && !contexts.back().currentNamespace.empty())
+        node.name = contexts.back().currentNamespace + "." + node.name;
     // Проверяем, существует ли переменная в реестре. _ можно объявлять сколько угодно: так игнорируют result
     if (node.name != "_" && contexts.back().variables.find(node.name) != contexts.back().variables.end()) {
         LogError("Variable already defined: " + node.name);
@@ -527,6 +685,10 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
     // Проверяем тип переменной
     node.type->accept(*this);
     std::string varType = node.type->toString();
+    // Stack<i32> s = Stack(): аргументы шаблона берутся из типа переменной, как у [] и ok(x)
+    if (auto call = std::dynamic_pointer_cast<CallNode>(node.expression);
+        call && genericStructs.count(call->callee) && varType.starts_with(call->callee + "<"))
+        call->callee = varType;
     bool isAuto = false;
     bool isStrict = checkLabels("@strict");
 
@@ -556,7 +718,8 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
                 LogError("Global final variable '" + node.name + "' must have a value", node.shared_from_this());
         } else if (!noValue->isEmptyLiteral && node.isConst) {
             LogError("Constant '" + node.name + "' must have a value", node.shared_from_this());
-        } else if (!noValue->isEmptyLiteral && (isCollection || registry.findStruct(varType))) {
+        // У func и enum нет значения по умолчанию: пустая функция упадёт при вызове, а 0 может не быть значением enum
+        } else if (!noValue->isEmptyLiteral && (isCollection || registry.findStruct(varType) || varType.starts_with("func") || enumTypeNames().count(varType))) {
             LogError("Variable '" + node.name + "' of type " + varType + " must have a value", node.shared_from_this());
         }
     }
@@ -641,7 +804,11 @@ void TypeSymbolVisitor::visit(VariableAssignNode &node)
     // Добавляем переменную в реестр
     auto varNode = std::make_shared<VariableAssignNode>(node.name, node.isConst, node.type, node.expression);
     varNode->inferredType = node.type; // Устанавливаем тип переменной
-    if (node.type && node.type->toString().find("func") != std::string::npos) {
+    // Явно объявленная локальная func<...> хранит замыкание и вызывается по имени. Остальное (auto, коллекции, глобальные) пока нельзя вызвать
+    auto funcType = std::dynamic_pointer_cast<GenericTypeNode>(node.type);
+    const bool localFunction = funcType && funcType->baseName == "func" && contexts.size() > 1 && contexts.back().returnType
+        && (!isAuto || std::dynamic_pointer_cast<LambdaNode>(node.expression)); // f ^= [i32](i32: a) -> a + 1
+    if (node.type && node.type->toString().find("func") != std::string::npos && !localFunction) {
         LogError("Functions can only be passed as arguments, not stored in variables: " + node.name, node.shared_from_this());
     }
     varNode->isDeferred = node.isDeferred;
@@ -664,6 +831,12 @@ void TypeSymbolVisitor::visit(ReturnNode &node)
     if (contexts.back().currentFunctionName.empty()) {
         LogError("Return statement outside of function", node.shared_from_this());
     }
+
+    // return Box(): аргументы шаблона из типа возврата функции
+    if (auto call = std::dynamic_pointer_cast<CallNode>(node.expression);
+        call && genericStructs.count(call->callee) && contexts.back().returnType
+        && contexts.back().returnType->toString().starts_with(call->callee + "<"))
+        call->callee = contexts.back().returnType->toString();
 
     // Проверяем тип возвращаемого значения
     if (node.expression)
@@ -689,6 +862,7 @@ void TypeSymbolVisitor::visit(ReturnNode &node)
 
 // TODO: Переделать функцию полность потому что она хуйня ебанная
 void TypeSymbolVisitor::visit(VariableReassignNode& node) {
+    resolveNamespaceVariable(node.name);
     // Проверяем, существует ли переменная в реестре
     if (contexts.back().variables.find(node.name) == contexts.back().variables.end()) {
         LogError("Variable not found: " + node.name, node.shared_from_this());
@@ -704,6 +878,9 @@ void TypeSymbolVisitor::visit(VariableReassignNode& node) {
     }
     if (varAssign->isConst && !varAssign->isDeferred) {
         LogError("Cannot reassign constant variable: " + node.name, node.shared_from_this());
+    }
+    if (varAssign->isCaptured) {
+        LogError("Cannot assign to captured variable " + node.name + ": the lambda has its own copy", node.shared_from_this());
     }
     if (varAssign->isDeferred) {
         if (maybeAssignedFinals.count(varAssign.get()))
@@ -976,6 +1153,14 @@ void TypeSymbolVisitor::visit(ContinueNode& node) {
 }
 
 void TypeSymbolVisitor::visit(CallNode& node) { 
+    if (genericStructs.count(node.callee))
+        LogError("Struct " + node.callee + " needs its type arguments from the target: write " + node.callee + "<...> x = " + node.callee + "()", node.shared_from_this());
+    // Внутри namespace m короткий вызов g() это m.g(), если g не видна иначе. Так работают и шаблоны, и функции ниже вызова
+    if (const std::string& ns = contexts.back().currentNamespace; !ns.empty()
+        && !contexts.back().functions.count(node.callee) && !declaredFunctions.count(node.callee) && !overloads.count(node.callee)
+        && (declaredFunctions.count(ns + "." + node.callee) || overloads.count(ns + "." + node.callee)))
+        node.callee = ns + "." + node.callee;
+
     // Делаем список типов аргументов
     std::vector<std::shared_ptr<TypeNode>> argTypes;
     for (size_t i = 0; i < node.arguments.size(); ++i) {
@@ -986,6 +1171,10 @@ void TypeSymbolVisitor::visit(CallNode& node) {
         else
             argTypes.push_back(node.arguments[i]->inferredType);
     }
+
+    // Перегруженная f: выбираем по типам аргументов. Переменная func с тем же именем важнее
+    if (auto group = overloads.find(node.callee); group != overloads.end() && !contexts.back().variables.count(node.callee))
+        node.callee = resolveOverload(group->first, group->second, node, argTypes);
 
     // keep(x), где keep это параметр типа func. Переменная важнее функции с таким же именем
     if (auto variable = contexts.back().variables.find(node.callee); variable != contexts.back().variables.end()) {
@@ -1055,6 +1244,27 @@ void TypeSymbolVisitor::visit(CallNode& node) {
         return;
     }
 
+    if(node.callee == "typeof")
+    {
+        // просто меняем call node на cstr() и пишем в аргумент тип
+        node.callee = "cstr";
+        if (node.arguments.empty()) {
+            LogError("type() expects one argument", node.shared_from_this());
+        }
+
+        if(node.arguments.size() > 1)
+            LogError("type() expects at most one argument", node.shared_from_this());
+
+        // если он решил проверить array или map(не переменную а чисто её инициализировать внутри вызова) то их надо завалидейтить
+        if (auto block = std::dynamic_pointer_cast<BlockNode>(node.arguments[0])) {
+            argTypes[0] = literalCollectionType(block, *this); // GenericTypeNode("array", {elementType})
+        }
+
+        node.arguments.pop_back();
+        node.arguments.push_back(std::make_shared<StringNode>(argTypes[0] ? argTypes[0]->toString() : "unknown"));
+        argTypes[0] = registry.findType("string");
+    }
+
     // cstr(x): значение в строку, тем же способом, что и в склейке "x=" + n. Функция с таким же именем важнее
     if (node.callee == "cstr"
         && contexts.back().functions.find(node.callee) == contexts.back().functions.end()
@@ -1074,7 +1284,8 @@ void TypeSymbolVisitor::visit(CallNode& node) {
             return firstStatement && firstStatement->isCharLiteral;
         }();
 
-        if (getTypeRank(argumentType) == 0 && argumentType != "char" && !isCharArrayLiteral && argumentType != "array<char>") {
+        // enum печатается своим числом
+        if (getTypeRank(argumentType) == 0 && argumentType != "char" && !isCharArrayLiteral && argumentType != "array<char>" && !enumTypeNames().count(argumentType)) {
             LogError("cstr expects a number, char or string, got " + argumentType, node.arguments[0]);
         }
         if (std::dynamic_pointer_cast<BinaryOpNode>(node.arguments[0]) || std::dynamic_pointer_cast<UnaryOpNode>(node.arguments[0])) {
@@ -1159,11 +1370,36 @@ void TypeSymbolVisitor::visit(CallNode& node) {
     }
 
     // Создание структуры: P(). Функция с таким же именем важнее
+    // x() внутри namespace Xyi создаёт Xyi.x
+    if (auto fullName = findStructFullName(node.callee); fullName
+        && contexts.back().functions.find(node.callee) == contexts.back().functions.end()
+        && declaredFunctions.find(node.callee) == declaredFunctions.end())
+        node.callee = *fullName;
     if (contexts.back().functions.find(node.callee) == contexts.back().functions.end()
         && declaredFunctions.find(node.callee) == declaredFunctions.end()
         && registry.findStruct(node.callee)) {
-        if (!node.arguments.empty()) {
-            LogError("Struct " + node.callee + " has no constructor with arguments yet", node.shared_from_this());
+        // P(args) это P() и затем init(args). P() вызывает init, только если есть init без параметров
+        auto inits = findMethods(registry.findStruct(node.callee), "init");
+        for (const auto& init : inits)
+            if (init->returnType->toString() != "void")
+                LogError("init of struct " + node.callee + " must return void", init);
+        std::shared_ptr<FunctionNode> init;
+        if (inits.empty() && !node.arguments.empty())
+            LogError("Struct " + node.callee + " has no init method, so it cannot take arguments", node.shared_from_this());
+        else if (inits.size() == 1 && (!node.arguments.empty() || inits[0]->parameters.size() == 1))
+            init = inits[0];
+        else if (inits.size() > 1 && node.arguments.empty()) {
+            for (const auto& candidate : inits) if (candidate->parameters.size() == 1) init = candidate;
+        }
+        else if (inits.size() > 1) {
+            const std::string chosen = resolveOverload(node.callee + ".init", inits, node, argTypes, 1);
+            for (const auto& candidate : inits) if (candidate->name == chosen) init = candidate;
+        }
+        if (init) {
+            if (node.arguments.size() + 1 != init->parameters.size())
+                LogError("Constructor " + node.callee + " expects " + std::to_string(init->parameters.size() - 1) + " arguments, got " + std::to_string(node.arguments.size()), node.shared_from_this());
+            checkCallArguments(node.arguments, init->parameters, 1, "Constructor " + node.callee);
+            node.init = init->name;
         }
         node.inferredType = std::make_shared<SimpleTypeNode>(node.callee);
         return;

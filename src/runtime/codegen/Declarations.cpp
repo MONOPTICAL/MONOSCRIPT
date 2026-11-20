@@ -2,6 +2,9 @@
 #include "../headers/ASTVisitors.h"
 namespace Declarations 
 {
+    std::map<std::string, std::string> replGlobals;
+    std::string replPrefix;
+
     // Значение объявления без значения: ноль, пустая строка. Объект получит значение до чтения, это проверила семантика
     static llvm::Value* emitDefaultValue(CodeGenContext& context, VariableAssignNode& node, llvm::Type* varType)
     {
@@ -50,7 +53,7 @@ namespace Declarations
 
         value = TypeConversions::loadValueIfPointer(context, value);
         // Значение всегда приводим к типу переменной: иначе в ячейку запишется не столько байт, сколько в ней есть
-        value = TypeConversions::convertValueToType(context, value, varType);
+        value = TypeConversions::convertNodeValue(context, value, varType, node.expression, node.type);
 
         // Создаем переменную в таблице символов
         llvm::AllocaInst* alloca = context.createEntryAlloca(varType, node.name);
@@ -77,6 +80,13 @@ namespace Declarations
     // Вызывается внутри стартовой функции: всё, что не константа, вычисляется при запуске программы
     llvm::Value* handleGlobalVariable(CodeGenContext& context, VariableAssignNode& node, llvm::Type* varType)
     {
+        // REPL: переменная уже создана и проинициализирована прошлой строкой, здесь только ссылка на неё
+        if (auto existing = replGlobals.find(node.name); existing != replGlobals.end()) {
+            auto* globalVar = new llvm::GlobalVariable(*context.TheModule, varType, false, llvm::GlobalValue::ExternalLinkage, nullptr, existing->second);
+            context.NamedValues[node.name] = globalVar;
+            return globalVar;
+        }
+
         ASTGen codeGen(context);
 
         llvm::Value* initValue = nullptr;
@@ -95,7 +105,7 @@ namespace Declarations
         }
 
         initValue = TypeConversions::loadValueIfPointer(context, initValue);
-        initValue = TypeConversions::convertValueToType(context, initValue, varType);
+        initValue = TypeConversions::convertNodeValue(context, initValue, varType, node.expression, node.type);
 
         llvm::Constant* constantValue = llvm::dyn_cast<llvm::Constant>(initValue);
 
@@ -103,9 +113,9 @@ namespace Declarations
             *context.TheModule,
             varType,
             node.isConst && constantValue, // Переменную, в которую пишем при запуске, нельзя класть в константную память
-            llvm::GlobalValue::PrivateLinkage,
+            replPrefix.empty() ? llvm::GlobalValue::PrivateLinkage : llvm::GlobalValue::ExternalLinkage, // В REPL её найдут модули следующих строк
             constantValue ? constantValue : llvm::Constant::getNullValue(varType),
-            node.name
+            replPrefix + node.name
         );
 
         // Константная ссылка указывает на данные программы, сборщику там делать нечего
@@ -136,7 +146,7 @@ llvm::Value *Declarations::handleSimpleReassignment(CodeGenContext &context, Var
     }
 
     value = TypeConversions::loadValueIfPointer(context, value);
-    value = TypeConversions::convertValueToType(context, value, varType);
+    value = TypeConversions::convertNodeValue(context, value, varType, node.expression, node.inferredType);
 
     // Записываем значение в переменную
     context.Builder.CreateStore(value, context.NamedValues[node.name]);

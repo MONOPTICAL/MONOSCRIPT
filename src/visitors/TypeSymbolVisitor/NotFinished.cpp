@@ -9,7 +9,35 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
     lastAccessResultField = false;
     std::shared_ptr<TypeNode> currentType = nullptr;
     std::shared_ptr<StructNode> currentStructDef = nullptr;
+    std::shared_ptr<NamespaceNode> currentNamespaceDef = nullptr;       
     auto currentLink = node.shared_from_this();
+
+    if (auto idNode = std::dynamic_pointer_cast<IdentifierNode>(node.expression))
+        resolveNamespaceVariable(idNode->name);
+
+    // math.f(1) сворачивается в вызов функции math.f, Xyi.x в переменную Xyi.x
+    if (auto idNode = std::dynamic_pointer_cast<IdentifierNode>(node.expression);
+        idNode && !contexts.back().variables.count(idNode->name) && registry.findNamespace(idNode->name)) {
+        auto next = std::dynamic_pointer_cast<AccessExpression>(node.nextAccess);
+        auto call = next ? std::dynamic_pointer_cast<CallNode>(next->expression) : nullptr;
+        auto variable = next ? std::dynamic_pointer_cast<IdentifierNode>(next->expression) : nullptr;
+        if (!call && !variable) {
+            LogError("Only functions and variables can be accessed through namespace '" + idNode->name + "'", node.shared_from_this());
+            return;
+        }
+        if (call) call->callee = idNode->name + "." + call->callee;
+        else variable->name = idNode->name + "." + variable->name;
+        node.baseName = call ? call->callee : variable->name;
+        node.expression = next->expression;
+        node.memberName = next->memberName;
+        node.notation = next->notation;
+        node.nextAccess = next->nextAccess;
+        if (!node.nextAccess) {
+            node.expression->accept(*this);
+            node.inferredType = node.expression->inferredType;
+            return;
+        }
+    }
 
     if (node.expression) {
         if (auto idNode = std::dynamic_pointer_cast<IdentifierNode>(node.expression)) {
@@ -22,6 +50,7 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
                 }
             } else {
                 currentStructDef = registry.findStruct(idNode->name);
+                currentNamespaceDef = registry.findNamespace(idNode->name);
             }
         } else { 
             node.expression->accept(*this);
@@ -31,6 +60,7 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
 
     if (currentType) {
         currentStructDef = registry.findStruct(currentType->toString());
+        currentNamespaceDef = registry.findNamespace(currentType->toString());
     }
 
     if (!currentType && !currentStructDef) {
@@ -98,7 +128,8 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
                 [&](const auto& stmt) {
                     if (auto var = std::dynamic_pointer_cast<VariableAssignNode>(stmt)) return var->name == accessNode->memberName;
                     if (auto str = std::dynamic_pointer_cast<StructNode>(stmt)) return str->name == accessNode->memberName;
-                    if (auto method = std::dynamic_pointer_cast<FunctionNode>(stmt)) return method->name == accessNode->memberName;
+                    if (auto method = std::dynamic_pointer_cast<FunctionNode>(stmt))
+                        return method->name == accessNode->memberName || method->name.starts_with(accessNode->memberName + "(");
                     return false;
                 });
 
@@ -110,6 +141,18 @@ void TypeSymbolVisitor::visit(AccessExpression& node) {
             auto memberLink = std::dynamic_pointer_cast<AccessExpression>(accessNode->nextAccess);
             auto call = memberLink ? std::dynamic_pointer_cast<CallNode>(memberLink->expression) : nullptr;
             auto method = std::dynamic_pointer_cast<FunctionNode>(*fieldIt);
+            // Перегруженный метод: выбираем по типам аргументов, как функцию
+            if (method && call && method->name != accessNode->memberName) {
+                std::vector<std::shared_ptr<TypeNode>> argTypes;
+                for (const auto& argument : call->arguments) {
+                    argument->accept(*this);
+                    argTypes.push_back(argument->implicitCastTo ? argument->implicitCastTo : argument->inferredType);
+                }
+                auto candidates = findMethods(currentStructDef, accessNode->memberName);
+                const std::string chosen = resolveOverload(currentStructDef->name + "." + accessNode->memberName, candidates, *call, argTypes, 1);
+                for (const auto& candidate : candidates) if (candidate->name == chosen) method = candidate;
+            }
+            if (method && call) call->callee = method->name;
             if (call && !method)
                 LogError("'" + accessNode->memberName + "' is a field of struct '" + currentStructDef->name + "', not a method", accessNode);
             if (method && !call)
@@ -323,6 +366,13 @@ void TypeSymbolVisitor::visit(ReassignMemberNode& node) {
     }
 
     access->accept(*this);
+    // m.x = 6: после свёртки namespace цель это сама переменная, и константу так не поменять
+    if (auto target = std::dynamic_pointer_cast<IdentifierNode>(access->expression); target && !access->nextAccess) {
+        auto it = contexts.back().variables.find(target->name);
+        if (it != contexts.back().variables.end())
+            if (auto var = std::dynamic_pointer_cast<VariableAssignNode>(it->second); var && var->isConst)
+                LogError("Cannot reassign constant variable: " + target->name, node.shared_from_this());
+    }
     checkPureAlias(access->expression);
     auto targetType = access->inferredType;
     if (!targetType)

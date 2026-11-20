@@ -223,7 +223,8 @@ MONOSCRIPT is young and the syntax can still change. Here's where it stands:
 - [x] Garbage collection, runtime errors with line numbers
 - [x] JIT and native executables
 - [ ] Standard library (mono)
-- [ ] Lambdas and pipes (`|>`)
+- [x] Lambdas with closures, enums, overloading, generic structs, namespaces
+- [ ] Pipes (`|>`)
 - [ ] Null safety
 - [ ] Embedding and sandboxing
 

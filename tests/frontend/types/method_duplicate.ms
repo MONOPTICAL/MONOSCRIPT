@@ -1,4 +1,4 @@
-// expect-error: already has a member named
+// expect-error: Method P.a() is already defined
 [struct]P
 |   [i32]a()
 |   |   return 1

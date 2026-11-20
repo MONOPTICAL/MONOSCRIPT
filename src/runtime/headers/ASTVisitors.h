@@ -48,6 +48,7 @@ public:
     void                visit(ContinueNode& node) override;
     void                visit(AccessExpression& node) override;
     void                visit(ImportNode& node) override;
+    void                visit(NamespaceNode& node) override;
     void                visit(LambdaNode& node) override;
     void                visit(ModuleMark& node) override;
 };

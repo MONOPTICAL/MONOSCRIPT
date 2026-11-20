@@ -11,6 +11,7 @@ struct TypeNode;
 struct FunctionNode;
 struct StructNode;
 struct ClassNode;
+struct NamespaceNode;
 
 class Registry {
 public:
@@ -23,6 +24,9 @@ public:
     // Пользовательские структуры
     std::unordered_map<std::string, std::shared_ptr<StructNode>> userStructs;
 
+    // Пользовательские пространства имён
+    std::unordered_map<std::string, std::shared_ptr<NamespaceNode>> userNamespaces;
+
     // Пользовательские классы
     std::unordered_map<std::string, std::shared_ptr<ClassNode>> userClasses;
 
@@ -30,6 +34,7 @@ public:
     void addBuiltinType(const std::string& name, std::shared_ptr<TypeNode> type);
     void addBuiltinFunction(const std::string& name, std::shared_ptr<FunctionNode> func);
     void addStruct(const std::string& name, std::shared_ptr<StructNode> strct);
+    void addNamespace(const std::string& name, std::shared_ptr<NamespaceNode> ns);
     void addClass(const std::string& name, std::shared_ptr<ClassNode> cls);
 
     // Поиск
@@ -37,6 +42,7 @@ public:
     std::shared_ptr<FunctionNode> findFunction(const std::string& name) const;
     std::shared_ptr<FunctionNode> findFunction(const std::string& name, const std::vector<std::shared_ptr<TypeNode>>& args) const;
     std::shared_ptr<StructNode> findStruct(const std::string& name) const;
+    std::shared_ptr<NamespaceNode> findNamespace(const std::string& name) const;
     std::shared_ptr<ClassNode> findClass(const std::string& name) const;
 };
 
