@@ -1,6 +1,7 @@
 */main
 *.go
 /build
+/build-frontend
 /.ccls-cache
 /.vscode
 ms

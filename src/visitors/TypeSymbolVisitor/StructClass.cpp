@@ -114,6 +114,10 @@ void TypeSymbolVisitor::visit(StructNode& node) {
     contexts.back().structsFullName.emplace(node.name, fullName);
     node.name = fullName;
 
+#if DEBUG
+    std::cout << "Processing struct: " << fullName << std::endl;
+    std::cout << "Current context: " << contexts.back().currentFunctionName << std::endl;
+#endif
     contexts.push_back(structContext);
 
     registry.addStruct(fullName, std::make_shared<StructNode>(node.name, node.body));

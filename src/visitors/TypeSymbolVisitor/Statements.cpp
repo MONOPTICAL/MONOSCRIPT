@@ -456,7 +456,7 @@ void TypeSymbolVisitor::visit(NamespaceNode &node)
     // Проходим по телу пространства имён
     node.body->accept(*this);
     contexts.back().scopePath = ""; // Убираем пространство имён из текущего контекста после обработки его тела
-    contexts.back().currentNamespace = "";  
+    contexts.back().currentNamespace = "";
 }
 
 void TypeSymbolVisitor::visit(FunctionNode &node)
@@ -564,6 +564,9 @@ void TypeSymbolVisitor::visit(FunctionNode &node)
     };
     currentFunction.scopePath = parent.empty() ? visibleName : parent + "." + visibleName;
 
+#if DEBUG
+    std::cout << "Current scope path: " << currentFunction.scopePath << std::endl;
+#endif
     // Добавляем параметры функции в текущий контекст
     for (const auto& param : args) {
         auto varNode = std::make_shared<VariableAssignNode>(
@@ -1248,13 +1251,13 @@ void TypeSymbolVisitor::visit(CallNode& node) {
         if (node.arguments.empty()) {
             LogError("type() expects one argument", node.shared_from_this());
         }
-        
+
         if(node.arguments.size() > 1)
             LogError("type() expects at most one argument", node.shared_from_this());
 
-        // если он решил проверить array или map(не переменную а чисто её инициализировать внутри вызова) то их надо завалидейтить 
+        // если он решил проверить array или map(не переменную а чисто её инициализировать внутри вызова) то их надо завалидейтить
         if (auto block = std::dynamic_pointer_cast<BlockNode>(node.arguments[0])) {
-            argTypes[0] = literalCollectionType(block, *this); // GenericTypeNode("array", {elementType}) 
+            argTypes[0] = literalCollectionType(block, *this); // GenericTypeNode("array", {elementType})
         }
 
         node.arguments.pop_back();
