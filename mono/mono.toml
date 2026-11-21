@@ -25,6 +25,12 @@ ret = "i1"
 args = ["string", "string"]
 
 [[function]]
+name = "endsWith"
+pure = true
+ret = "i1"
+args = ["string", "string"]
+
+[[function]]
 name = "count"
 pure = true
 ret = "i32"
@@ -132,6 +138,13 @@ panic_context = true
 pure = true
 ret = "string"
 args = ["i64"]
+
+[[function]]
+name = "toString_ulong"
+panic_context = true
+pure = true
+ret = "string"
+args = ["u64"]
 
 [[function]]
 name = "toArray"

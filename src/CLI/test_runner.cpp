@@ -337,7 +337,7 @@ static std::string evaluate(const TestCase& test, const RunResult& run)
     // Программа дошла до конца: код выхода теперь её собственный, это не ошибка компилятора.
     // Строки вывода ищем по порядку: между ними может быть отладочный вывод
     const bool programFinished = run.output.find(" exited with code ") != std::string::npos;
-    if (test.expect == "run" && programFinished) {
+    if (test.expect == "run" && (programFinished || run.exitCode == 0)) {
         std::istringstream programOutput(run.output);
         std::string programLine;
         size_t nextOutputCheck = 0;

@@ -20,6 +20,10 @@ std::shared_ptr<FunctionNode> Parser::parseFunction()
     consume(TokenType::RightBracket, "Expected ']' before function declaration"); 
     std::string functionName = current().value; // Сохраняем имя функции
     consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора
+    if (functionName == "operator" && check(TokenType::Operator) && operatorMethods.count(current().value)) {
+        functionName = operatorMethods.at(current().value); // operator+ это op_add
+        advance();
+    }
 
     // Шаблон: [T]first<T>(array<T>: a)
     std::vector<std::string> typeParameters;
@@ -179,6 +183,14 @@ std::shared_ptr<ASTNode> Parser::parseCast(std::shared_ptr<ASTNode> expression)
     if (check(TokenType::Identifier) && typeSubstitution.count(current().value))
     {
         expression->implicitCastTo = parseTomlType(typeSubstitution.at(current().value));
+        advance();
+        return expression;
+    }
+    // n->Color: каст в enum, объявленный выше
+    if (check(TokenType::Identifier) && enumTypeNames().count(current().value))
+    {
+        expression->implicitCastTo = std::make_shared<SimpleTypeNode>(current().value);
+        expression->implicitCastTo->line = lineIndex; expression->implicitCastTo->column = tokenIndex;
         advance();
         return expression;
     }
@@ -412,7 +424,7 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
         advance();                                                 // Переходим к следующему токену
     }
 
-    if(current().type == TokenType::Type && (current().value != "array" && current().value != "map"))                       // Проверяем наличие типа
+    if(current().type == TokenType::Type && (current().value != "array" && current().value != "map" && current().value != "func"))                       // Проверяем наличие типа
     {
         type = std::make_shared<SimpleTypeNode>(current().value); // Сохраняем тип переменной   
         type->line = lineIndex; type->column = tokenIndex; // Устанавливаем строку и колонку для узла
@@ -442,6 +454,20 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
         {
             throwError("Expected '^=' operator after static variable declaration");
         }
+    }
+    else if(current().type == TokenType::Identifier && isCompoundAssignment(peek().value))
+    {
+        variableName = current().value;
+        auto target = std::make_shared<IdentifierNode>(variableName);
+        target->line = lineIndex; target->column = tokenIndex;
+        advance();
+        const std::string op = current().value.substr(0, 1);
+        advance();
+        auto value = std::make_shared<BinaryOpNode>(target, op, parseExpression());
+        value->line = target->line; value->column = target->column;
+        auto varReassign = std::make_shared<VariableReassignNode>(variableName, value);
+        varReassign->line = target->line; varReassign->column = target->column;
+        return varReassign;
     }
     else if(current().type == TokenType::Identifier && peek().value == "=")
     {
@@ -498,6 +524,103 @@ std::shared_ptr<ASTNode> Parser::parseAssignment(bool isConst)
     return varAssign; // Возвращаем узел присваивания переменной
 }
 
+std::shared_ptr<ASTNode> Parser::parseNamespace()
+{
+    /*
+    Namespace definition:
+    [namespace] MyNamespace
+    | // body
+    */
+    int line = lineIndex; int token = tokenIndex; // Запоминаем строку и токен
+    consume(TokenType::LeftBracket, "Expected '[' before namespace declaration"); // Проверяем наличие левой скобки
+    consume(TokenType::Keyword, "Expected 'namespace' keyword"); // Проверяем наличие ключевого слова namespace
+    consume(TokenType::RightBracket, "Expected ']' before namespace declaration"); // Проверяем наличие правой скобки
+
+    std::string name = current().value; // Сохраняем имя пространства имён
+    consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора
+    if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
+
+    std::shared_ptr<NamespaceNode> namespaceNode = std::make_shared<NamespaceNode>();
+    namespaceNode->line = line; namespaceNode->column = token;
+    namespaceNode->name = name;
+
+    const int declIndent = getIndentLevel(lines[lineIndex]);
+    const int expectedIndent = declIndent + 1;
+
+    nextLine();
+
+    if (isEndOfFile())
+        throwError("Expected indentation after function declaration");
+
+    if (getIndentLevel(lines[lineIndex]) == expectedIndent)
+    {
+        namespaceNode->body = parseBlock(expectedIndent);
+        lineIndex--; 
+    }
+    else
+    {
+        throwError("Expected indentation after function declaration");
+    }
+    
+    return namespaceNode;
+}
+
+std::shared_ptr<ASTNode> Parser::parseEnum()
+{
+    /*
+    [enum]Color
+    |   Red
+    |   Green = 5     // значение по умолчанию: предыдущее + 1, первое 0
+    Это namespace Color с константами типа Color: Color.Red
+    */
+    int line = lineIndex; int token = tokenIndex;
+    consume(TokenType::LeftBracket, "Expected '[' before enum declaration");
+    advance(); // enum
+    consume(TokenType::RightBracket, "Expected ']' after enum");
+    std::string name = current().value;
+    consume(TokenType::Identifier, "Expected enum name");
+    if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
+    enumTypeNames().insert(name);
+
+    auto body = std::make_shared<BlockNode>();
+    const int expectedIndent = getIndentLevel(lines[lineIndex]) + 1;
+    int64_t next = 0;
+    std::set<std::string> members;
+    nextLine();
+    while (!isEndOfFile() && getIndentLevel(lines[lineIndex]) >= expectedIndent) {
+        if (getIndentLevel(lines[lineIndex]) > expectedIndent) throwError("Unexpected indentation");
+        tokenIndex = expectedIndent;
+        if (isEndOfLine()) { nextLine(); continue; }
+
+        int memberLine = lineIndex, memberToken = tokenIndex;
+        std::string member = current().value;
+        consume(TokenType::Identifier, "Expected enum member name");
+        if (!members.insert(member).second) throwError("Enum " + name + " already has a member named " + member);
+        if (check(TokenType::Operator) && current().value == "=") {
+            advance();
+            const bool negative = check(TokenType::Operator) && current().value == "-";
+            if (negative) advance();
+            next = std::stoll(current().value) * (negative ? -1 : 1);
+            consume(TokenType::Number, "Expected a number for enum member value");
+        }
+        if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
+
+        auto value = std::make_shared<NumberNode>(next++, std::make_shared<SimpleTypeNode>("i32"));
+        value->line = memberLine; value->column = memberToken;
+        auto constant = std::make_shared<VariableAssignNode>(member, true, std::make_shared<SimpleTypeNode>(name), value);
+        constant->line = memberLine; constant->column = memberToken;
+        body->statements.push_back(constant);
+        nextLine();
+    }
+    lineIndex--; // как у namespace: следующую строку разбирает вызывающий
+    if (body->statements.empty()) throwError("Enum " + name + " has no members");
+
+    auto enumNode = std::make_shared<NamespaceNode>(name, body);
+    enumNode->isEnum = true;
+    enumNode->line = line; enumNode->column = token;
+    return enumNode;
+}
+
 std::shared_ptr<ASTNode> Parser::parseCall()
 {
     /*
@@ -543,7 +666,31 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
 
     std::string name = current().value; // Сохраняем имя структуры
     consume(TokenType::Identifier, "Expected identifier"); // Проверяем наличие идентификатора структуры
+
+    // Шаблон: [struct]Stack<T>
+    std::vector<std::string> typeParameters;
+    if (check(TokenType::Operator) && current().value == "<") {
+        advance();
+        do {
+            typeParameters.push_back(current().value);
+            consume(TokenType::Identifier, "Expected type parameter name");
+        } while (match(TokenType::Comma));
+        if (!check(TokenType::Operator) || current().value != ">")
+            throwError("Expected > to close type parameters");
+        advance();
+    }
     if (!isEndOfLine()) throwError("Character(" + current().value + ") not parsed at the end of");
+
+    // Пока разбираем шаблон, T это имя типа. В копии подстановка уже задана, и имя копии Stack<i32>
+    const bool isTemplate = !typeParameters.empty() && typeSubstitution.empty();
+    if (isTemplate)
+        for (const auto& parameter : typeParameters) typeSubstitution[parameter] = parameter;
+    else if (!typeParameters.empty()) {
+        std::string arguments;
+        for (const auto& parameter : typeParameters)
+            arguments += (arguments.empty() ? "" : ",") + typeSubstitution.at(parameter);
+        name += "<" + arguments + ">";
+    }
 
     int expectedIndent = getIndentLevel(lines[lineIndex]) + 1; // Уровень отступа для блока структуры
     nextLine(); // Переходим к следующему токену
@@ -561,10 +708,41 @@ std::shared_ptr<ASTNode> Parser::parseStruct()
                 method->parameters.insert(method->parameters.begin(), {std::make_shared<SimpleTypeNode>(name), "self"});
             }
         }
+        // Перегруженный метод, как и функция, получает имя с сигнатурой без self: push(i32). Вызов выбирает семантика
+        std::map<std::string, std::vector<std::shared_ptr<FunctionNode>>> sameName;
+        for (const auto& statement : block->statements)
+            if (auto method = std::dynamic_pointer_cast<FunctionNode>(statement)) sameName[method->name].push_back(method);
+        for (auto& [methodName, methods] : sameName) {
+            if (methods.size() < 2) continue;
+            std::set<std::string> signatures;
+            for (const auto& method : methods) {
+                std::string signature;
+                for (size_t i = 1; i < method->parameters.size(); i++)
+                    signature += (i == 1 ? "" : ",") + method->parameters[i].first->toString();
+                if (!signatures.insert(signature).second)
+                    throwError("Method " + name + "." + methodName + "(" + signature + ") is already defined");
+                method->name = methodName + "(" + signature + ")";
+            }
+        }
     }
 
     auto structNode = std::make_shared<StructNode>(name, body); // Создаём узел структуры
     structNode->line = line; structNode->column = token; // Устанавливаем строку и колонку для узла
+
+    if (isTemplate) {
+        typeSubstitution.clear();
+        if (!sharedLines) sharedLines = std::make_shared<std::vector<std::vector<Token>>>(lines);
+        structNode->typeParameters = typeParameters;
+        auto source = sharedLines;
+        const std::string module = moduleName;
+        structNode->instantiate = [source, module, line, token](const std::map<std::string, std::string>& types) {
+            Parser copy(*source, module);
+            copy.typeSubstitution = types;
+            copy.lineIndex = line;
+            copy.tokenIndex = token;
+            return std::static_pointer_cast<StructNode>(copy.parseStruct());
+        };
+    }
     return structNode; // Возвращаем узел структуры
 }
 

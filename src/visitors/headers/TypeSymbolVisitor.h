@@ -10,14 +10,17 @@
 #include "Register.h"
 #include "BuiltIn.h"
 #include <fstream>
+#include <string>
 
 struct Context {
     std::vector<std::string> labels;
     std::unordered_map<std::string, std::shared_ptr<ASTNode>> variables;
     std::unordered_map<std::string, std::shared_ptr<ASTNode>> functions;
+    std::unordered_map<std::string, std::shared_ptr<ASTNode>> namespaces; // Пространства имён в текущем контексте
     std::unordered_map<std::string, std::string> structsFullName; // Полное имя структуры по её локальному имени
     std::string scopePath; // Путь области видимости, например "h" для h::local1
     std::string currentFunctionName;
+    std::string currentNamespace;
     std::shared_ptr<TypeNode> returnType;
     int resultHandlerDepth = 0;
     bool returnedValue = false;
@@ -42,12 +45,23 @@ private:
 
     std::vector<Context>                                            contexts;
     std::vector<std::shared_ptr<ASTNode>>                           hoistedStructs;
+    // Полное имя структуры (Xyi.x) по короткому: лежит в контексте, где её объявили, а не в текущем
+    const std::string*                                              findStructFullName(const std::string& name) const;
+    // Внутри namespace Xyi короткое x это переменная Xyi.x: переписывает имя на полное
+    void                                                            resolveNamespaceVariable(std::string& name) const;
 
     bool                                                            lastAccessResultField = false; // r.value и прочие поля result только для чтения
     bool                                                            checkResultLiteral(const std::shared_ptr<ASTNode>& node, const std::string& targetType);
     // Копии шаблонов: добавляются в программу после обхода, из какого модуля шаблон
     std::vector<std::shared_ptr<ASTNode>>                           genericInstances;
     std::map<std::string, std::string>                              genericModules;
+    std::map<std::string, std::string>                              genericNamespaces; // m.sort -> m: копия шаблона проверяется внутри своего namespace
+    std::map<std::string, std::shared_ptr<StructNode>>              genericStructs; // Stack -> шаблон [struct]Stack<T>
+    std::map<std::string, std::vector<std::shared_ptr<FunctionNode>>> overloads; // f -> f(i32), f(string)
+    std::string                                                     resolveOverload(const std::string& name, const std::vector<std::shared_ptr<FunctionNode>>& candidates,
+                                                                        CallNode& call, const std::vector<std::shared_ptr<TypeNode>>& argTypes, size_t skip = 0); // skip: self у метода
+    std::vector<std::shared_ptr<FunctionNode>>                      findMethods(const std::shared_ptr<StructNode>& structure, const std::string& name); // push и push(i32), push(string)
+    void                                                            instantiateStruct(const std::string& name); // Stack<i32> -> копия шаблона
     std::string                                                     instantiateGeneric(const std::shared_ptr<FunctionNode>& generic, CallNode& call,
                                                                         const std::vector<std::shared_ptr<TypeNode>>& argTypes);
     bool                                                            lastAccessIndexedString = false; // Последнее звено цепочки это s[i]: писать туда нельзя
@@ -127,6 +141,16 @@ private:
                                                                             std::shared_ptr<TypeNode> rightType);
 
     void                                                            handleModOperator(
+                                                                            std::shared_ptr<BinaryOpNode>& node, 
+                                                                            std::shared_ptr<TypeNode> leftType, 
+                                                                            std::shared_ptr<TypeNode> rightType);
+
+    void                                                            handleBitwiseOperator(
+                                                                            std::shared_ptr<BinaryOpNode>& node, 
+                                                                            std::shared_ptr<TypeNode> leftType, 
+                                                                            std::shared_ptr<TypeNode> rightType);
+
+    void                                                            handlePowOperator(
                                                                             std::shared_ptr<BinaryOpNode>& node, 
                                                                             std::shared_ptr<TypeNode> leftType, 
                                                                             std::shared_ptr<TypeNode> rightType);
@@ -212,6 +236,7 @@ public:
     void                                                            visit(SimpleTypeNode& node) override;
     void                                                            visit(GenericTypeNode& node) override;
     void                                                            visit(ProgramNode& node) override;
+    void                                                            visit(NamespaceNode& node) override;
     void                                                            visit(FunctionNode& node) override;
     void                                                            visit(StructNode& node) override;
     void                                                            visit(BlockNode& node) override;

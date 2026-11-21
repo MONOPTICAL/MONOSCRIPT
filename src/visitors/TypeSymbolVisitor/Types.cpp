@@ -1,16 +1,35 @@
 #include "../headers/TypeSymbolVisitor.h"
 
+const std::string* TypeSymbolVisitor::findStructFullName(const std::string& name) const
+{
+    for (auto it = contexts.rbegin(); it != contexts.rend(); ++it)
+        if (auto f = it->structsFullName.find(name); f != it->structsFullName.end()) return &f->second;
+    return nullptr;
+}
+
+void TypeSymbolVisitor::resolveNamespaceVariable(std::string& name) const
+{
+    const auto& context = contexts.back();
+    if (context.currentNamespace.empty() || context.variables.count(name)) return;
+    if (const std::string full = context.currentNamespace + "." + name; context.variables.count(full)) name = full;
+}
+
 void TypeSymbolVisitor::visit(SimpleTypeNode &node)
 {
+    if (node.name.find('<') != std::string::npos) instantiateStruct(node.name);
     // Проверяем, существует ли тип в реестре
     auto type = registry.findType(node.name);
-    if (!type && !registry.findStruct(node.name) && !contexts.back().structsFullName.count(node.name)) {
+    auto fullName = findStructFullName(node.name);
+    
+    if (!type && !registry.findStruct(node.name) && !registry.findNamespace(node.name) && !fullName) {
         LogError("Unknown type: " + node.name);
     }
 
-    if (!type && contexts.back().structsFullName.count(node.name)) {
-        node.name = contexts.back().structsFullName[node.name];
+    if (!type && fullName) {
+        node.name = *fullName;
     }
+    if (!type && registry.findNamespace(node.name))
+        node.name = contexts.back().scopePath + "." + node.name;
     // Структуры в реестре типов нет, тип такого узла это он сам
     node.inferredType = type ? type : std::make_shared<SimpleTypeNode>(node.name);
 }
@@ -60,9 +79,16 @@ std::shared_ptr<TypeNode> functionTypeOf(const FunctionNode& function) {
 
 void TypeSymbolVisitor::visit(IdentifierNode& node)
 {
+    resolveNamespaceVariable(node.name);
     // Проверяем, существует ли переменная в реестре
     auto it = contexts.back().variables.find(node.name);
+    // Color.Blue в значении поля структуры: у структуры свой контекст без глобальных, а переменные namespace глобальные
+    if (it == contexts.back().variables.end() && node.name.find('.') != std::string::npos)
+        if (auto global = contexts[0].variables.find(node.name); global != contexts[0].variables.end())
+            it = contexts.back().variables.emplace(node.name, global->second).first;
     if (it == contexts.back().variables.end()) {
+        if (overloads.count(node.name))
+            LogError("Function " + node.name + " is overloaded and cannot be passed by name, wrap the one you need in a lambda", node.shared_from_this());
         // Не переменная, а имя функции: её передают как значение
         std::shared_ptr<FunctionNode> function;
         std::string internalName = node.name;
@@ -116,6 +142,9 @@ void TypeSymbolVisitor::checkCharCast(ASTNode& node)
     const bool integerTo = getTypeRank(to) > 0 && !isFloatType(to);
     if ((to == "char" && !integerFrom) || (from == "char" && !integerTo))
         LogError("Cannot cast " + from + " to " + to, node.shared_from_this());
+    // enum хранится как i32: явный каст только в целое и из целого
+    if ((enumTypeNames().count(to) && !integerFrom) || (enumTypeNames().count(from) && !integerTo))
+        LogError("Cannot cast " + from + " to " + to, node.shared_from_this());
 }
 
 void TypeSymbolVisitor::visit(NumberNode& node)
@@ -148,10 +177,20 @@ void TypeSymbolVisitor::visit(NoneNode& node)
 }
 
 void TypeSymbolVisitor::visit(KeyValueNode& node) {
-    node.key->accept(*this);
-    node.value->accept(*this);
-    auto keyType = checkForIdentifier(node.key);
-    auto valueType = checkForIdentifier(node.value);
+    auto typeOf = [this](std::shared_ptr<ASTNode>& value)
+        -> std::shared_ptr<TypeNode>
+    {
+        if (auto block = std::dynamic_pointer_cast<BlockNode>(value)) {
+            block->inferredType = infer_collection_type_revised(block);
+            return block->inferredType;
+        }
+
+        value->accept(*this);
+        return checkForIdentifier(value);
+    };
+
+    auto keyType = typeOf(node.key);
+    auto valueType = typeOf(node.value);
 }
 
 void TypeSymbolVisitor::visit(ModuleMark &node)

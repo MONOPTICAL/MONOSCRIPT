@@ -293,6 +293,20 @@ extern(C) char* toString_long(const long a, MsPanicContext* panic) nothrow @nogc
     return result;
 }
 
+extern(C) char* toString_ulong(const ulong a, MsPanicContext* panic) nothrow @nogc
+{
+    import core.stdc.stdio : sprintf;
+    import core.stdc.string : strlen, strcpy;
+
+    char[32] buffer;
+    sprintf(buffer.ptr, "%lu", a);
+
+    char* result = newString(strlen(buffer.ptr), panic);
+    if (result is null) return null;
+    strcpy(result, buffer.ptr);
+    return result;
+}
+
 extern(C) char* toString_bool(const bool a, MsPanicContext* panic) nothrow @nogc
 {
     import core.stdc.string : strlen, strcpy;

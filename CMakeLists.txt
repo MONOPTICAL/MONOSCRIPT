@@ -87,6 +87,7 @@ if(LLVM_FOUND)
     core
     support
     irreader
+    asmparser
     executionengine
     mcjit
     orcjit
@@ -122,6 +123,8 @@ if(LLVM_FOUND)
       src/runtime/codegen/Expressions.cpp
       src/runtime/codegen/TypeConversions.cpp
       src/CLI/runner.cpp
+      src/CLI/repl.cpp
+      src/CLI/lineedit.cpp
       src/CLI/compile.cpp
   )
 
@@ -155,7 +158,18 @@ target_link_libraries(run_tests PRIVATE ms_frontend)
 
 set_target_properties(ms_check run_tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
 
-add_test(NAME frontend COMMAND run_tests $<TARGET_FILE:ms_check> ${CMAKE_SOURCE_DIR}/tests/frontend)
+if(LLVM_FOUND)
+  add_test(NAME frontend COMMAND ms --run_tests)
+else()
+  add_test(NAME frontend COMMAND run_tests $<TARGET_FILE:ms_check> ${CMAKE_SOURCE_DIR}/tests/frontend)
+endif()
+
+if(UNIX)
+  add_executable(test_runner_checks tests/test_runner_checks.cpp)
+  target_link_libraries(test_runner_checks PRIVATE ms_frontend)
+  set_target_properties(test_runner_checks PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+  add_test(NAME test-runner COMMAND test_runner_checks)
+endif()
 
 # Все сочетания типа, источника значения и контекста: около минуты на режим, поэтому отдельно от обычных тестов
 if(LLVM_FOUND)

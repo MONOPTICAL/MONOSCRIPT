@@ -7,6 +7,7 @@
 namespace ui {
     bool isTerminal(FILE* stream);
     bool colorEnabled(FILE* stream);
+    extern bool forceColor; // Цвет даже в трубе: REPL печатает ошибки компилятора за него
 
     // Цвет для потока, или пустая строка, если цвета там нет
     std::string style(FILE* stream, const char* code);
